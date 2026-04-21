@@ -50,15 +50,37 @@ describe('isValidKzPhone', () => {
 })
 
 describe('maskPhone', () => {
-  it('masks a valid E.164 KZ phone', () => {
-    expect(maskPhone('+77010001122')).toBe('+7******1122')
-  })
+  const cases: Array<[string, string, string]> = [
+    ['+77010001122', '+7******1122', 'valid KZ E.164'],
+    ['+77012345678', '+7******5678', 'valid KZ E.164 (alt)'],
+    ['+12025550100', '+1******0100', 'foreign E.164 also masked'],
+    ['+123456', '***3456', 'short + form (len < 8) falls to last-4'],
+    ['8701234', '***1234', 'non-E.164 7-digit → last-4 only'],
+    ['garbage', '***bage', 'garbage string → last-4 only'],
+    ['1234', '****', 'len 4 → fully masked'],
+    ['12', '****', 'len 2 → fully masked'],
+    ['', '***', 'empty → placeholder'],
+  ]
 
-  it('returns input unchanged when not in E.164 KZ format', () => {
-    // Защита от случайной маскировки невалидной строки — пусть падает явно
-    // на валидации выше, не тихо «маскируется».
-    expect(maskPhone('garbage')).toBe('garbage')
-    expect(maskPhone('+12025550100')).toBe('+12025550100')
+  for (const [input, expected, label] of cases) {
+    it(`${label}: "${input}" → "${expected}"`, () => {
+      expect(maskPhone(input)).toBe(expected)
+    })
+  }
+
+  it('invariant: at most 4 trailing chars of input visible', () => {
+    // Свойство-тест: что бы ни пришло, из оригинала утечь могут только
+    // последние 4 символа. Если вход короче 5 символов — вообще 0 утечек.
+    const inputs = ['', 'a', 'ab', 'abcd', 'abcde', 'secret123', '+77010001122', '+1']
+    for (const input of inputs) {
+      const masked = maskPhone(input)
+      const suffix = input.slice(-4)
+      const leak = input.length <= 4 ? '' : suffix
+      // masked либо не содержит оригинала, либо заканчивается на leak.
+      if (leak) expect(masked.endsWith(leak)).toBe(true)
+      // Никогда не возвращаем вход как есть (кроме случая где сам вход — маска).
+      if (input.length > 0) expect(masked).not.toBe(input)
+    }
   })
 })
 

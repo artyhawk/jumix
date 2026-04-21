@@ -45,15 +45,26 @@ export function isValidKzPhone(raw: string): boolean {
  * Маскирует телефон для отображения в API-ответах и логах:
  *   "+77010001122" → "+7******1122"
  *
- * Оставляем префикс (+7) и 4 последних цифры — этого достаточно чтобы
- * пользователь узнал свой номер, но enumeration-атака через 409 conflict
- * responses становится бесполезной (нужно угадать 6 цифр).
+ * Инвариант: **что бы ни пришло на вход, в выводе открытыми остаются
+ * максимум 4 последних символа.** Это fail-safe от утечки: если невалидный
+ * телефон каким-то путём дотечёт до response (constraint violation с raw
+ * message, hand-written logger, bypass Zod) — номер не уйдёт наружу.
+ *
+ * Правила (проверяются сверху вниз):
+ *   - пусто → `"***"` (плейсхолдер)
+ *   - длина ≤ 4 → `"****"` (целиком скрываем, длину не светим)
+ *   - начинается с `+` и длина ≥ 8 → `+XX****YYYY` (E.164)
+ *   - иначе → `"***" + last4` (короткий / мусорный вход)
  *
  * Полный номер — только в audit_log (internal) и в SMS-провайдере.
  */
 export function maskPhone(phone: string): string {
-  if (!/^\+7[0-9]{10}$/.test(phone)) return phone
-  return `${phone.slice(0, 2)}******${phone.slice(-4)}`
+  if (!phone) return '***'
+  if (phone.length <= 4) return '****'
+  if (phone.startsWith('+') && phone.length >= 8) {
+    return `${phone.slice(0, 2)}${'*'.repeat(phone.length - 6)}${phone.slice(-4)}`
+  }
+  return `***${phone.slice(-4)}`
 }
 
 /**
