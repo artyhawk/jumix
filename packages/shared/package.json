@@ -9,7 +9,18 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "echo 'TODO: tsc --noEmit'",
-    "test": "echo 'TODO: vitest run'"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.11.14",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@jumix/config": "workspace:*",
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
   }
 }

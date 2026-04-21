@@ -1,0 +1,4 @@
+{
+  "extends": "@jumix/config/tsconfig.node.json",
+  "include": ["src/**/*.ts", "tests/**/*.ts", "vitest.config.ts"]
+}
