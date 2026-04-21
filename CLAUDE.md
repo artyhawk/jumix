@@ -518,9 +518,10 @@ operator_payment_terms {
 ```
 sites {
   id, organization_id, name, address,
-  geofence_center (PostGIS POINT), geofence_radius_m (default 150),
-  status ('published' | 'completed' | 'archived'),
-  ...
+  geofence_center (GEOGRAPHY(Point, 4326)),     -- PostGIS; GIST-индекс
+  geofence_radius_m (int, default 150, CHECK 1..10000),
+  status ('active' | 'completed' | 'archived'), -- см. transitions ниже
+  notes, created_at, updated_at
 }
 
 cranes {
@@ -535,6 +536,21 @@ assignments {
   ...
 }
 ```
+
+**Sites: статусы.** Enum `site_status` в миграции 0003. Дефолт `active` (не `published` — используем один глагол «активный объект», не два). Разрешённые переходы (enforced в `SiteService`):
+
+```
+active    ⇄ completed   (объект сдан / вернули в работу)
+active    → archived    (скрыть из активных списков)
+completed → archived
+archived  → active       (восстановить)
+```
+
+Запрещено `archived → completed` (вычеркнутый объект нельзя внезапно «сдать» — сначала `activate`, потом `complete`). Любой другой переход → `409 INVALID_STATUS_TRANSITION`. Идемпотентность: повтор status=current возвращает 200 без второй audit-записи (консистентно с organizations).
+
+**Sites: координаты.** GEOGRAPHY(Point, 4326) хранит lng/lat как один spatial-столбец (`geofence_center`). Вставка через `ST_MakePoint(lng, lat)::geography`, чтение через `ST_Y(::geometry) AS latitude, ST_X(::geometry) AS longitude`. На слое API координаты отдаются двумя числами (`latitude`, `longitude`), округлёнными до 6 знаков (`round6`, ≈11 см — достаточно для GPS с 3-5 м accuracy). GIST-индекс по `geofence_center` готов к spatial queries (для shifts).
+
+**Sites: REST (реализовано).** `GET /api/v1/sites`, `GET /:id`, `POST /`, `PATCH /:id`, плюс action-style переходы `POST /:id/complete|archive|activate`. Policy: owner видит только свою org, superadmin — всех, operator → 403 на list/create, 404 на read (404-вместо-403 по §4.3). Audit: `site.create|update|activate|complete|archive` в той же транзакции что мутация.
 
 ### 6.4 Смены
 

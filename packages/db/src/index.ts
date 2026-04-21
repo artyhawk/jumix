@@ -6,10 +6,13 @@ export {
   authEvents,
   passwordResetTokens,
   auditLog,
+  sites,
   userRoleEnum,
   userStatusEnum,
   organizationStatusEnum,
+  siteStatusEnum,
   authEventTypeEnum,
+  SITE_STATUSES,
   type Organization,
   type NewOrganization,
   type User,
@@ -22,6 +25,8 @@ export {
   type NewPasswordResetToken,
   type AuditEntry,
   type NewAuditEntry,
+  type Site,
+  type SiteStatus,
 } from './schema/index'
 
 export { createDatabase, type DatabaseClient, type CreateDatabaseOptions } from './client'

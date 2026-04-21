@@ -18,6 +18,12 @@ export const organizationStatusEnum = pgEnum('organization_status', [
   'archived',
 ])
 
+// Жизненный цикл объекта (стройплощадки)
+//   active    → активная стройка, смены фиксируются
+//   completed → стройка сдана, данные остаются, новые смены не создаются
+//   archived  → скрыт из списков, переходит из любого состояния
+export const siteStatusEnum = pgEnum('site_status', ['active', 'completed', 'archived'])
+
 // События auth для audit trail (CLAUDE.md §5.4)
 export const authEventTypeEnum = pgEnum('auth_event_type', [
   'login_success',

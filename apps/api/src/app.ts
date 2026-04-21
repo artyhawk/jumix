@@ -7,6 +7,7 @@ import { type FastifyInstance, fastify } from 'fastify'
 import type { Env } from './config/env'
 import authPlugin from './modules/auth/auth.plugin'
 import organizationPlugin from './modules/organization/organization.plugin'
+import sitePlugin from './modules/site/site.plugin'
 import authenticatePlugin from './plugins/authenticate'
 import { registerErrorHandler } from './plugins/error-handler'
 import jwtPlugin from './plugins/jwt'
@@ -61,6 +62,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(registerHealthRoutes)
   await app.register(authPlugin)
   await app.register(organizationPlugin)
+  await app.register(sitePlugin)
 
   return app
 }
