@@ -7,6 +7,8 @@ import {
   type SmsProvider,
 } from '../../integrations/mobizon/sms-provider'
 import { registerAuthRoutes } from './auth.routes'
+import { registerPasswordRoutes } from './password/password.routes'
+import { PasswordAuthService } from './password/password.service'
 import {
   AuthEventRepository,
   PasswordResetTokenRepository,
@@ -20,6 +22,7 @@ import { TokenIssuerService } from './token-issuer.service'
 
 type AuthServices = {
   sms: SmsAuthService
+  password: PasswordAuthService
   tokenIssuer: TokenIssuerService
   authEvents: AuthEventRepository
   userRepo: UserRepository
@@ -95,8 +98,20 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     mobileSeconds: 90 * 24 * 60 * 60,
   })
 
+  const passwordService = new PasswordAuthService(
+    userRepo,
+    authEvents,
+    passwordResetRepo,
+    refreshRepo,
+    tokenIssuer,
+    smsProvider,
+    limiters,
+    app.log,
+  )
+
   app.decorate('authServices', {
     sms: smsService,
+    password: passwordService,
     tokenIssuer,
     authEvents,
     userRepo,
@@ -106,6 +121,7 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
 
   await app.register(registerAuthRoutes)
   await app.register(registerSmsRoutes)
+  await app.register(registerPasswordRoutes)
 }
 
 export default fp(authPlugin, { name: 'auth', dependencies: ['jwt', 'redis', 'authenticate'] })
