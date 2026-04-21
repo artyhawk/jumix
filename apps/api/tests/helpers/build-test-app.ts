@@ -50,6 +50,14 @@ export async function buildTestApp(overrides: Partial<Env> = {}): Promise<TestAp
     JWT_ISSUER: 'jumix-api-test',
     JWT_AUDIENCE: 'jumix-test',
     JWT_ACCESS_TTL_SECONDS: 15 * 60,
+    // Storage: без STORAGE_ENDPOINT → плагин поднимет InMemoryStorageClient.
+    // Для тестов с реальным MinIO (smoke) поднимается отдельно, не через buildApp.
+    STORAGE_REGION: 'us-east-1',
+    STORAGE_BUCKET: 'jumix-test',
+    STORAGE_FORCE_PATH_STYLE: true,
+    STORAGE_PRESIGN_GET_TTL_SECONDS: 900,
+    STORAGE_PRESIGN_PUT_TTL_SECONDS: 300,
+    STORAGE_PRESIGN_PART_TTL_SECONDS: 900,
     ...overrides,
   }
 

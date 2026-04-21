@@ -79,6 +79,14 @@ HTTP Request
 - Repository **требует AuthContext** в конструкторе (tenant scope автоматически)
 - Policy — **чистые функции**, легко тестируются
 
+**Декораторы FastifyInstance** (инициализируются в `buildApp`):
+- `app.appEnv` — типизированный env (config/env.ts)
+- `app.db` — DatabaseClient
+- `app.jwtConfig` — ключи + iss/aud (plugins/jwt.ts)
+- `app.redis` — RedisLikeClient | null (plugins/redis.ts)
+- `app.storage` — StorageClient (plugins/storage.ts, см. [storage.md](storage.md))
+- `app.authenticate` — preHandler для защищённых маршрутов (plugins/authenticate.ts)
+
 ## 3.3 Структура `apps/api`
 
 ```

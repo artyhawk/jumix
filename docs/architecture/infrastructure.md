@@ -7,10 +7,15 @@
 Минимальный набор для локальной разработки:
 - `postgres` (с PostGIS)
 - `redis`
-- `minio`
+- `minio` (console `:9001`, S3 API `:9000`)
 - `mailhog` (для тестирования email)
 
 API и Web запускаются локально через `pnpm dev` (hot reload).
+
+**MinIO в API (B2a):** клиент инстанциируется в `apps/api/src/plugins/storage.ts`
+по env (`STORAGE_ENDPOINT` и creds). Если endpoint не задан — падаем на
+`InMemoryStorageClient` (тестовый drайвер без сети). Конвенции bucket/keys/TTL
+описаны в [storage.md](storage.md).
 
 ## 10.2 docker-compose.prod.yml (production)
 

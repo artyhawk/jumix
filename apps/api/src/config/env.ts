@@ -60,6 +60,57 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(15 * 60),
+
+  /**
+   * Object storage (MinIO в dev/prod, AWS/Hetzner/Cloud.kz S3 если переедем).
+   *
+   * Drайвер выбирается плагином (apps/api/src/plugins/storage.ts):
+   *  - STORAGE_ENDPOINT задан → MinioStorageClient через minio npm-пакет
+   *  - не задан → InMemoryStorageClient (dev без compose / test без Testcontainers)
+   *
+   * В prod оба STORAGE_ENDPOINT + creds обязательны — проверяется в
+   * server.ts (refine по NODE_ENV), как с REDIS_URL.
+   *
+   * Конвенция ключей и TTL — docs/architecture/storage.md.
+   */
+  STORAGE_ENDPOINT: z.string().url().optional(),
+  STORAGE_REGION: z.string().min(1).default('us-east-1'),
+  STORAGE_ACCESS_KEY: z.string().min(1).optional(),
+  STORAGE_SECRET_KEY: z.string().min(1).optional(),
+  STORAGE_BUCKET: z.string().min(1).default('jumix-documents'),
+  /** MinIO не поддерживает vhost-style. Для AWS S3 можно оставить true. */
+  STORAGE_FORCE_PATH_STYLE: z
+    .string()
+    .default('true')
+    .transform((raw) => raw === 'true'),
+  /** TTL presigned GET (просмотр в UI). */
+  STORAGE_PRESIGN_GET_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(15 * 60),
+  /** TTL presigned PUT (простой upload, короткая сессия). */
+  STORAGE_PRESIGN_PUT_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5 * 60),
+  /** TTL presigned part-URL (multipart части, длинные mobile-аплоады). */
+  STORAGE_PRESIGN_PART_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(15 * 60),
+  /**
+   * Автосоздание бакета плагином при старте.
+   *  - dev/test: по умолчанию true (MinIO контейнер пустой)
+   *  - prod: false (bucket провижинится инфрой/террформом)
+   * Читается плагином как string-boolean.
+   */
+  STORAGE_ENSURE_BUCKET: z
+    .string()
+    .optional()
+    .transform((raw) => (raw === undefined ? undefined : raw === 'true')),
 })
 
 export type Env = z.infer<typeof envSchema>

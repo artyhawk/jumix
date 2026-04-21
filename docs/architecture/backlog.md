@@ -100,3 +100,18 @@
 Отложено до Vertical B2 (operators): там появится аналогичный паттерн с `?craneId=...` query-фильтром. Добавить оба теста вместе — один для cranes.siteId, один для operators.craneId — чтобы закрыть класс "foreign resource ID in list filter" целиком.
 
 Тест должен: создать org A (+ site + crane), org B (+ site), залогинить owner A, дёрнуть `GET /cranes?siteId={orgB_site.id}` → ожидать 200 с пустым items array.
+
+---
+
+## Storage (from B2a)
+
+Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:
+
+1. **ClamAV virus scanning** на upload документов — worker job + `documents.scan_status`. Триггер: появление реальных документов крановщиков в системе.
+2. **Public bucket для avatars / CDN** — если фронт-UX потребует моментальной отдачи без signed URL refresh.
+3. **Lifecycle policy для auto-abort незавершённых multipart** — MinIO rule, когда bucket начнёт накапливать мусор.
+4. **Retention policy для старых версий документов** — auto-delete `v1` при `vN > N` или `age > X дней`. Решение юриста по compliance.
+5. **Signed URL caching в Redis** — для горячих GET.
+6. **Image thumbnails** для аватаров (3 размера через worker).
+7. **Server-side encryption (SSE-C / SSE-KMS)** — требует key management.
+8. **Strict content-length enforcement** для simple PUT через `presignedPostPolicy` — актуально при появлении DoS-сценариев с большими uploads.

@@ -43,6 +43,7 @@ SaaS-платформа для компаний Казахстана, сдающ
 | Authentication | [authentication.md](docs/architecture/authentication.md) | JWT + refresh rotation, хранение на web/mobile, rate limit, schema |
 | Database schema | [database.md](docs/architecture/database.md) | Все таблицы MVP, status-инварианты, критичные индексы |
 | Business logic | [business-logic.md](docs/architecture/business-logic.md) | Геозона, state machine operator, document expiry cron, payroll (DEFERRED), audit |
+| Object storage | [storage.md](docs/architecture/storage.md) | MinIO bucket layout, key-конвенции, versioning, TTL, drivers |
 | Design system | [design-system.md](docs/architecture/design-system.md) | Цвет, типографика, spacing, компоненты, логотип |
 | Mobile app | [mobile-app.md](docs/architecture/mobile-app.md) | UX для крановщика, экраны, GPS, push, offline |
 | Infrastructure | [infrastructure.md](docs/architecture/infrastructure.md) | docker-compose, healthchecks, backup, monitoring, secrets |
@@ -213,6 +214,8 @@ SaaS-платформа для компаний Казахстана, сдающ
 7. **При сомнении — спроси.** Не делай предположений в критичной логике (auth, финансы, права доступа).
 
 8. **Обновляй документацию** когда архитектурные решения меняются. Правка в detail-файле + (если меняется critical-rule или index) — в CLAUDE.md. Не молча — сначала обсуди с пользователем.
+
+9. **Object storage — только через `app.storage`.** Никогда не импортируй `MinioStorageClient` / `InMemoryStorageClient` из модулей. Ключи строятся через helpers в `apps/api/src/lib/storage/object-key.ts` (tenant-prefix обязателен). Детали — [storage.md](docs/architecture/storage.md).
 
 ---
 

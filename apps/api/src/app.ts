@@ -13,6 +13,7 @@ import authenticatePlugin from './plugins/authenticate'
 import { registerErrorHandler } from './plugins/error-handler'
 import jwtPlugin from './plugins/jwt'
 import redisPlugin from './plugins/redis'
+import storagePlugin from './plugins/storage'
 import { registerHealthRoutes } from './routes/health'
 
 export interface AppDeps {
@@ -58,6 +59,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   await app.register(jwtPlugin)
   await app.register(redisPlugin)
+  await app.register(storagePlugin)
   await app.register(authenticatePlugin)
 
   await app.register(registerHealthRoutes)
