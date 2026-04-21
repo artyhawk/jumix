@@ -56,6 +56,18 @@ export class UserRepository {
   }
 
   /**
+   * Ищет ЛЮБОГО пользователя по телефону, игнорируя `deleted_at` и `status`.
+   * Используется при создании организации (и любой регистрации) для
+   * обнаружения phone-конфликта до INSERT: соболезную soft-deleted user'у,
+   * он всё равно держит уникальный phone по constraint'у, и попытка создать
+   * нового с тем же номером упадёт 23505. Вернуть 409 до INSERT'а чище.
+   */
+  async findAnyByPhone(phone: string): Promise<User | null> {
+    const rows = await this.database.db.select().from(users).where(eq(users.phone, phone)).limit(1)
+    return rows[0] ?? null
+  }
+
+  /**
    * Атомарный bump tokenVersion. Вызывается при logout-all и при успешном
    * password reset — обесценивает все ранее выданные access-токены (§5.5).
    * Возвращает новое значение tokenVersion, либо null если пользователя нет.
