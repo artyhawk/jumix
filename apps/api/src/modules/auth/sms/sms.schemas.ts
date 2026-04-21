@@ -1,5 +1,5 @@
+import { phoneSchema } from '@jumix/shared'
 import { z } from 'zod'
-import { phoneSchema } from '../../../lib/phone'
 
 /** Запрос SMS-кода. IP берётся из request, не из body. */
 export const smsRequestSchema = z.object({

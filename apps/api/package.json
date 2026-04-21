@@ -19,6 +19,7 @@
     "@fastify/sensible": "^6.0.2",
     "@jumix/auth": "workspace:*",
     "@jumix/db": "workspace:*",
+    "@jumix/shared": "workspace:*",
     "drizzle-orm": "^0.36.4",
     "fastify": "^5.1.0",
     "fastify-plugin": "^5.0.1",

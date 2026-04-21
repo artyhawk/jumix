@@ -1,6 +1,6 @@
 import { MIN_PASSWORD_LENGTH } from '@jumix/auth'
+import { phoneSchema } from '@jumix/shared'
 import { z } from 'zod'
-import { phoneSchema } from '../../../lib/phone'
 
 /**
  * POST /auth/login. Phone + password. clientKind разрешён из body но
