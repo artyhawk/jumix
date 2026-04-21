@@ -42,6 +42,20 @@ export class RefreshTokenRepository {
   }
 
   /**
+   * Lookup по id — нужен, чтобы сравнить контекст "победителя" ротации
+   * с контекстом заново пришедшего запроса (rotation-race detection §5.1).
+   * Возвращает полную запись независимо от revoked_at.
+   */
+  async findById(id: string): Promise<RefreshToken | null> {
+    const rows = await this.database.db
+      .select()
+      .from(refreshTokens)
+      .where(eq(refreshTokens.id, id))
+      .limit(1)
+    return rows[0] ?? null
+  }
+
+  /**
    * Маркирует токен revoked с указанной причиной и replaced_by.
    * Idempotent: условие `revoked_at IS NULL` в WHERE — повторный revoke
    * того же токена не тронет уже проставленные revoked_at / reason /
@@ -86,9 +100,12 @@ export class RefreshTokenRepository {
    * revoked_reason для всей цепочки перезаписывается в 'reuse_detected' —
    * это важнее, чем первоначальный reason 'rotation', т.к. сигнализирует
    * о компрометации, а не о штатной ротации.
+   *
+   * Возвращает количество пройденных звеньев — пишется в audit metadata
+   * для forensic-ревью инцидентов.
    */
-  async revokeChainFrom(id: string): Promise<void> {
-    await this.database.sql`
+  async revokeChainFrom(id: string): Promise<number> {
+    const result = await this.database.sql`
       WITH RECURSIVE chain AS (
         SELECT id, replaced_by FROM refresh_tokens WHERE id = ${id}
         UNION ALL
@@ -100,6 +117,55 @@ export class RefreshTokenRepository {
          SET revoked_at = COALESCE(revoked_at, now()),
              revoked_reason = 'reuse_detected'
        WHERE id IN (SELECT id FROM chain)
+       RETURNING id
     `
+    return result.length
+  }
+
+  /**
+   * Атомарная ротация refresh-токена (CAS + INSERT + UPDATE в одной
+   * транзакции с row-lock на старом токене). Устраняет race при двух
+   * параллельных /auth/refresh с одним презентованным токеном — типичный
+   * сценарий на React Native wake-from-background.
+   *
+   * Алгоритм:
+   *   1. BEGIN TX
+   *   2. SELECT ... WHERE id = old AND revoked_at IS NULL FOR UPDATE
+   *      — блокирует строку до коммита; параллельный запрос ждёт.
+   *   3. Если строка не найдена (уже отозвана) → COMMIT, вернуть null
+   *      (проигравшая сторона ничего не пишет).
+   *   4. INSERT нового токена (RETURNING *)
+   *   5. UPDATE старого: revoked_at = now(), reason = 'rotation',
+   *      replaced_by = newId
+   *   6. COMMIT
+   *
+   * Postgres гарантирует: из двух параллельных транзакций первая получит
+   * lock, отроtирует, вторая дождётся COMMIT первой и увидит revoked_at
+   * IS NOT NULL → SELECT FOR UPDATE вернёт 0 строк → null.
+   */
+  async rotateWithLock(
+    oldId: string,
+    newToken: InsertRefreshTokenInput,
+  ): Promise<RefreshToken | null> {
+    return await this.database.db.transaction(async (tx) => {
+      const existing = await tx
+        .select({ id: refreshTokens.id })
+        .from(refreshTokens)
+        .where(and(eq(refreshTokens.id, oldId), isNull(refreshTokens.revokedAt)))
+        .for('update')
+        .limit(1)
+      if (existing.length === 0) return null
+
+      const insertedRows = await tx.insert(refreshTokens).values(newToken).returning()
+      const inserted = insertedRows[0]
+      if (!inserted) throw new Error('refresh token insert returned no row')
+
+      await tx
+        .update(refreshTokens)
+        .set({ revokedAt: new Date(), revokedReason: 'rotation', replacedBy: inserted.id })
+        .where(eq(refreshTokens.id, oldId))
+
+      return inserted
+    })
   }
 }

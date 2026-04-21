@@ -10,7 +10,7 @@ import { registerAuthRoutes } from './auth.routes'
 import { registerPasswordRoutes } from './password/password.routes'
 import { PasswordAuthService } from './password/password.service'
 import { registerRefreshRoutes } from './refresh/refresh.routes'
-import { RefreshAuthService } from './refresh/refresh.service'
+import { RefreshAuthService, type RefreshRateLimiters } from './refresh/refresh.service'
 import {
   AuthEventRepository,
   PasswordResetTokenRepository,
@@ -69,6 +69,14 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     perIpHourly: makeLimiter(60 * 60_000, 20),
   }
 
+  // Refresh-лимиты: 10/мин/user (нормальный клиент не делает больше
+  // 1 refresh в 5-10 мин), 100/час/IP (отсекает спам). Эти окна независимы
+  // от SMS-лимитов: другой канал, другие ресурсы.
+  const refreshLimiters: RefreshRateLimiters = {
+    perUserPerMinute: makeLimiter(60_000, 10),
+    perIpPerHour: makeLimiter(60 * 60_000, 100),
+  }
+
   // SMS provider
   const mobizonKey = process.env.MOBIZON_API_KEY
   const mobizonUrl = process.env.MOBIZON_API_URL ?? 'https://api.mobizon.kz'
@@ -117,6 +125,7 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     userRepo,
     authEvents,
     tokenIssuer,
+    refreshLimiters,
     app.log,
   )
 

@@ -26,6 +26,7 @@ export const authEventTypeEnum = pgEnum('auth_event_type', [
   'logout_all',
   'refresh_used',
   'refresh_reuse_detected',
+  'refresh_rotation_race',
   'password_reset_requested',
   'password_reset_completed',
   'sms_requested',

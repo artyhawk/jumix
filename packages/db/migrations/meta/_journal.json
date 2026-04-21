@@ -15,6 +15,13 @@
       "when": 1776790187241,
       "tag": "0001_hesitant_dust",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777000000000,
+      "tag": "0002_tidy_rotation_race",
+      "breakpoints": true
     }
   ]
 }

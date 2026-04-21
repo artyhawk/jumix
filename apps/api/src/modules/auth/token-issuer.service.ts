@@ -54,6 +54,53 @@ export class TokenIssuerService {
   ) {}
 
   async issue(input: IssueTokensInput): Promise<IssuedTokens> {
+    const prepared = await this.prepare(input)
+    const inserted = await this.refreshTokens.insert(prepared.refreshInsert)
+    await this.users.updateLastLogin(input.user.id, prepared.now)
+    return prepared.build(inserted.id)
+  }
+
+  /**
+   * Как `issue`, но INSERT нового refresh'а + revoke старого происходят
+   * в одной транзакции с SELECT ... FOR UPDATE на старом токене. Защищает
+   * от race condition при параллельных POST /auth/refresh (типично при
+   * wake-from-background на мобильном клиенте).
+   *
+   * Возвращает `null` если старый токен уже отозван — caller обязан
+   * отреагировать 401 INVALID_REFRESH. access-JWT генерируется заранее,
+   * но наружу не возвращается в случае проигрыша race — stateless, нигде
+   * не пишется в БД, утечки нет.
+   */
+  async issueAndRotate(
+    input: IssueTokensInput,
+    oldRefreshTokenId: string,
+  ): Promise<IssuedTokens | null> {
+    const prepared = await this.prepare(input)
+    const inserted = await this.refreshTokens.rotateWithLock(
+      oldRefreshTokenId,
+      prepared.refreshInsert,
+    )
+    if (!inserted) return null
+    await this.users.updateLastLogin(input.user.id, prepared.now)
+    return prepared.build(inserted.id)
+  }
+
+  /**
+   * Строит access-JWT и материалы refresh'а (plain + hash + expiresAt).
+   * Не пишет в БД — caller решает, INSERT или rotateWithLock.
+   */
+  private async prepare(input: IssueTokensInput): Promise<{
+    now: Date
+    refreshInsert: {
+      userId: string
+      tokenHash: Buffer
+      deviceId: string | null
+      ipAddress: string | null
+      userAgent: string | null
+      expiresAt: Date
+    }
+    build: (refreshTokenId: string) => IssuedTokens
+  }> {
     const now = new Date()
     const accessToken = await signAccessToken(
       {
@@ -71,23 +118,23 @@ export class TokenIssuerService {
       input.clientKind === 'mobile' ? this.refreshTtls.mobileSeconds : this.refreshTtls.webSeconds
     const refreshTokenExpiresAt = new Date(now.getTime() + refreshTtlSeconds * 1000)
 
-    const inserted = await this.refreshTokens.insert({
-      userId: input.user.id,
-      tokenHash: refresh.hash,
-      deviceId: input.deviceId ?? null,
-      ipAddress: input.ipAddress ?? null,
-      userAgent: input.userAgent ?? null,
-      expiresAt: refreshTokenExpiresAt,
-    })
-
-    await this.users.updateLastLogin(input.user.id, now)
-
     return {
-      accessToken,
-      refreshToken: refresh.token,
-      refreshTokenId: inserted.id,
-      accessTokenExpiresAt,
-      refreshTokenExpiresAt,
+      now,
+      refreshInsert: {
+        userId: input.user.id,
+        tokenHash: refresh.hash,
+        deviceId: input.deviceId ?? null,
+        ipAddress: input.ipAddress ?? null,
+        userAgent: input.userAgent ?? null,
+        expiresAt: refreshTokenExpiresAt,
+      },
+      build: (refreshTokenId) => ({
+        accessToken,
+        refreshToken: refresh.token,
+        refreshTokenId,
+        accessTokenExpiresAt,
+        refreshTokenExpiresAt,
+      }),
     }
   }
 
