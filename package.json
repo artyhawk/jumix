@@ -1,0 +1,29 @@
+{
+  "name": "jumix",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Jumix — SaaS-платформа управления крановщиками (монорепа)",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm -r build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "docker:dev:up": "docker compose -f infra/docker/docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker compose -f infra/docker/docker-compose.dev.yml down",
+    "docker:dev:logs": "docker compose -f infra/docker/docker-compose.dev.yml logs -f",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "lefthook": "^1.7.0",
+    "typescript": "^5.6.3"
+  }
+}

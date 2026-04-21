@@ -1,0 +1,33 @@
+assert_lefthook_installed: true
+
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{js,jsx,ts,tsx,json,jsonc}"
+      run: pnpm biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+    gitleaks:
+      run: |
+        if command -v gitleaks >/dev/null 2>&1; then
+          gitleaks protect --staged --redact --verbose
+        else
+          echo "⚠️  gitleaks не установлен, пропускаю. Установка: brew install gitleaks"
+        fi
+
+pre-push:
+  parallel: false
+  commands:
+    typecheck:
+      run: pnpm typecheck
+
+commit-msg:
+  commands:
+    conventional:
+      run: |
+        pattern='^(feat|fix|chore|docs|refactor|test|perf|build|ci|style|revert)(\([a-z0-9-]+\))?!?: .+'
+        if ! grep -qE "$pattern" {1}; then
+          echo "❌ Commit message не соответствует Conventional Commits"
+          echo "   Пример: feat(auth): add refresh token rotation"
+          exit 1
+        fi

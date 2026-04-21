@@ -1,0 +1,12 @@
+# Глобальные владельцы — по умолчанию ревьюит вся команда
+* @armani910
+
+# Auth и финансы — критичные зоны, особое внимание
+/packages/auth/                 @armani910
+/apps/api/src/modules/auth/     @armani910
+/apps/api/src/modules/payroll/  @armani910
+/docs/architecture/             @armani910
+
+# Infra — только с явным согласованием
+/infra/                         @armani910
+/.github/                       @armani910

@@ -1,0 +1,13 @@
+{
+  "name": "@jumix/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Jumix Mobile — Expo + React Native (приложение крановщика)",
+  "scripts": {
+    "start": "echo 'TODO: expo start'",
+    "android": "echo 'TODO: expo start --android'",
+    "ios": "echo 'TODO: expo start --ios'",
+    "typecheck": "echo 'TODO: tsc --noEmit'",
+    "test": "echo 'TODO: jest'"
+  }
+}

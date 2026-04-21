@@ -1,0 +1,15 @@
+{
+  "name": "@jumix/worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Jumix Worker — BullMQ job processor (cron, SMS, push, payroll)",
+  "type": "module",
+  "main": "dist/worker.js",
+  "scripts": {
+    "dev": "echo 'TODO: tsx watch src/worker.ts'",
+    "build": "echo 'TODO: tsc --project tsconfig.json'",
+    "start": "node dist/worker.js",
+    "typecheck": "echo 'TODO: tsc --noEmit'",
+    "test": "echo 'TODO: vitest run'"
+  }
+}

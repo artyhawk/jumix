@@ -1,0 +1,15 @@
+{
+  "name": "@jumix/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Общие Zod-схемы, типы, константы (используется и API, и веб, и мобилкой)",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "echo 'TODO: tsc --noEmit'",
+    "test": "echo 'TODO: vitest run'"
+  }
+}

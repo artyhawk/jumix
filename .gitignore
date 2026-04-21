@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+out/
+.turbo/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE / editor
+.vscode/
+!.vscode/settings.json.example
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Drizzle
+drizzle/
+
+# Next.js / Expo caches
+.next/
+.expo/
+
+# Testcontainers
+.testcontainers/
+
+# Docker volumes (local bind mounts, if any)
+infra/docker/volumes/
+
+# Python (если появятся скрипты)
+__pycache__/
+*.pyc
+
+# Contract docs staying local (оригиналы заказчика не коммитим до согласования)
+docs/contract/*.docx
+docs/contract/*.pdf

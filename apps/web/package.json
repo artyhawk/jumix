@@ -1,0 +1,14 @@
+{
+  "name": "@jumix/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Jumix Web — Next.js 15 (App Router) админ-портал",
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'TODO: next dev'",
+    "build": "echo 'TODO: next build'",
+    "start": "echo 'TODO: next start'",
+    "typecheck": "echo 'TODO: tsc --noEmit'",
+    "test": "echo 'TODO: vitest run'"
+  }
+}
