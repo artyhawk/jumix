@@ -69,6 +69,7 @@ async function main() {
       role: 'superadmin',
       organizationId: null,
       name: 'Платформенный администратор',
+      status: 'active',
     },
     {
       phone: '+77010001122',
@@ -76,6 +77,7 @@ async function main() {
       role: 'owner',
       organizationId: orgA.id,
       name: 'Асылбек Темирханов',
+      status: 'active',
     },
     {
       phone: '+77020003344',
@@ -83,6 +85,7 @@ async function main() {
       role: 'owner',
       organizationId: orgB.id,
       name: 'Ерлан Оспанов',
+      status: 'active',
     },
   ])
 

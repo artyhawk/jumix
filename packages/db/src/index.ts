@@ -7,6 +7,7 @@ export {
   passwordResetTokens,
   auditLog,
   userRoleEnum,
+  userStatusEnum,
   organizationStatusEnum,
   authEventTypeEnum,
   type Organization,

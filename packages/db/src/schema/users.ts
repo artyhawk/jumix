@@ -9,7 +9,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
-import { userRoleEnum } from './enums'
+import { userRoleEnum, userStatusEnum } from './enums'
 import { organizations } from './organizations'
 
 export const users = pgTable(
@@ -24,6 +24,10 @@ export const users = pgTable(
     // null только для superadmin (см. check constraint ниже)
     organizationId: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
     name: text().notNull(),
+    // 'active' | 'blocked'. Default 'active'. Orthogonal к deleted_at.
+    status: userStatusEnum().notNull().default('active'),
+    // Soft-delete. NULL = живой пользователь; timestamptz = когда удалён (история сохраняется).
+    deletedAt: timestamp({ withTimezone: true, mode: 'date' }),
     // Инкрементируется при logout-all, обесценивает все активные access-токены (§5.5)
     tokenVersion: integer().notNull().default(0),
     lastLoginAt: timestamp({ withTimezone: true, mode: 'date' }),
@@ -33,6 +37,11 @@ export const users = pgTable(
   (t) => [
     uniqueIndex('users_phone_key').on(t.phone),
     index('users_org_role_idx').on(t.organizationId, t.role),
+    // Partial index для типичных list-запросов в пределах организации.
+    // Hot path: RBAC-scoped выборки owner'ом активных пользователей своей org.
+    index('users_active_idx')
+      .on(t.organizationId)
+      .where(sql`status = 'active' AND deleted_at IS NULL`),
     check('users_phone_format_chk', sql`${t.phone} ~ '^\\+7[0-9]{10}$'`),
     // Инвариант: у superadmin organization_id = NULL; у остальных ролей — NOT NULL
     check(

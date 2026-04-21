@@ -466,9 +466,24 @@ password_reset_tokens { id, user_id, token_hash, expires_at, used_at }
 ### 6.1 Организации и пользователи
 
 ```
-organizations { id, name, bin, status, contact_name, contact_phone, ... }
-users { id, phone, password_hash, role, organization_id (nullable for superadmin), name, ... }
+organizations { id, name, bin, status ('active' | 'suspended' | 'archived'), contact_name, contact_phone, ... }
+
+users {
+  id, phone, password_hash, role,
+  organization_id (nullable for superadmin), name,
+  status ('active' | 'blocked'),        -- временная блокировка, обратимо
+  deleted_at (timestamptz | null),       -- soft-delete, ортогонально status
+  token_version (int, default 0),        -- инкремент при logout-all → обесценивает access
+  last_login_at, created_at, updated_at
+}
 ```
+
+**Про `status` и `deleted_at`:** два независимых поля, не объединённые в один enum.
+- `status='active' + deleted_at=null` — рабочий пользователь
+- `status='blocked' + deleted_at=null` — временная блокировка (владелец/superadmin может снять)
+- `deleted_at IS NOT NULL` — soft-delete, пользователь "удалён", но история (смены, audit) сохраняется. В списках скрывается, логин блокируется.
+
+Middleware `authenticate` обязан отвергать вход при `deleted_at IS NOT NULL` ИЛИ `status='blocked'` ИЛИ (для non-superadmin) `organization.status != 'active'`.
 
 ### 6.2 Операторы (крановщики)
 
