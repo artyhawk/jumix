@@ -7,12 +7,17 @@ export {
   passwordResetTokens,
   auditLog,
   sites,
+  cranes,
   userRoleEnum,
   userStatusEnum,
   organizationStatusEnum,
   siteStatusEnum,
+  craneTypeEnum,
+  craneStatusEnum,
   authEventTypeEnum,
   SITE_STATUSES,
+  CRANE_TYPES,
+  CRANE_STATUSES,
   type Organization,
   type NewOrganization,
   type User,
@@ -27,6 +32,10 @@ export {
   type NewAuditEntry,
   type Site,
   type SiteStatus,
+  type Crane,
+  type CraneType,
+  type CraneStatus,
+  type NewCrane,
 } from './schema/index'
 
 export { createDatabase, type DatabaseClient, type CreateDatabaseOptions } from './client'

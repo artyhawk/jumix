@@ -63,8 +63,14 @@ sites {
 }
 
 cranes {
-  id, organization_id, type, model, capacity_ton, boom_length_m,
-  year, inventory_number, tariffs_json, ...
+  id, organization_id, site_id (nullable, ON DELETE SET NULL),
+  type ('tower' | 'mobile' | 'crawler' | 'overhead'),
+  model, inventory_number,
+  capacity_ton numeric(8,2), boom_length_m numeric(6,2) nullable,
+  year_manufactured integer nullable,
+  tariffs_json jsonb NOT NULL DEFAULT '{}',
+  status ('active' | 'maintenance' | 'retired'),
+  notes, deleted_at, created_at, updated_at
 }
 
 assignments {
@@ -89,6 +95,31 @@ archived  → active       (восстановить)
 **Sites: координаты.** GEOGRAPHY(Point, 4326) хранит lng/lat как один spatial-столбец (`geofence_center`). Вставка через `ST_MakePoint(lng, lat)::geography`, чтение через `ST_Y(::geometry) AS latitude, ST_X(::geometry) AS longitude`. На слое API координаты отдаются двумя числами (`latitude`, `longitude`), округлёнными до 6 знаков (`round6`, ≈11 см — достаточно для GPS с 3-5 м accuracy). GIST-индекс по `geofence_center` готов к spatial queries (для shifts).
 
 **Sites: REST (реализовано).** `GET /api/v1/sites`, `GET /:id`, `POST /`, `PATCH /:id`, плюс action-style переходы `POST /:id/complete|archive|activate`. Policy: owner видит только свою org, superadmin — всех, operator → 403 на list/create, 404 на read (404-вместо-403 по [authorization.md](authorization.md) §4.3). Audit: `site.create|update|activate|complete|archive` в той же транзакции что мутация.
+
+**Cranes: `site_id` vs таблица `assignments`.** Два ортогональных отношения, не дублирующих друг друга:
+
+- `cranes.site_id` — «где сейчас физически стоит кран» (home/current site). Меняется редко (перевозка между стройками — разы в месяц). Cardinality one-to-one: один кран = один site (или NULL если на складе / в ремонте). FK `ON DELETE SET NULL` — удаление site не каскадирует на cranes, кран становится «без дислокации».
+- `assignments` — «кто работает на этом кране в какой период». Меняется часто (посменные назначения), многомерная (operator × crane × period × role). Реализуется с operators-vertical; в текущий момент ещё нет таблицы.
+
+Без `site_id` на cranes каждый UI-список "краны организации с текущими объектами" требовал бы JOIN через `assignments` с окном по `now()` — дорого и невыразимо без активного operators-модуля. Прямой FK упрощает hot path.
+
+**Cranes: статусы и жизненный цикл.** Enum `crane_status` в миграции 0004. Разрешённые переходы (enforced в `CraneService`):
+
+```
+active      ⇄ maintenance   (в работе / на ТО)
+active      → retired       (списан с эксплуатации)
+maintenance → retired
+```
+
+`retired` — терминал. Возврат в эксплуатацию требует нового INSERT (новый inventory, новая запись, история старого крана сохраняется). Если заказчик попросит «разретайрить» — добавим в backlog. Любой другой переход → `409 INVALID_STATUS_TRANSITION`. Идемпотентность: повтор status=current → 200 без audit-дубля (консистентно с sites/organizations).
+
+**Cranes: soft-delete.** Колонка `deleted_at TIMESTAMPTZ` ортогональна `status` (как у users). Retired значит «кран списан с эксплуатации, запись видна». Deleted значит «скрыт из UI полностью; история (assignments, shifts) остаётся целой». Default scope queries фильтруют `WHERE deleted_at IS NULL`. `DELETE /api/v1/cranes/:id` выставляет `deleted_at = now()`; hard-delete не экспонируется.
+
+**Cranes: UNIQUE(organization_id, inventory_number).** Партиальный уникальный индекс `cranes_inventory_unique_active_idx` с `WHERE deleted_at IS NULL AND inventory_number IS NOT NULL`. Консистентно с паттерном `organizations.bin` (unique удерживается на живых записях). `inventory_number IS NULL` разрешён множественно — не все краны имеют инвентарный номер (например, арендованный). После soft-delete номер освобождается.
+
+**Cranes: REST.** `GET /api/v1/cranes`, `GET /:id`, `POST /`, `PATCH /:id`, `DELETE /:id` (soft), плюс `POST /:id/{activate,maintenance,retire}`. Policy: owner — своя org, superadmin — все (read/update/status), operator → 403 list/create, 404 на read. Cross-table tenant: при `siteId` в create/update `SiteRepository(ctx).findInScope(siteId)` + проверка `site.organizationId === crane.organizationId` — foreign/out-of-scope → 404 `SITE_NOT_FOUND`. Audit: `crane.create|update|activate|maintenance|retire|delete` в транзакции мутации.
+
+**Cranes: tariffs_json placeholder.** Хранится как свободный JSONB (`z.record(z.unknown())` на API). Финальная структура придёт от заказчика с payroll-спекой (Этап 3) — см. [backlog.md](backlog.md) `Cranes` раздел. Payroll engine это поле пока не читает.
 
 ## 6.4 Смены
 

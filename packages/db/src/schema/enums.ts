@@ -24,6 +24,18 @@ export const organizationStatusEnum = pgEnum('organization_status', [
 //   archived  → скрыт из списков, переходит из любого состояния
 export const siteStatusEnum = pgEnum('site_status', ['active', 'completed', 'archived'])
 
+// Тип крана. Соответствует разновидностям на стройках РК; расширяется при
+// необходимости отдельной миграцией (ALTER TYPE ... ADD VALUE).
+export const craneTypeEnum = pgEnum('crane_type', ['tower', 'mobile', 'crawler', 'overhead'])
+
+// Жизненный цикл крана.
+//   active      → в эксплуатации, может быть назначен на смены
+//   maintenance → на ТО/ремонте (временно), новые смены не создаются
+//   retired     → списан с эксплуатации (терминал), назад не возвращается
+// Orthogonal к deleted_at: retired + deleted_at=null → виден как «списан»,
+// deleted_at!=null → скрыт из UI полностью, история сохраняется.
+export const craneStatusEnum = pgEnum('crane_status', ['active', 'maintenance', 'retired'])
+
 // События auth для audit trail (CLAUDE.md §5.4)
 export const authEventTypeEnum = pgEnum('auth_event_type', [
   'login_success',

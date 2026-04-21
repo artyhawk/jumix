@@ -68,3 +68,25 @@
 Подключать когда: (а) self-service регистрация организаций (не через superadmin), либо (б) заказчик запросит auto-fill name/address по BIN в форме создания.
 
 Не блокер MVP — superadmin проверяет BIN глазами по договору с клиентом.
+
+---
+
+## Cranes
+
+### `cranes.tariffs_json` structured schema (blocked on payroll spec)
+
+Сейчас `tariffs_json` хранится как свободный JSONB (`z.record(z.unknown())`). Это позволяет создавать краны и тестировать CRUD + ассоциации без финальной структуры тарифов.
+
+Финальная структура придёт от специалиста заказчика на Этапе 3 (payroll engine). Ожидаемые поля (гипотеза, НЕ реализуется до подтверждения):
+
+- `dayRate` / `nightRate` — часовые ставки
+- `overtimeMultiplier` — коэффициент переработок
+- `weekendMultiplier`, `holidayMultiplier`
+- `fixedDailyRate` — альтернатива hourly
+- `bonusStructure`
+- `currency` (`'KZT'` в MVP)
+- `effectiveFrom` / `effectiveTo` — история тарифов
+
+Когда получим спеку → заменяем `z.record` на строгую Zod-схему + возможно JSONB CHECK constraint в БД. Сейчас owner/superadmin могут записать любой JSON в это поле. Payroll engine пока не использует `tariffs_json` (engine не написан — см. CLAUDE.md §4, Этап 3).
+
+Триггер: получение спеки начислений от заказчика в первую неделю Этапа 3.
