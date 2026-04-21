@@ -90,3 +90,13 @@
 Когда получим спеку → заменяем `z.record` на строгую Zod-схему + возможно JSONB CHECK constraint в БД. Сейчас owner/superadmin могут записать любой JSON в это поле. Payroll engine пока не использует `tariffs_json` (engine не написан — см. CLAUDE.md §4, Этап 3).
 
 Триггер: получение спеки начислений от заказчика в первую неделю Этапа 3.
+
+### Cover `siteId`-filter enumeration in cranes tests
+
+Сейчас `GET /cranes?siteId=...` покрыт только happy-path (owner фильтрует по своему site). Foreign-siteId в query-параметре (owner A → `?siteId={orgB_siteId}`) НЕ имеет explicit теста.
+
+Поведение скорее всего корректное: repository добавляет `WHERE organization_id = ctx.organizationId AND site_id = $filter` — пересечение пусто, вернётся `200 []` (не 403, legitimate query с бесполезным фильтром). Но без теста это полагание на имплементацию, регрессия пройдёт молча.
+
+Отложено до Vertical B2 (operators): там появится аналогичный паттерн с `?craneId=...` query-фильтром. Добавить оба теста вместе — один для cranes.siteId, один для operators.craneId — чтобы закрыть класс "foreign resource ID in list filter" целиком.
+
+Тест должен: создать org A (+ site + crane), org B (+ site), залогинить owner A, дёрнуть `GET /cranes?siteId={orgB_site.id}` → ожидать 200 с пустым items array.
