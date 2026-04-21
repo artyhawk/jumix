@@ -1,6 +1,6 @@
 import type { DatabaseClient, NewRefreshToken, RefreshToken } from '@jumix/db'
 import { refreshTokens } from '@jumix/db'
-import { and, eq, isNull, sql } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 
 export type InsertRefreshTokenInput = Omit<NewRefreshToken, 'id' | 'createdAt'>
 
@@ -43,8 +43,9 @@ export class RefreshTokenRepository {
 
   /**
    * Маркирует токен revoked с указанной причиной и replaced_by.
-   * Idempotent: повторный revoke того же токена ничего не меняет
-   * (COALESCE на revoked_at оставляет первое значение).
+   * Idempotent: условие `revoked_at IS NULL` в WHERE — повторный revoke
+   * того же токена не тронет уже проставленные revoked_at / reason /
+   * replaced_by, сохраняя первое значение.
    */
   async revoke(
     id: string,
@@ -54,12 +55,8 @@ export class RefreshTokenRepository {
   ): Promise<void> {
     await this.database.db
       .update(refreshTokens)
-      .set({
-        revokedAt: sql`COALESCE(${refreshTokens.revokedAt}, ${at})`,
-        revokedReason: sql`COALESCE(${refreshTokens.revokedReason}, ${reason})`,
-        replacedBy: sql`COALESCE(${refreshTokens.replacedBy}, ${replacedBy})`,
-      })
-      .where(eq(refreshTokens.id, id))
+      .set({ revokedAt: at, revokedReason: reason, replacedBy })
+      .where(and(eq(refreshTokens.id, id), isNull(refreshTokens.revokedAt)))
   }
 
   /**
@@ -84,11 +81,13 @@ export class RefreshTokenRepository {
    * Алгоритм: транзитивно пройтись по replaced_by через рекурсивный CTE.
    * Если клиент предъявил токен, у которого revokedReason='rotation',
    * значит кто-то скопировал токен и использовал раньше легитимного клиента.
+   *
+   * COALESCE на revoked_at сохраняет первую метку для уже отозванных звеньев;
+   * revoked_reason для всей цепочки перезаписывается в 'reuse_detected' —
+   * это важнее, чем первоначальный reason 'rotation', т.к. сигнализирует
+   * о компрометации, а не о штатной ротации.
    */
-  async revokeChainFrom(id: string, at: Date = new Date()): Promise<void> {
-    // Recursive CTE: собираем всю цепочку и помечаем каждую запись.
-    // postgres.js принимает plain SQL через sql.unsafe / template — у нас
-    // доступен database.sql template.
+  async revokeChainFrom(id: string): Promise<void> {
     await this.database.sql`
       WITH RECURSIVE chain AS (
         SELECT id, replaced_by FROM refresh_tokens WHERE id = ${id}
@@ -98,7 +97,7 @@ export class RefreshTokenRepository {
           JOIN chain c ON rt.id = c.replaced_by
       )
       UPDATE refresh_tokens
-         SET revoked_at = COALESCE(revoked_at, ${at}),
+         SET revoked_at = COALESCE(revoked_at, now()),
              revoked_reason = 'reuse_detected'
        WHERE id IN (SELECT id FROM chain)
     `

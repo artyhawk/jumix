@@ -9,6 +9,8 @@ import {
 import { registerAuthRoutes } from './auth.routes'
 import { registerPasswordRoutes } from './password/password.routes'
 import { PasswordAuthService } from './password/password.service'
+import { registerRefreshRoutes } from './refresh/refresh.routes'
+import { RefreshAuthService } from './refresh/refresh.service'
 import {
   AuthEventRepository,
   PasswordResetTokenRepository,
@@ -23,6 +25,7 @@ import { TokenIssuerService } from './token-issuer.service'
 type AuthServices = {
   sms: SmsAuthService
   password: PasswordAuthService
+  refresh: RefreshAuthService
   tokenIssuer: TokenIssuerService
   authEvents: AuthEventRepository
   userRepo: UserRepository
@@ -109,9 +112,18 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
     app.log,
   )
 
+  const refreshService = new RefreshAuthService(
+    refreshRepo,
+    userRepo,
+    authEvents,
+    tokenIssuer,
+    app.log,
+  )
+
   app.decorate('authServices', {
     sms: smsService,
     password: passwordService,
+    refresh: refreshService,
     tokenIssuer,
     authEvents,
     userRepo,
@@ -122,6 +134,7 @@ const authPlugin: FastifyPluginAsync = async (app: FastifyInstance) => {
   await app.register(registerAuthRoutes)
   await app.register(registerSmsRoutes)
   await app.register(registerPasswordRoutes)
+  await app.register(registerRefreshRoutes)
 }
 
 export default fp(authPlugin, { name: 'auth', dependencies: ['jwt', 'redis', 'authenticate'] })
