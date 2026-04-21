@@ -2,14 +2,31 @@
   "name": "@jumix/auth",
   "version": "0.0.0",
   "private": true,
-  "description": "Auth core: JWT (RS256), refresh rotation, RBAC policies, password hashing",
+  "description": "Auth core: JWT (RS256), refresh rotation, RBAC policies, password hashing, rate limiter",
   "type": "module",
   "main": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./jwt": "./src/jwt/index.ts",
+    "./refresh": "./src/refresh/index.ts",
+    "./password": "./src/password/index.ts",
+    "./policy": "./src/policy/index.ts",
+    "./rate-limit": "./src/rate-limit/index.ts"
   },
   "scripts": {
-    "typecheck": "echo 'TODO: tsc --noEmit'",
-    "test": "echo 'TODO: vitest run'"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "argon2": "^0.41.1",
+    "jose": "^5.9.6",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@jumix/config": "workspace:*",
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
   }
 }
