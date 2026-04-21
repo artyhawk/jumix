@@ -5,7 +5,11 @@ import sensible from '@fastify/sensible'
 import type { DatabaseClient } from '@jumix/db'
 import { type FastifyInstance, fastify } from 'fastify'
 import type { Env } from './config/env'
+import { registerAuthRoutes } from './modules/auth/auth.routes'
+import authenticatePlugin from './plugins/authenticate'
 import { registerErrorHandler } from './plugins/error-handler'
+import jwtPlugin from './plugins/jwt'
+import redisPlugin from './plugins/redis'
 import { registerHealthRoutes } from './routes/health'
 
 export interface AppDeps {
@@ -49,7 +53,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   })
   await app.register(cookie)
 
+  await app.register(jwtPlugin)
+  await app.register(redisPlugin)
+  await app.register(authenticatePlugin)
+
   await app.register(registerHealthRoutes)
+  await app.register(registerAuthRoutes)
 
   return app
 }

@@ -47,6 +47,9 @@ export async function buildTestApp(overrides: Partial<Env> = {}): Promise<TestAp
     LOG_LEVEL: 'silent',
     DATABASE_URL: databaseUrl,
     CORS_ORIGINS: [],
+    JWT_ISSUER: 'jumix-api-test',
+    JWT_AUDIENCE: 'jumix-test',
+    JWT_ACCESS_TTL_SECONDS: 15 * 60,
     ...overrides,
   }
 

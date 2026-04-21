@@ -30,6 +30,36 @@ export const envSchema = z.object({
         .map((s) => s.trim())
         .filter(Boolean),
     ),
+
+  /**
+   * Redis для rate-limit, SMS-cooldown и BullMQ backend. Опционален:
+   *  - в dev/test без Redis использует MemoryRateLimiter;
+   *  - в prod — ОБЯЗАТЕЛЕН, иначе лимиты не переживают рестарт.
+   * Проверку на обязательность делаем в server.ts через refine по NODE_ENV.
+   */
+  REDIS_URL: z.string().url().optional(),
+
+  /**
+   * Пути к RSA-ключам для подписи/верификации access-токенов (RS256, §5.1).
+   *
+   * Prod: оба пути обязательны, ключи лежат на сервере, права 600.
+   * Dev/test: если пути не заданы, plugins/jwt.ts генерирует ephemeral keypair
+   * при старте (с WARN-логом). Генерация in-memory означает что после рестарта
+   * все ранее выданные токены недействительны — для локальной разработки OK.
+   */
+  JWT_PRIVATE_KEY_PATH: z.string().optional(),
+  JWT_PUBLIC_KEY_PATH: z.string().optional(),
+
+  /** JWT iss/aud claims. Клиенты проверяют эти поля при decode. */
+  JWT_ISSUER: z.string().min(1).default('jumix-api'),
+  JWT_AUDIENCE: z.string().min(1).default('jumix-clients'),
+
+  /** TTL access-токена (§5.1: 15 минут). */
+  JWT_ACCESS_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(15 * 60),
 })
 
 export type Env = z.infer<typeof envSchema>

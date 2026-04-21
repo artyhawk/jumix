@@ -11,6 +11,8 @@ import type { FastifyInstance, FastifyPluginAsync } from 'fastify'
  * Ready возвращает 503 при недоступной БД — это сигнал orchestrator'у
  * НЕ слать запросы в этот инстанс.
  */
+const READINESS_TIMEOUT_MS = 2000
+
 export const registerHealthRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
   app.get('/health', async () => ({
     status: 'ok',
@@ -19,7 +21,12 @@ export const registerHealthRoutes: FastifyPluginAsync = async (app: FastifyInsta
 
   app.get('/health/ready', async (_, reply) => {
     try {
-      await app.db.sql`select 1`
+      await Promise.race([
+        app.db.sql`select 1`,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('db readiness timeout')), READINESS_TIMEOUT_MS).unref(),
+        ),
+      ])
       return { status: 'ready', checks: { db: 'ok' } }
     } catch (err) {
       app.log.warn({ err }, 'readiness check failed')

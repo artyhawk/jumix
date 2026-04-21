@@ -38,9 +38,18 @@ importers:
       '@jumix/db':
         specifier: workspace:*
         version: link:../../packages/db
+      drizzle-orm:
+        specifier: ^0.36.4
+        version: 0.36.4(postgres@3.4.9)
       fastify:
         specifier: ^5.1.0
         version: 5.8.5
+      fastify-plugin:
+        specifier: ^5.0.1
+        version: 5.1.0
+      jose:
+        specifier: ^5.9.6
+        version: 5.10.0
       pino:
         specifier: ^9.5.0
         version: 9.14.0
