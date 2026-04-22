@@ -6,25 +6,14 @@ import { PageTransition } from '@/components/motion/page-transition'
 import { StaggerItem, StaggerList } from '@/components/motion/stagger-list'
 import { Card } from '@/components/ui/card'
 import { useAuth } from '@/hooks/use-auth'
+import { formatRuLongDate } from '@/lib/format/date'
 import { useDashboardStats } from '@/lib/hooks/use-dashboard'
 import { t } from '@/lib/i18n'
 import { IconCrane } from '@tabler/icons-react'
-import {
-  AlertCircle,
-  Building2,
-  CalendarRange,
-  HardHat,
-  type IdCard,
-  Sparkles,
-  UsersRound,
-} from 'lucide-react'
+import { AlertCircle, Building2, HardHat, type IdCard, Sparkles, UsersRound } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 
-/**
- * Superadmin dashboard (B3-UI-2). Owner/operator редиректятся на /;
- * редирект делает (app)/page.tsx по роли.
- */
 export default function DashboardPage() {
   const { user } = useAuth()
   const router = useRouter()
@@ -34,15 +23,21 @@ export default function DashboardPage() {
     if (user && user.role !== 'superadmin') router.replace('/')
   }, [user, router])
 
+  const formattedDate = useMemo(() => formatRuLongDate(), [])
+
   if (!user || user.role !== 'superadmin') return null
+
+  const displayName = user.name?.trim() || t('dashboard.hero.fallbackName')
 
   return (
     <PageTransition>
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl md:text-[32px] md:leading-[40px] font-semibold tracking-tight text-text-primary">
-          {t('dashboard.title')}
+          {t('dashboard.hero.greeting', { name: displayName })}
         </h1>
-        <p className="text-text-secondary">{t('dashboard.subtitle')}</p>
+        <p className="text-sm text-text-secondary">
+          {t('dashboard.hero.subtitle', { date: formattedDate })}
+        </p>
       </div>
 
       {stats.isError ? (
@@ -63,79 +58,57 @@ export default function DashboardPage() {
         </Card>
       ) : (
         <>
-          {stats.data && (
-            <PendingAttentionCallout
-              craneProfiles={stats.data.pending.craneProfiles}
-              organizationOperators={stats.data.pending.organizationOperators}
-              cranes={stats.data.pending.cranes}
-            />
-          )}
+          <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <StaggerItem>
+              <StatCard
+                icon={Building2}
+                label={t('dashboard.active.organizations')}
+                value={stats.data?.active.organizations ?? 0}
+                loading={stats.isLoading}
+                href="/organizations"
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatCard
+                icon={HardHat}
+                label={t('dashboard.active.craneProfiles')}
+                value={stats.data?.active.craneProfiles ?? 0}
+                loading={stats.isLoading}
+                href="/crane-profiles"
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatCard
+                icon={IconCrane as unknown as typeof IdCard}
+                label={t('dashboard.active.cranes')}
+                value={stats.data?.active.cranes ?? 0}
+                loading={stats.isLoading}
+                href="/cranes"
+              />
+            </StaggerItem>
+            <StaggerItem>
+              <StatCard
+                icon={UsersRound}
+                label={t('dashboard.active.memberships')}
+                value={stats.data?.active.memberships ?? 0}
+                loading={stats.isLoading}
+                href="/organization-operators"
+              />
+            </StaggerItem>
+          </StaggerList>
 
-          <div className="flex flex-col gap-3">
-            <h2 className="text-sm font-semibold text-text-tertiary uppercase tracking-wider">
-              {t('dashboard.active.title')}
-            </h2>
-            <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <StaggerItem>
-                <StatCard
-                  icon={Building2}
-                  label={t('dashboard.active.organizations')}
-                  value={stats.data?.active.organizations ?? 0}
-                  loading={stats.isLoading}
-                  href="/organizations"
-                />
-              </StaggerItem>
-              <StaggerItem>
-                <StatCard
-                  icon={HardHat}
-                  label={t('dashboard.active.craneProfiles')}
-                  value={stats.data?.active.craneProfiles ?? 0}
-                  loading={stats.isLoading}
-                  href="/crane-profiles"
-                />
-              </StaggerItem>
-              <StaggerItem>
-                <StatCard
-                  icon={IconCrane as unknown as typeof IdCard}
-                  label={t('dashboard.active.cranes')}
-                  value={stats.data?.active.cranes ?? 0}
-                  loading={stats.isLoading}
-                  href="/cranes"
-                />
-              </StaggerItem>
-              <StaggerItem>
-                <StatCard
-                  icon={UsersRound}
-                  label={t('dashboard.active.memberships')}
-                  value={stats.data?.active.memberships ?? 0}
-                  loading={stats.isLoading}
-                  href="/organization-operators"
-                />
-              </StaggerItem>
-            </StaggerList>
-          </div>
+          <StatCard
+            icon={Sparkles}
+            label={t('dashboard.thisWeek.title')}
+            value={stats.data?.thisWeek.newRegistrations ?? 0}
+            loading={stats.isLoading}
+          />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <StatCard
-              icon={Sparkles}
-              label={t('dashboard.thisWeek.title')}
-              value={stats.data?.thisWeek.newRegistrations ?? 0}
-              loading={stats.isLoading}
-              accent="brand"
-            />
-            <Card variant="default" className="flex items-center gap-3">
-              <span className="inline-flex items-center justify-center size-9 rounded-md border border-border-subtle bg-layer-3">
-                <CalendarRange
-                  className="size-5 text-text-secondary"
-                  strokeWidth={1.5}
-                  aria-hidden
-                />
-              </span>
-              <div className="text-sm text-text-secondary">
-                Добро пожаловать, {user.name || 'администратор'}.
-              </div>
-            </Card>
-          </div>
+          <PendingAttentionCallout
+            craneProfiles={stats.data?.pending.craneProfiles ?? 0}
+            organizationOperators={stats.data?.pending.organizationOperators ?? 0}
+            cranes={stats.data?.pending.cranes ?? 0}
+          />
         </>
       )}
     </PageTransition>

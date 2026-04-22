@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { PendingAttentionCallout } from './pending-attention-callout'
 
 describe('PendingAttentionCallout', () => {
-  it('renders nothing when total pending is zero', () => {
-    const { container } = render(
-      <PendingAttentionCallout craneProfiles={0} organizationOperators={0} cranes={0} />,
-    )
-    expect(container.firstChild).toBeNull()
+  it('renders empty state (success icon + allClear text) when total pending is zero', () => {
+    render(<PendingAttentionCallout craneProfiles={0} organizationOperators={0} cranes={0} />)
+    expect(screen.getByText('Всё одобрено')).toBeInTheDocument()
+    expect(screen.getByText('Нет заявок на рассмотрение')).toBeInTheDocument()
+    expect(screen.queryAllByRole('link')).toHaveLength(0)
   })
 
   it('renders three pending rows with links to /approvals tabs', () => {

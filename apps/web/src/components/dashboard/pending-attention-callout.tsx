@@ -3,14 +3,9 @@
 import { Card } from '@/components/ui/card'
 import { t } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { ArrowRight, HardHat, ShieldCheck, UsersRound } from 'lucide-react'
+import { ArrowRight, CheckCircle2, HardHat, ShieldCheck, UsersRound } from 'lucide-react'
 import Link from 'next/link'
 
-/**
- * Callout-блок на дашборде: агрегирует все три pending-счётчика и даёт
- * прямые ссылки на /approvals?tab=<pipeline>. Скрывается когда total=0
- * (пустая очередь — нет что показывать).
- */
 export function PendingAttentionCallout({
   craneProfiles,
   organizationOperators,
@@ -21,7 +16,26 @@ export function PendingAttentionCallout({
   cranes: number
 }) {
   const total = craneProfiles + organizationOperators + cranes
-  if (total === 0) return null
+
+  if (total === 0) {
+    return (
+      <Card variant="default" className="border-success/20 bg-success/5">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center justify-center size-9 rounded-md bg-success/10 border border-success/20 shrink-0">
+            <CheckCircle2 className="size-5 text-success" strokeWidth={1.5} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <div className="text-[18px] leading-7 font-semibold text-text-primary">
+              {t('dashboard.pending.allClear')}
+            </div>
+            <div className="text-sm text-text-secondary">
+              {t('dashboard.pending.allClearSubtitle')}
+            </div>
+          </div>
+        </div>
+      </Card>
+    )
+  }
 
   return (
     <Card variant="elevated" className="border-brand-500/30 bg-brand-500/5">

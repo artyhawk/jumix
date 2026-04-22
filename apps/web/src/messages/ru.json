@@ -79,26 +79,28 @@
     "operator": "Крановщик"
   },
   "dashboard": {
-    "title": "Обзор платформы",
-    "subtitle": "Ключевые метрики и очередь заявок.",
+    "hero": {
+      "greeting": "Добро пожаловать, {name}",
+      "subtitle": "{date} · Обзор Jumix",
+      "fallbackName": "Администратор"
+    },
     "pending": {
       "title": "Ожидают модерации",
       "craneProfiles": "Профили крановщиков",
       "organizationOperators": "Найм",
       "cranes": "Краны",
-      "empty": "Очередь пуста",
-      "review": "Рассмотреть"
+      "review": "Рассмотреть",
+      "allClear": "Всё одобрено",
+      "allClearSubtitle": "Нет заявок на рассмотрение"
     },
     "active": {
-      "title": "Активные",
       "organizations": "Организации",
       "craneProfiles": "Крановщики",
       "cranes": "Краны",
       "memberships": "Активные найма"
     },
     "thisWeek": {
-      "title": "Новые регистрации (7 дней)",
-      "value": "{count}"
+      "title": "Новые регистрации (7 дней)"
     },
     "errorTitle": "Не удалось загрузить метрики",
     "retry": "Повторить"
