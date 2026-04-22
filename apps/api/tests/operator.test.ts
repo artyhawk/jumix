@@ -1,4 +1,4 @@
-import { auditLog, operators, users } from '@jumix/db'
+import { auditLog, craneProfiles, organizationOperators, users } from '@jumix/db'
 import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type TestAppHandle, buildTestApp } from './helpers/build-test-app'
@@ -446,7 +446,10 @@ describe('POST /api/v1/operators (create)', () => {
     expect(res.json().error.code).toBe('IIN_ALREADY_EXISTS_IN_ORG')
   })
 
-  it('201: same IIN allowed in DIFFERENT org (partial unique is per-org)', async () => {
+  it('409: same IIN rejected in DIFFERENT org (ADR 0003: IIN now global)', async () => {
+    // B2d-1: crane_profiles.iin — global UNIQUE среди живых. Один человек
+    // живёт на платформе как один профиль; per-org дубликаты больше не
+    // допускаются. B2d-3 введёт hire-request flow поверх existing crane_profile.
     const sharedIin = iin(111_000_104)
     const first = await createOperator(ownerAToken, { iin: sharedIin })
     expect(first.organizationId).toBe(orgAId)
@@ -461,8 +464,8 @@ describe('POST /api/v1/operators (create)', () => {
         iin: sharedIin,
       },
     })
-    expect(res.statusCode).toBe(201)
-    expect(res.json().organizationId).toBe(orgBId)
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('IIN_ALREADY_EXISTS_IN_ORG')
   })
 
   it('409 + atomic rollback: IIN conflict does NOT leave orphan user', async () => {
@@ -939,9 +942,9 @@ describe('PATCH /api/v1/operators/:id/status — CRITICAL terminated_at semantic
       payload: { status: 'terminated' },
     })
     const row1 = await handle.app.db.db
-      .select({ terminatedAt: operators.terminatedAt })
-      .from(operators)
-      .where(eq(operators.id, op.id))
+      .select({ terminatedAt: organizationOperators.terminatedAt })
+      .from(organizationOperators)
+      .where(eq(organizationOperators.id, op.id))
     const terminatedAt1 = row1[0]?.terminatedAt
 
     const res = await handle.app.inject({
@@ -952,9 +955,9 @@ describe('PATCH /api/v1/operators/:id/status — CRITICAL terminated_at semantic
     })
     expect(res.statusCode).toBe(200)
     const row2 = await handle.app.db.db
-      .select({ terminatedAt: operators.terminatedAt })
-      .from(operators)
-      .where(eq(operators.id, op.id))
+      .select({ terminatedAt: organizationOperators.terminatedAt })
+      .from(organizationOperators)
+      .where(eq(organizationOperators.id, op.id))
     expect(row2[0]?.terminatedAt?.toISOString()).toBe(terminatedAt1?.toISOString())
   })
 
@@ -967,9 +970,9 @@ describe('PATCH /api/v1/operators/:id/status — CRITICAL terminated_at semantic
       payload: { status: 'terminated' },
     })
     const row1 = await handle.app.db.db
-      .select({ terminatedAt: operators.terminatedAt })
-      .from(operators)
-      .where(eq(operators.id, op.id))
+      .select({ terminatedAt: organizationOperators.terminatedAt })
+      .from(organizationOperators)
+      .where(eq(organizationOperators.id, op.id))
     const firstTerminatedAt = row1[0]?.terminatedAt?.toISOString()
 
     // повторно
@@ -983,9 +986,9 @@ describe('PATCH /api/v1/operators/:id/status — CRITICAL terminated_at semantic
     expect(res.statusCode).toBe(200)
 
     const row2 = await handle.app.db.db
-      .select({ terminatedAt: operators.terminatedAt })
-      .from(operators)
-      .where(eq(operators.id, op.id))
+      .select({ terminatedAt: organizationOperators.terminatedAt })
+      .from(organizationOperators)
+      .where(eq(organizationOperators.id, op.id))
     expect(row2[0]?.terminatedAt?.toISOString()).toBe(firstTerminatedAt)
 
     // Idempotent call — ровно один audit entry, не два.
@@ -1006,9 +1009,9 @@ describe('PATCH /api/v1/operators/:id/status — CRITICAL terminated_at semantic
       payload: { status: 'terminated' },
     })
     const row1 = await handle.app.db.db
-      .select({ terminatedAt: operators.terminatedAt })
-      .from(operators)
-      .where(eq(operators.id, op.id))
+      .select({ terminatedAt: organizationOperators.terminatedAt })
+      .from(organizationOperators)
+      .where(eq(organizationOperators.id, op.id))
     const first = row1[0]?.terminatedAt
     if (!first) throw new Error('expected terminated_at after first terminate')
 
@@ -1036,9 +1039,9 @@ describe('PATCH /api/v1/operators/:id/status — CRITICAL terminated_at semantic
     })
     expect(second.statusCode).toBe(200)
     const row2 = await handle.app.db.db
-      .select({ terminatedAt: operators.terminatedAt })
-      .from(operators)
-      .where(eq(operators.id, op.id))
+      .select({ terminatedAt: organizationOperators.terminatedAt })
+      .from(organizationOperators)
+      .where(eq(organizationOperators.id, op.id))
     const fresh = row2[0]?.terminatedAt
     // Должна быть проставлена заново (не null и >= first по дате).
     expect(fresh).not.toBeNull()
@@ -1671,6 +1674,10 @@ describe('Avatar flow (/me/avatar/*)', () => {
 })
 
 describe('Data layer guarantees', () => {
+  // B2d-1 (ADR 0003): таблица operators разделена на crane_profiles +
+  // organization_operators. Inserts направлены на новые таблицы напрямую;
+  // проверяемые CHECK'и и FK-restrict'ы переехали вместе с данными.
+
   it('DB CHECK rejects ИИН формат не 12 цифр (bypass Zod)', async () => {
     const user = await createUser(handle.app, {
       role: 'operator',
@@ -1679,10 +1686,10 @@ describe('Data layer guarantees', () => {
       name: 'Direct',
     })
     const invalidInsert = handle.app.db.db.execute(sql`
-      INSERT INTO operators (user_id, organization_id, first_name, last_name, iin)
-      VALUES (${user.id}, ${orgAId}, 'X', 'Y', 'abc123')
+      INSERT INTO crane_profiles (user_id, first_name, last_name, iin)
+      VALUES (${user.id}, 'X', 'Y', 'abc123')
     `)
-    await expect(invalidInsert).rejects.toThrow(/operators_iin_format_chk/i)
+    await expect(invalidInsert).rejects.toThrow(/crane_profiles_iin_format_chk/i)
   })
 
   it('DB CHECK rejects availability NOT NULL with status != active', async () => {
@@ -1692,11 +1699,25 @@ describe('Data layer guarantees', () => {
       organizationId: orgAId,
       name: 'Avail',
     })
+    const cp = await handle.app.db.db
+      .insert(craneProfiles)
+      .values({
+        userId: user.id,
+        firstName: 'X',
+        lastName: 'Y',
+        iin: iin(333_010_001),
+        approvalStatus: 'approved',
+      })
+      .returning()
+    const craneProfileId = cp[0]?.id
+    if (!craneProfileId) throw new Error('crane_profile insert failed')
     const invalidInsert = handle.app.db.db.execute(sql`
-      INSERT INTO operators (user_id, organization_id, first_name, last_name, iin, status, availability)
-      VALUES (${user.id}, ${orgAId}, 'X', 'Y', '111111111110', 'blocked', 'free')
+      INSERT INTO organization_operators (crane_profile_id, organization_id, status, availability, approval_status)
+      VALUES (${craneProfileId}, ${orgAId}, 'blocked', 'free', 'approved')
     `)
-    await expect(invalidInsert).rejects.toThrow(/operators_availability_only_when_active_chk/i)
+    await expect(invalidInsert).rejects.toThrow(
+      /organization_operators_availability_only_when_active_chk/i,
+    )
   })
 
   it('DB CHECK allows availability NULL with any status', async () => {
@@ -1706,14 +1727,29 @@ describe('Data layer guarantees', () => {
       organizationId: orgAId,
       name: 'NullAvail',
     })
+    const cp = await handle.app.db.db
+      .insert(craneProfiles)
+      .values({
+        userId: user.id,
+        firstName: 'X',
+        lastName: 'Y',
+        iin: iin(333_000_001),
+        approvalStatus: 'approved',
+      })
+      .returning()
+    const craneProfileId = cp[0]?.id
+    if (!craneProfileId) throw new Error('crane_profile insert failed')
     const validInsert = handle.app.db.db.execute(sql`
-      INSERT INTO operators (user_id, organization_id, first_name, last_name, iin, status)
-      VALUES (${user.id}, ${orgAId}, 'X', 'Y', ${iin(333_000_001)}, 'terminated')
+      INSERT INTO organization_operators (crane_profile_id, organization_id, status, approval_status)
+      VALUES (${craneProfileId}, ${orgAId}, 'terminated', 'approved')
     `)
     await expect(validInsert).resolves.toBeDefined()
   })
 
-  it('partial UNIQUE(iin, org) excludes soft-deleted (slot освобождается)', async () => {
+  it('partial UNIQUE(iin) GLOBAL excludes soft-deleted (slot освобождается)', async () => {
+    // B2d-1: IIN теперь глобально уникален среди живых crane_profiles (был
+    // per-org в B2b). Семантика сохраняется: soft-delete → слот свободен,
+    // recreate проходит. Compat-shim softDelete помечает ОБЕ таблицы.
     const iinVal = iin(444_000_001)
     const first = await createOperator(ownerAToken, { iin: iinVal })
     await handle.app.inject({
@@ -1721,7 +1757,6 @@ describe('Data layer guarantees', () => {
       url: `/api/v1/operators/${first.id}`,
       headers: { authorization: `Bearer ${ownerAToken}` },
     })
-    // Повторный insert того же ИИН через raw SQL — ДОЛЖЕН пройти.
     const user = await createUser(handle.app, {
       role: 'operator',
       phone: nextPhone(),
@@ -1729,19 +1764,19 @@ describe('Data layer guarantees', () => {
       name: 'ReIns',
     })
     const re = handle.app.db.db.execute(sql`
-      INSERT INTO operators (user_id, organization_id, first_name, last_name, iin)
-      VALUES (${user.id}, ${orgAId}, 'Rehired', 'Same', ${iinVal})
+      INSERT INTO crane_profiles (user_id, first_name, last_name, iin)
+      VALUES (${user.id}, 'Rehired', 'Same', ${iinVal})
     `)
     await expect(re).resolves.toBeDefined()
   })
 
-  it('FK ON DELETE RESTRICT: cannot delete user with operator', async () => {
+  it('FK ON DELETE RESTRICT: cannot delete user referenced by crane_profile', async () => {
     const op = await createOperator(ownerAToken)
     const del = handle.app.db.db.execute(sql`DELETE FROM users WHERE id = ${op.userId}`)
     await expect(del).rejects.toThrow(/violates foreign key/i)
   })
 
-  it('FK ON DELETE RESTRICT: cannot delete organization with operator', async () => {
+  it('FK ON DELETE RESTRICT: cannot delete organization with organization_operator', async () => {
     const orphan = await createOrganization(handle.app, { bin: '630000000099' })
     const u = await createUser(handle.app, {
       role: 'operator',
@@ -1749,17 +1784,36 @@ describe('Data layer guarantees', () => {
       organizationId: orphan.id,
       name: 'Stuck',
     })
-    await handle.app.db.db.execute(sql`
-      INSERT INTO operators (user_id, organization_id, first_name, last_name, iin)
-      VALUES (${u.id}, ${orphan.id}, 'X', 'Y', ${iin(444_000_099)})
-    `)
+    const cp = await handle.app.db.db
+      .insert(craneProfiles)
+      .values({
+        userId: u.id,
+        firstName: 'X',
+        lastName: 'Y',
+        iin: iin(444_000_099),
+        approvalStatus: 'approved',
+      })
+      .returning()
+    const craneProfileId = cp[0]?.id
+    if (!craneProfileId) throw new Error('crane_profile insert failed')
+    await handle.app.db.db.insert(organizationOperators).values({
+      craneProfileId,
+      organizationId: orphan.id,
+      approvalStatus: 'approved',
+    })
     const del = handle.app.db.db.execute(sql`DELETE FROM organizations WHERE id = ${orphan.id}`)
     await expect(del).rejects.toThrow(/violates foreign key/i)
   })
 
   it('specialization jsonb default = {} при пропуске', async () => {
     const op = await createOperator(ownerAToken)
-    const row = await handle.app.db.db.select().from(operators).where(eq(operators.id, op.id))
+    // specialization живёт на crane_profiles (B2d-1). hydrated Operator.id
+    // ссылается на organization_operators.id — находим профиль через JOIN.
+    const row = await handle.app.db.db
+      .select({ specialization: craneProfiles.specialization })
+      .from(organizationOperators)
+      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+      .where(eq(organizationOperators.id, op.id))
     expect(row[0]?.specialization).toEqual({})
   })
 })

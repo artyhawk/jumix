@@ -18,6 +18,13 @@ import type { User } from '@jumix/db'
  *
  * Используем role из БД (источник истины) и инвариант
  * users_org_role_consistency_chk гарантирует правильный пар (role, orgId).
+ *
+ * B2d-1 (ADR 0003): operator AuthContext больше не несёт organizationId.
+ * Users row для operator всё равно имеет organizationId (FK + БД CHECK
+ * сохраняются) — это «primary org» legacy-поле, используется для
+ * authenticate.ts шага 5 (organization.status). В per-request ctx его не
+ * пробрасываем: per-org операции идут через `X-Organization-Id` header
+ * (B2d-2).
  */
 export function buildAuthContext(claims: AccessTokenClaims, user: User): AuthContext {
   if (claims.role !== user.role) {
@@ -37,12 +44,21 @@ export function buildAuthContext(claims: AccessTokenClaims, user: User): AuthCon
     }
   }
 
+  if (user.role === 'operator') {
+    return {
+      role: 'operator',
+      userId: user.id,
+      tokenVersion: user.tokenVersion,
+    }
+  }
+
+  // owner
   if (!user.organizationId) {
-    throw new AuthError('TOKEN_INVALID', `${user.role} must have an organization`)
+    throw new AuthError('TOKEN_INVALID', 'owner must have an organization')
   }
 
   return {
-    role: user.role,
+    role: 'owner',
     userId: user.id,
     organizationId: user.organizationId,
     tokenVersion: user.tokenVersion,

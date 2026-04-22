@@ -24,10 +24,12 @@ const owner = (orgId = randomUUID()): AuthContext => ({
   tokenVersion: 0,
 })
 
-const operator = (orgId = randomUUID()): AuthContext => ({
+// B2d-1 (ADR 0003): operator AuthContext больше не несёт organizationId
+// (M:N через organization_operators). Параметр orgId сохраняем сигнатурно
+// для будущих тестов, но игнорируем.
+const operator = (_orgId = randomUUID()): AuthContext => ({
   role: 'operator',
   userId: randomUUID(),
-  organizationId: orgId,
   tokenVersion: 0,
 })
 
@@ -69,8 +71,8 @@ describe('policy helpers', () => {
     expect(tenantListScope(owner(orgId))).toEqual({ type: 'by_org', organizationId: orgId })
   })
 
-  it('tenantListScope: operator → by_user', () => {
+  it('tenantListScope: operator → by_crane_profile (ADR 0003)', () => {
     const ctx = operator()
-    expect(tenantListScope(ctx)).toEqual({ type: 'by_user', userId: ctx.userId })
+    expect(tenantListScope(ctx)).toEqual({ type: 'by_crane_profile', userId: ctx.userId })
   })
 })

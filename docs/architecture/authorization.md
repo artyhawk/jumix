@@ -91,6 +91,24 @@ status:          'active' | 'maintenance' | 'retired'   ← operational
 
 **Индексы:** partial index для hot-path очереди `WHERE approval_status = 'pending' AND deleted_at IS NULL`; существующие operational индексы (например «какие краны на site'е») дополняются условием `approval_status = 'approved'`, чтобы в индексе не сидели pending/rejected записи.
 
+## 4.2c Multi-org operator model (ADR 0003)
+
+Один человек-крановщик может работать в нескольких дочках холдинга. Для этого identity + membership разделены на две таблицы — **holding-approval в two-pipeline форме** (ADR [0003](adr/0003-operators-multi-org-model.md)):
+
+- **`crane_profiles`** — платформенная личность: ФИО, **ИИН глобально уникален** среди живых, аватар, навыки. Свой `approval_status` (pipeline 1 — платформа пускает человека в пул найма).
+- **`organization_operators`** — M:N membership `(crane_profile_id, organization_id)`: «этот человек работает в этой дочке». Свой `approval_status` (pipeline 2 — холдинг одобряет конкретный найм). Сюда же переезжают operational поля: `hired_at`, `terminated_at`, `status` (active/blocked/terminated), `availability`.
+
+Оба pipeline'а подчиняются § 4.2b (superadmin-only approve/reject, rejected read-only, operational gate на approved).
+
+**JWT-контракт для operator (BREAKING vs B2b):**
+
+- `org` claim в access-токене operator'а — **всегда `null`**. Operator не привязан к одной дочке на уровне идентичности. Zod-схема `accessTokenClaimsSchema` и БД CHECK это инвариантят.
+- `AuthContext` для role=operator: `{ role: 'operator', userId, tokenVersion }` — **без** `organizationId`. Owner/superadmin по-прежнему несут `organizationId` / `null`.
+- Per-org операции operator'а (выбор конкретной дочки, смен, баланса) идут через `X-Organization-Id` header (вводится в B2d-2). Middleware резолвит его в нужный `organization_operators.id` и проверяет `approval_status='approved' AND status<>'terminated' AND deleted_at IS NULL`. Без header'а per-org endpoints возвращают 400.
+- `sameOrganization(ctx, orgId)` для operator'а теперь **всегда `false`** (нет «той же» org без выбора). `tenantListScope` для operator → `{ type: 'by_crane_profile', userId }`.
+
+**Compat-shim (B2d-1):** `OperatorRepository` отдаёт legacy `Operator` shape (единая плоская запись) INNER-JOIN'ом между `organization_operators` и `crane_profiles`. Id в hydrated-форме — это `organization_operators.id` (preserved из `operators.id` через миграцию 0007 → audit-log continuity). Все записи, создаваемые шимом, сразу `approved` в обеих таблицах. Реальный approval-workflow поверх профилей и найма — B2d-3.
+
 **Layer 3: Repository с обязательным AuthContext**
 
 ```typescript

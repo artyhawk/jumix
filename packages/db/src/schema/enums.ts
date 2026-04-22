@@ -51,17 +51,39 @@ export const craneApprovalStatusEnum = pgEnum('crane_approval_status', [
   'rejected',
 ])
 
-// Жизненный цикл крановщика (employment status).
+// Жизненный цикл крановщика (employment status) — существует per-organization:
+// после B2d-1 (ADR 0003) хранится в `organization_operators.status`. Один человек
+// (crane_profile) может иметь разный status в разных дочках: в одной active,
+// в другой terminated.
 //   active      → работает нормально, смены фиксируются
 //   blocked     → временно заблокирован (дисциплинарно), не может работать,
 //                 профиль остаётся виден самому оператору
-//   terminated  → трудовой договор расторгнут, не может работать; профиль
-//                 остаётся виден оператору — по законодательству РК (PDL)
+//   terminated  → трудовой договор расторгнут в этой дочке, не может работать;
+//                 профиль остаётся виден оператору — по законодательству РК (PDL)
 //                 субъект персональных данных имеет право читать свои данные,
 //                 в т.ч. после увольнения
 // Orthogonal к deleted_at: terminated + deleted_at=null → в списке как «уволен»;
 // deleted_at!=null → скрыт из UI полностью (permanent-удаление).
 export const operatorStatusEnum = pgEnum('operator_status', ['active', 'blocked', 'terminated'])
+
+// Approval workflow профиля крановщика на платформе (ADR 0003, pipeline 1).
+// Gate на появление человека в пуле доступных для найма. После approved
+// дочки могут предлагать этому профилю найм — отдельный pipeline через
+// `organization_operators.approval_status`. Меняется только через
+// /crane-profiles/:id/approve / /reject суперадмином.
+export const craneProfileApprovalStatusEnum = pgEnum('crane_profile_approval_status', [
+  'pending',
+  'approved',
+  'rejected',
+])
+
+// Approval workflow найма крановщика в конкретную дочку (ADR 0003, pipeline 2).
+// Ортогонален operational `organization_operators.status`. Холдинг одобряет
+// каждый найм отдельно — даже для approved crane_profile'а.
+export const organizationOperatorApprovalStatusEnum = pgEnum(
+  'organization_operator_approval_status',
+  ['pending', 'approved', 'rejected'],
+)
 
 // Доступность крановщика для назначения смен. Имеет смысл ТОЛЬКО при
 // status='active' (CHECK constraint на уровне БД). Nullable: у blocked/terminated

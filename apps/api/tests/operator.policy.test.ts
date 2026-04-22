@@ -34,16 +34,15 @@ const ownerB: AuthContext = {
   organizationId: orgB,
   tokenVersion: 0,
 }
+// B2d-1 (ADR 0003): operator AuthContext больше не несёт organizationId.
 const operatorA: AuthContext = {
   userId: userA,
   role: 'operator',
-  organizationId: orgA,
   tokenVersion: 0,
 }
 const operatorB: AuthContext = {
   userId: userB,
   role: 'operator',
-  organizationId: orgB,
   tokenVersion: 0,
 }
 

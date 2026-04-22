@@ -3,9 +3,11 @@ import { z } from 'zod'
 const uuid = z.string().uuid()
 
 /**
- * Access token claims, §5.1 CLAUDE.md.
+ * Access token claims, §5.1 CLAUDE.md + ADR 0003 (operator loses org).
  * - sub: user_id
- * - org: organization_id (null только для superadmin)
+ * - org: organization_id — null для superadmin И operator (последнее — с
+ *        B2d-1: operator работает в N дочках через organization_operators,
+ *        JWT не несёт одну). Only `owner` всегда имеет org != null.
  * - role: superadmin | owner | operator
  * - tv: token_version — инкрементируется при logout-all и обесценивает
  *       все выданные ранее access-токены (§5.5)
@@ -24,7 +26,8 @@ export const accessTokenClaimsSchema = z
     aud: z.string().min(1),
   })
   .superRefine((c, ctx) => {
-    // CLAUDE.md §4.2 + users_org_role_consistency_chk: superadmin → org=null, остальные → org!=null
+    // Only owner должен иметь org. superadmin — всегда null (constraint БД).
+    // operator после B2d-1 — null (работает через organization_operators M:N).
     if (c.role === 'superadmin' && c.org !== null) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -32,10 +35,17 @@ export const accessTokenClaimsSchema = z
         path: ['org'],
       })
     }
-    if (c.role !== 'superadmin' && c.org === null) {
+    if (c.role === 'operator' && c.org !== null) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: `${c.role} must have non-null org`,
+        message: 'operator must have org=null (M:N via organization_operators)',
+        path: ['org'],
+      })
+    }
+    if (c.role === 'owner' && c.org === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'owner must have non-null org',
         path: ['org'],
       })
     }

@@ -175,7 +175,7 @@ export class OperatorService {
         if (err.constraint_name === 'users_phone_key') {
           throw conflict('PHONE_ALREADY_REGISTERED', 'This phone is already registered')
         }
-        if (err.constraint_name === 'operators_iin_unique_active_idx') {
+        if (err.constraint_name === 'crane_profiles_iin_unique_active_idx') {
           throw conflict(
             'IIN_ALREADY_EXISTS_IN_ORG',
             'Operator with this IIN already exists in this organization',
@@ -235,7 +235,10 @@ export class OperatorService {
       if (!updated) throw operatorNotFound()
       return { operator: updated, userPhone: existingWithUser.userPhone }
     } catch (err) {
-      if (isPgUniqueViolation(err) && err.constraint_name === 'operators_iin_unique_active_idx') {
+      if (
+        isPgUniqueViolation(err) &&
+        err.constraint_name === 'crane_profiles_iin_unique_active_idx'
+      ) {
         throw conflict(
           'IIN_ALREADY_EXISTS_IN_ORG',
           'Operator with this IIN already exists in this organization',

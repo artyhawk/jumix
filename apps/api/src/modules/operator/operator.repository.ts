@@ -5,32 +5,47 @@ import {
   type OperatorAvailability,
   type OperatorStatus,
   auditLog,
-  operators,
+  craneProfiles,
+  organizationOperators,
   users,
 } from '@jumix/db'
 import { type SQL, and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm'
 
 /**
- * OperatorRepository — data access с tenant scope через AuthContext
- * (CLAUDE.md §4.2 Layer 3).
+ * OperatorRepository — data access для operator-модуля.
+ *
+ * ### B2d-1 compat-shim (ADR 0003)
+ *
+ * Таблица `operators` разделена на `crane_profiles` (global identity) +
+ * `organization_operators` (M:N membership). Этот repo продолжает отдавать
+ * единый hydrated `Operator` shape наверх — service/routes/tests модифицировать
+ * массово нецелесообразно внутри одного коммита. Чтение — INNER JOIN между
+ * двумя таблицами; мутации, затрагивающие оба сегмента (updateFields,
+ * softDelete), — две UPDATE в одной транзакции.
+ *
+ * Все записи, создаваемые шимом, сразу `approval_status='approved'` в обеих
+ * таблицах. Реальный approval-workflow (два pipeline'а из ADR 0003) приходит
+ * в B2d-3 отдельным модулем; тогда create будет создавать pending и шим
+ * уйдёт вместе с этим файлом.
+ *
+ * Assumptions шима (валидны, пока не появится B2d-2 multi-org path):
+ *   - один user → ровно один crane_profile → ровно одна organization_operator;
+ *   - soft-delete operator'а soft-delete'ит ОБЕ строки (иначе iin/user_id
+ *     unique-slot'ы остаются занятыми, recreate падает).
  *
  * Reads:
  *   - findInScope — owner/superadmin; soft-deleted игнорируется.
- *   - findByUserId — self-scope lookup по user_id, БЕЗ org-check: operator
- *     знает свой organizationId внутри записи. Caller (service) проверит
- *     canReadSelf до вызова.
+ *   - findByUserId — self-scope lookup по user_id → первый (и, пока шим,
+ *     единственный) живой hire. B2d-2 заменит первый-живой на hire,
+ *     выбранный X-Organization-Id header'ом.
  *   - findAnyById — service-internal, включая soft-deleted.
- *   - findActiveByIin — conflict-detection перед create/update, игнорирует
- *     soft-deleted (слот освобождается).
- *   - list — cursor-based, DESC по id; owner → своя org; superadmin → все;
- *     operator → пусто.
+ *   - findActiveByIin — conflict-detection перед create/update в пределах
+ *     одной org (legacy semantics; в post-B2d-3 iin будет global-scope).
+ *   - list — cursor-based, DESC по organization_operators.id.
  *
- * Mutations: ВСЕ в транзакции с audit_log (инвариант проекта — нет мутации
- * без аудита). setStatus принимает status И terminated_at как явные аргументы
- * — service решает что именно записать (сохранение исторической даты).
- *
- * `findInScopeWithUser` / `findByUserIdWithUser` — JOIN с users для DTO
- * generation (phone живёт в users, operator его не дублирует).
+ * Mutations: все в транзакции с audit_log (проектный инвариант).
+ * setStatus принимает status + terminated_at как явные аргументы — service
+ * решает что записать (сохранение исторической даты при восстановлении).
  */
 export type AuditMeta = {
   actorUserId: string
@@ -39,26 +54,29 @@ export type AuditMeta = {
   metadata: Record<string, unknown>
 }
 
-type OperatorRow = typeof operators.$inferSelect
+type JoinedRow = {
+  oo: typeof organizationOperators.$inferSelect
+  cp: typeof craneProfiles.$inferSelect
+}
 
-function hydrate(row: OperatorRow): Operator {
+function hydrate(row: JoinedRow): Operator {
   return {
-    id: row.id,
-    userId: row.userId,
-    organizationId: row.organizationId,
-    firstName: row.firstName,
-    lastName: row.lastName,
-    patronymic: row.patronymic,
-    iin: row.iin,
-    avatarKey: row.avatarKey,
-    hiredAt: row.hiredAt,
-    terminatedAt: row.terminatedAt,
-    specialization: (row.specialization ?? {}) as Record<string, unknown>,
-    status: row.status as OperatorStatus,
-    availability: row.availability as OperatorAvailability | null,
-    deletedAt: row.deletedAt,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
+    id: row.oo.id,
+    userId: row.cp.userId,
+    organizationId: row.oo.organizationId,
+    firstName: row.cp.firstName,
+    lastName: row.cp.lastName,
+    patronymic: row.cp.patronymic,
+    iin: row.cp.iin,
+    avatarKey: row.cp.avatarKey,
+    hiredAt: row.oo.hiredAt,
+    terminatedAt: row.oo.terminatedAt,
+    specialization: (row.cp.specialization ?? {}) as Record<string, unknown>,
+    status: row.oo.status as OperatorStatus,
+    availability: row.oo.availability as OperatorAvailability | null,
+    deletedAt: row.oo.deletedAt,
+    createdAt: row.oo.createdAt,
+    updatedAt: row.oo.updatedAt,
   }
 }
 
@@ -106,14 +124,19 @@ export class OperatorRepository {
   async findInScope(id: string): Promise<Operator | null> {
     if (this.ctx.role === 'operator') return null
 
-    const conds: SQL[] = [eq(operators.id, id), isNull(operators.deletedAt)]
+    const conds: SQL[] = [
+      eq(organizationOperators.id, id),
+      isNull(organizationOperators.deletedAt),
+      isNull(craneProfiles.deletedAt),
+    ]
     if (this.ctx.role === 'owner') {
-      conds.push(eq(operators.organizationId, this.ctx.organizationId))
+      conds.push(eq(organizationOperators.organizationId, this.ctx.organizationId))
     }
 
     const rows = await this.database.db
-      .select()
-      .from(operators)
+      .select({ oo: organizationOperators, cp: craneProfiles })
+      .from(organizationOperators)
+      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
       .where(and(...conds))
       .limit(1)
     return rows[0] ? hydrate(rows[0]) : null
@@ -122,63 +145,100 @@ export class OperatorRepository {
   async findInScopeWithUser(id: string): Promise<OperatorWithUser | null> {
     if (this.ctx.role === 'operator') return null
 
-    const conds: SQL[] = [eq(operators.id, id), isNull(operators.deletedAt)]
+    const conds: SQL[] = [
+      eq(organizationOperators.id, id),
+      isNull(organizationOperators.deletedAt),
+      isNull(craneProfiles.deletedAt),
+    ]
     if (this.ctx.role === 'owner') {
-      conds.push(eq(operators.organizationId, this.ctx.organizationId))
+      conds.push(eq(organizationOperators.organizationId, this.ctx.organizationId))
     }
 
     const rows = await this.database.db
-      .select({ op: operators, phone: users.phone })
-      .from(operators)
-      .innerJoin(users, eq(operators.userId, users.id))
+      .select({ oo: organizationOperators, cp: craneProfiles, phone: users.phone })
+      .from(organizationOperators)
+      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+      .innerJoin(users, eq(craneProfiles.userId, users.id))
       .where(and(...conds))
       .limit(1)
     const row = rows[0]
     if (!row) return null
-    return { operator: hydrate(row.op), userPhone: row.phone }
+    return { operator: hydrate({ oo: row.oo, cp: row.cp }), userPhone: row.phone }
   }
 
-  /** Self-scope: поиск operator'а по user_id. Не фильтруется ctx'ом —
-   *  policy.canReadSelf вызывается в service до. Игнорирует soft-deleted. */
+  /**
+   * Self-scope lookup по user_id.
+   *
+   * TODO B2d-2: когда один user сможет иметь несколько active hire'ов, эта
+   * логика «первый живой» превращается в «выбери hire по X-Organization-Id
+   * header из request». Пока шим — один user ↔ один crane_profile ↔ один
+   * live hire, «первый» == «единственный».
+   */
   async findByUserId(userId: string): Promise<Operator | null> {
     const rows = await this.database.db
-      .select()
-      .from(operators)
-      .where(and(eq(operators.userId, userId), isNull(operators.deletedAt)))
+      .select({ oo: organizationOperators, cp: craneProfiles })
+      .from(organizationOperators)
+      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+      .where(
+        and(
+          eq(craneProfiles.userId, userId),
+          isNull(organizationOperators.deletedAt),
+          isNull(craneProfiles.deletedAt),
+        ),
+      )
       .limit(1)
     return rows[0] ? hydrate(rows[0]) : null
   }
 
   async findByUserIdWithUser(userId: string): Promise<OperatorWithUser | null> {
     const rows = await this.database.db
-      .select({ op: operators, phone: users.phone })
-      .from(operators)
-      .innerJoin(users, eq(operators.userId, users.id))
-      .where(and(eq(operators.userId, userId), isNull(operators.deletedAt)))
+      .select({ oo: organizationOperators, cp: craneProfiles, phone: users.phone })
+      .from(organizationOperators)
+      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+      .innerJoin(users, eq(craneProfiles.userId, users.id))
+      .where(
+        and(
+          eq(craneProfiles.userId, userId),
+          isNull(organizationOperators.deletedAt),
+          isNull(craneProfiles.deletedAt),
+        ),
+      )
       .limit(1)
     const row = rows[0]
     if (!row) return null
-    return { operator: hydrate(row.op), userPhone: row.phone }
+    return { operator: hydrate({ oo: row.oo, cp: row.cp }), userPhone: row.phone }
   }
 
   async findAnyById(id: string): Promise<Operator | null> {
+    // Без фильтра deletedAt — нужен и для soft-deleted. crane_profile
+    // в шиме soft-delete'ится синхронно с organization_operator (см. softDelete).
     const rows = await this.database.db
-      .select()
-      .from(operators)
-      .where(eq(operators.id, id))
+      .select({ oo: organizationOperators, cp: craneProfiles })
+      .from(organizationOperators)
+      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+      .where(eq(organizationOperators.id, id))
       .limit(1)
     return rows[0] ? hydrate(rows[0]) : null
   }
 
-  async findActiveByIin(organizationId: string, iin: string): Promise<Operator | null> {
+  /**
+   * B2d-1 (ADR 0003): iin теперь глобально уникален среди живых crane_profiles.
+   * `organizationId` оставлен в сигнатуре для минимального diff'а в service'е
+   * и игнорируется. Если нужен первый живой hire для найденного профиля —
+   * берём его же (для legacy shape с organizationId). Если профиль живой, но
+   * ни одного живого hire нет — возвращаем null, т.к. legacy Operator шейп
+   * требует organizationId.
+   */
+  async findActiveByIin(_organizationId: string, iin: string): Promise<Operator | null> {
     const rows = await this.database.db
-      .select()
-      .from(operators)
+      .select({ oo: organizationOperators, cp: craneProfiles })
+      .from(organizationOperators)
+      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
       .where(
         and(
-          eq(operators.organizationId, organizationId),
-          eq(operators.iin, iin),
-          isNull(operators.deletedAt),
+          eq(craneProfiles.iin, iin),
+          isNull(organizationOperators.deletedAt),
+          isNull(craneProfiles.deletedAt),
         ),
       )
       .limit(1)
@@ -193,27 +253,28 @@ export class OperatorRepository {
   }): Promise<{ rows: Operator[]; nextCursor: string | null }> {
     if (this.ctx.role === 'operator') return { rows: [], nextCursor: null }
 
-    const conds: SQL[] = [isNull(operators.deletedAt)]
+    const conds: SQL[] = [isNull(organizationOperators.deletedAt), isNull(craneProfiles.deletedAt)]
     if (this.ctx.role === 'owner') {
-      conds.push(eq(operators.organizationId, this.ctx.organizationId))
+      conds.push(eq(organizationOperators.organizationId, this.ctx.organizationId))
     }
-    if (params.cursor) conds.push(lt(operators.id, params.cursor))
-    if (params.status) conds.push(eq(operators.status, params.status))
+    if (params.cursor) conds.push(lt(organizationOperators.id, params.cursor))
+    if (params.status) conds.push(eq(organizationOperators.status, params.status))
     if (params.search) {
       const needle = `%${params.search}%`
       const match = or(
-        ilike(operators.firstName, needle),
-        ilike(operators.lastName, needle),
-        ilike(operators.iin, needle),
+        ilike(craneProfiles.firstName, needle),
+        ilike(craneProfiles.lastName, needle),
+        ilike(craneProfiles.iin, needle),
       )
       if (match) conds.push(match)
     }
 
     const rows = await this.database.db
-      .select()
-      .from(operators)
+      .select({ oo: organizationOperators, cp: craneProfiles })
+      .from(organizationOperators)
+      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
       .where(and(...conds))
-      .orderBy(desc(operators.id))
+      .orderBy(desc(organizationOperators.id))
       .limit(params.limit + 1)
 
     const hasMore = rows.length > params.limit
@@ -223,9 +284,12 @@ export class OperatorRepository {
   }
 
   /**
-   * Атомарный create: user + operator в одной транзакции + audit.
-   * Если operator insert падает (дубликат ИИН), user rollback'ается.
-   * Возвращает operator + phone (phone на users, нужен для DTO).
+   * Атомарный create: user + crane_profile + organization_operator + audit.
+   * Если любой insert падает (дубликат phone/iin), всё rollback'ается.
+   *
+   * Compat-shim (ADR 0003 / B2d-1): обе approval-строки создаются сразу
+   * `approved` — owner в этой ветке создаёт готового к работе оператора
+   * бесшовно. B2d-3 заменит это на pending + superadmin approve-flow.
    */
   async createUserAndOperator(
     user: UserCreateForOperator,
@@ -245,34 +309,52 @@ export class OperatorRepository {
       const insertedUser = userRows[0]
       if (!insertedUser) throw new Error('user insert returned no rows')
 
-      const opRows = await tx
-        .insert(operators)
+      const now = new Date()
+
+      const cpRows = await tx
+        .insert(craneProfiles)
         .values({
           userId: insertedUser.id,
-          organizationId: operator.organizationId,
           firstName: operator.firstName,
           lastName: operator.lastName,
           patronymic: operator.patronymic,
           iin: operator.iin,
-          hiredAt: operator.hiredAt,
           specialization: operator.specialization,
+          approvalStatus: 'approved',
+          approvedAt: now,
         })
         .returning()
-      const insertedOp = opRows[0]
-      if (!insertedOp) throw new Error('operator insert returned no rows')
+      const insertedCp = cpRows[0]
+      if (!insertedCp) throw new Error('crane_profile insert returned no rows')
+
+      const ooRows = await tx
+        .insert(organizationOperators)
+        .values({
+          craneProfileId: insertedCp.id,
+          organizationId: operator.organizationId,
+          hiredAt: operator.hiredAt,
+          approvalStatus: 'approved',
+          approvedAt: now,
+        })
+        .returning()
+      const insertedOo = ooRows[0]
+      if (!insertedOo) throw new Error('organization_operator insert returned no rows')
 
       await tx.insert(auditLog).values({
         actorUserId: audit.actorUserId,
         actorRole: audit.actorRole,
         action: 'operator.create',
         targetType: 'operator',
-        targetId: insertedOp.id,
-        organizationId: insertedOp.organizationId,
+        targetId: insertedOo.id,
+        organizationId: insertedOo.organizationId,
         metadata: audit.metadata,
         ipAddress: audit.ipAddress,
       })
 
-      return { operator: hydrate(insertedOp), userPhone: insertedUser.phone }
+      return {
+        operator: hydrate({ oo: insertedOo, cp: insertedCp }),
+        userPhone: insertedUser.phone,
+      }
     })
   }
 
@@ -283,23 +365,50 @@ export class OperatorRepository {
     audit: AuditMeta,
   ): Promise<Operator | null> {
     return this.database.db.transaction(async (tx) => {
-      const set: Record<string, unknown> = { updatedAt: new Date() }
-      if (patch.firstName !== undefined) set.firstName = patch.firstName
-      if (patch.lastName !== undefined) set.lastName = patch.lastName
-      if (patch.patronymic !== undefined) set.patronymic = patch.patronymic
-      if (patch.iin !== undefined) set.iin = patch.iin
-      if (patch.hiredAt !== undefined) set.hiredAt = patch.hiredAt
-      if (patch.terminatedAt !== undefined) set.terminatedAt = patch.terminatedAt
-      if (patch.specialization !== undefined) set.specialization = patch.specialization
+      const existing = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(
+          and(
+            eq(organizationOperators.id, id),
+            eq(organizationOperators.organizationId, organizationId),
+            isNull(organizationOperators.deletedAt),
+            isNull(craneProfiles.deletedAt),
+          ),
+        )
+        .limit(1)
+      const existingRow = existing[0]
+      if (!existingRow) return null
 
-      const rows = await tx
-        .update(operators)
-        .set(set)
-        .where(and(eq(operators.id, id), isNull(operators.deletedAt)))
-        .returning()
+      const now = new Date()
+      const cpSet: Record<string, unknown> = {}
+      const ooSet: Record<string, unknown> = {}
+      if (patch.firstName !== undefined) cpSet.firstName = patch.firstName
+      if (patch.lastName !== undefined) cpSet.lastName = patch.lastName
+      if (patch.patronymic !== undefined) cpSet.patronymic = patch.patronymic
+      if (patch.iin !== undefined) cpSet.iin = patch.iin
+      if (patch.specialization !== undefined) cpSet.specialization = patch.specialization
+      if (patch.hiredAt !== undefined) ooSet.hiredAt = patch.hiredAt
+      if (patch.terminatedAt !== undefined) ooSet.terminatedAt = patch.terminatedAt
 
-      const row = rows[0]
-      if (!row) return null
+      if (Object.keys(cpSet).length > 0) {
+        cpSet.updatedAt = now
+        await tx.update(craneProfiles).set(cpSet).where(eq(craneProfiles.id, existingRow.cp.id))
+      }
+      // Всегда bump'аем organization_operators.updatedAt — legacy-форма
+      // `Operator.updatedAt` маппится именно на это поле, тесты полагаются.
+      ooSet.updatedAt = now
+      await tx.update(organizationOperators).set(ooSet).where(eq(organizationOperators.id, id))
+
+      const updated = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(eq(organizationOperators.id, id))
+        .limit(1)
+      const updatedRow = updated[0]
+      if (!updatedRow) return null
 
       await tx.insert(auditLog).values({
         actorUserId: audit.actorUserId,
@@ -312,7 +421,7 @@ export class OperatorRepository {
         ipAddress: audit.ipAddress,
       })
 
-      return hydrate(row)
+      return hydrate(updatedRow)
     })
   }
 
@@ -323,19 +432,42 @@ export class OperatorRepository {
     audit: AuditMeta,
   ): Promise<Operator | null> {
     return this.database.db.transaction(async (tx) => {
-      const set: Record<string, unknown> = { updatedAt: new Date() }
-      if (patch.firstName !== undefined) set.firstName = patch.firstName
-      if (patch.lastName !== undefined) set.lastName = patch.lastName
-      if (patch.patronymic !== undefined) set.patronymic = patch.patronymic
+      const existing = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(
+          and(
+            eq(organizationOperators.id, id),
+            isNull(organizationOperators.deletedAt),
+            isNull(craneProfiles.deletedAt),
+          ),
+        )
+        .limit(1)
+      const existingRow = existing[0]
+      if (!existingRow) return null
 
-      const rows = await tx
-        .update(operators)
-        .set(set)
-        .where(and(eq(operators.id, id), isNull(operators.deletedAt)))
-        .returning()
+      const now = new Date()
+      const cpSet: Record<string, unknown> = { updatedAt: now }
+      if (patch.firstName !== undefined) cpSet.firstName = patch.firstName
+      if (patch.lastName !== undefined) cpSet.lastName = patch.lastName
+      if (patch.patronymic !== undefined) cpSet.patronymic = patch.patronymic
 
-      const row = rows[0]
-      if (!row) return null
+      await tx.update(craneProfiles).set(cpSet).where(eq(craneProfiles.id, existingRow.cp.id))
+      // Зеркалируем updatedAt на hire-строке, чтобы hydrated.updatedAt двигался.
+      await tx
+        .update(organizationOperators)
+        .set({ updatedAt: now })
+        .where(eq(organizationOperators.id, id))
+
+      const updated = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(eq(organizationOperators.id, id))
+        .limit(1)
+      const updatedRow = updated[0]
+      if (!updatedRow) return null
 
       await tx.insert(auditLog).values({
         actorUserId: audit.actorUserId,
@@ -348,14 +480,14 @@ export class OperatorRepository {
         ipAddress: audit.ipAddress,
       })
 
-      return hydrate(row)
+      return hydrate(updatedRow)
     })
   }
 
   /**
-   * setStatus: service передаёт status + terminated_at явно.
-   * repo просто пишет что передали — historical-record логика принадлежит
-   * service'у, НЕ repo (см. JSDoc сервиса).
+   * setStatus: service передаёт status + terminated_at явно. Затрагивает
+   * только organization_operators — crane_profile остаётся как есть
+   * (платформенный профиль не «терминируется» при увольнении из одной дочки).
    */
   async setStatus(
     id: string,
@@ -376,13 +508,20 @@ export class OperatorRepository {
       }
 
       const rows = await tx
-        .update(operators)
+        .update(organizationOperators)
         .set(set)
-        .where(and(eq(operators.id, id), isNull(operators.deletedAt)))
+        .where(and(eq(organizationOperators.id, id), isNull(organizationOperators.deletedAt)))
         .returning()
-
       const row = rows[0]
       if (!row) return null
+
+      const cpRows = await tx
+        .select()
+        .from(craneProfiles)
+        .where(and(eq(craneProfiles.id, row.craneProfileId), isNull(craneProfiles.deletedAt)))
+        .limit(1)
+      const cpRow = cpRows[0]
+      if (!cpRow) return null
 
       await tx.insert(auditLog).values({
         actorUserId: audit.actorUserId,
@@ -395,7 +534,7 @@ export class OperatorRepository {
         ipAddress: audit.ipAddress,
       })
 
-      return hydrate(row)
+      return hydrate({ oo: row, cp: cpRow })
     })
   }
 
@@ -406,14 +545,39 @@ export class OperatorRepository {
     audit: AuditMeta,
   ): Promise<Operator | null> {
     return this.database.db.transaction(async (tx) => {
-      const rows = await tx
-        .update(operators)
-        .set({ avatarKey: key, updatedAt: new Date() })
-        .where(and(eq(operators.id, id), isNull(operators.deletedAt)))
-        .returning()
+      const existing = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(
+          and(
+            eq(organizationOperators.id, id),
+            isNull(organizationOperators.deletedAt),
+            isNull(craneProfiles.deletedAt),
+          ),
+        )
+        .limit(1)
+      const existingRow = existing[0]
+      if (!existingRow) return null
 
-      const row = rows[0]
-      if (!row) return null
+      const now = new Date()
+      await tx
+        .update(craneProfiles)
+        .set({ avatarKey: key, updatedAt: now })
+        .where(eq(craneProfiles.id, existingRow.cp.id))
+      await tx
+        .update(organizationOperators)
+        .set({ updatedAt: now })
+        .where(eq(organizationOperators.id, id))
+
+      const updated = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(eq(organizationOperators.id, id))
+        .limit(1)
+      const updatedRow = updated[0]
+      if (!updatedRow) return null
 
       await tx.insert(auditLog).values({
         actorUserId: audit.actorUserId,
@@ -426,7 +590,7 @@ export class OperatorRepository {
         ipAddress: audit.ipAddress,
       })
 
-      return hydrate(row)
+      return hydrate(updatedRow)
     })
   }
 
@@ -436,14 +600,39 @@ export class OperatorRepository {
     audit: AuditMeta,
   ): Promise<Operator | null> {
     return this.database.db.transaction(async (tx) => {
-      const rows = await tx
-        .update(operators)
-        .set({ avatarKey: null, updatedAt: new Date() })
-        .where(and(eq(operators.id, id), isNull(operators.deletedAt)))
-        .returning()
+      const existing = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(
+          and(
+            eq(organizationOperators.id, id),
+            isNull(organizationOperators.deletedAt),
+            isNull(craneProfiles.deletedAt),
+          ),
+        )
+        .limit(1)
+      const existingRow = existing[0]
+      if (!existingRow) return null
 
-      const row = rows[0]
-      if (!row) return null
+      const now = new Date()
+      await tx
+        .update(craneProfiles)
+        .set({ avatarKey: null, updatedAt: now })
+        .where(eq(craneProfiles.id, existingRow.cp.id))
+      await tx
+        .update(organizationOperators)
+        .set({ updatedAt: now })
+        .where(eq(organizationOperators.id, id))
+
+      const updated = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(eq(organizationOperators.id, id))
+        .limit(1)
+      const updatedRow = updated[0]
+      if (!updatedRow) return null
 
       await tx.insert(auditLog).values({
         actorUserId: audit.actorUserId,
@@ -456,21 +645,60 @@ export class OperatorRepository {
         ipAddress: audit.ipAddress,
       })
 
-      return hydrate(row)
+      return hydrate(updatedRow)
     })
   }
 
+  /**
+   * softDelete шимит legacy-семантику: обе таблицы помечаются deleted_at'ом
+   * в одной транзакции. Причины:
+   *   - iin на crane_profiles уникален среди живых → если оставить профиль,
+   *     recreate с тем же ИИН упадёт (B2b ожидает освобождение слота);
+   *   - user_id на crane_profiles тоже уникален среди живых → нужно освободить
+   *     (хотя createUserAndOperator всегда берёт свежего user'а, но это
+   *     «broad strokes» гарантия).
+   *
+   * B2d-2+: когда один crane_profile начнёт иметь несколько hire'ов,
+   * softDelete должен трогать только ту organization_operator, которую
+   * удаляют. Профиль остаётся (он — платформенный). До того момента —
+   * шим грубый, но согласованный с B2b-тестами.
+   */
   async softDelete(id: string, organizationId: string, audit: AuditMeta): Promise<Operator | null> {
     return this.database.db.transaction(async (tx) => {
-      const now = new Date()
-      const rows = await tx
-        .update(operators)
-        .set({ deletedAt: now, updatedAt: now })
-        .where(and(eq(operators.id, id), isNull(operators.deletedAt)))
-        .returning()
+      const existing = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(
+          and(
+            eq(organizationOperators.id, id),
+            eq(organizationOperators.organizationId, organizationId),
+            isNull(organizationOperators.deletedAt),
+            isNull(craneProfiles.deletedAt),
+          ),
+        )
+        .limit(1)
+      const existingRow = existing[0]
+      if (!existingRow) return null
 
-      const row = rows[0]
-      if (!row) return null
+      const now = new Date()
+      await tx
+        .update(organizationOperators)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(eq(organizationOperators.id, id))
+      await tx
+        .update(craneProfiles)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(eq(craneProfiles.id, existingRow.cp.id))
+
+      const updated = await tx
+        .select({ oo: organizationOperators, cp: craneProfiles })
+        .from(organizationOperators)
+        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
+        .where(eq(organizationOperators.id, id))
+        .limit(1)
+      const updatedRow = updated[0]
+      if (!updatedRow) return null
 
       await tx.insert(auditLog).values({
         actorUserId: audit.actorUserId,
@@ -483,7 +711,7 @@ export class OperatorRepository {
         ipAddress: audit.ipAddress,
       })
 
-      return hydrate(row)
+      return hydrate(updatedRow)
     })
   }
 }

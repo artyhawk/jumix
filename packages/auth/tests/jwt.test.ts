@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { type KeyLike, exportPKCS8, exportSPKI, generateKeyPair } from 'jose'
+import { type KeyLike, SignJWT, exportPKCS8, exportSPKI, generateKeyPair } from 'jose'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   type AccessTokenConfig,
@@ -94,16 +94,33 @@ describe('JWT access token', () => {
     })
   })
 
-  it('operator без org отклоняется (invariant)', async () => {
+  it('operator с org=null валиден (ADR 0003)', async () => {
     const token = await signAccessToken(
-      {
-        userId: randomUUID(),
-        organizationId: null as unknown as string,
-        role: 'operator',
-        tokenVersion: 0,
-      },
+      { userId: randomUUID(), organizationId: null, role: 'operator', tokenVersion: 0 },
       cfg(),
     )
+    const claims = await verifyAccessToken(token, cfg())
+    expect(claims.role).toBe('operator')
+    expect(claims.org).toBeNull()
+  })
+
+  it('operator с заданной org отклоняется (invariant, ADR 0003)', async () => {
+    // signAccessToken нормализует org=null для operator — обойдём её,
+    // чтобы проверить что verifyAccessToken ловит bad payload (например,
+    // из legacy-токена, выданного pre-B2d-1).
+    const token = await new SignJWT({
+      sub: randomUUID(),
+      org: randomUUID(),
+      role: 'operator',
+      tv: 0,
+    })
+      .setProtectedHeader({ alg: JWT_ALG, typ: 'JWT' })
+      .setIssuer('jumix')
+      .setAudience('jumix-api')
+      .setJti(randomUUID())
+      .setIssuedAt()
+      .setExpirationTime('15m')
+      .sign(signingKey)
     await expect(verifyAccessToken(token, cfg())).rejects.toMatchObject({
       code: 'TOKEN_CLAIMS_INVALID',
     })

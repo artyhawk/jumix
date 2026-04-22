@@ -221,6 +221,8 @@ SaaS-платформа для компаний Казахстана, сдающ
 
 11. **Approval-gated entities (cranes; в будущем — crane_profiles и т.п.) имеют двумерный статус.** `approval_status` (pending/approved/rejected) ортогонален operational `status` и меняется ТОЛЬКО через отдельные endpoints `:id/approve` и `:id/reject`, доступные superadmin'у. `POST /entity` создаёт pending; operational операции (update, setStatus) требуют `approval_status='approved'`. Rejected — read-only (только delete для cleanup). Owner НЕ одобряет свои же заявки (внешний актор обязателен — инвариант holding-approval). Детали — [authorization.md §4.2b](docs/architecture/authorization.md) + ADR [0002](docs/architecture/adr/0002-holding-approval-model.md).
 
+12. **Operator identity ⊥ hire. Operator JWT не несёт organizationId (ADR 0003).** Крановщик живёт как `crane_profiles` (global identity, ИИН глобально уникальный) + N `organization_operators` (M:N hire). `AuthContext` для role=operator — `{ role, userId, tokenVersion }`, БЕЗ `organizationId`. Per-org действия operator'а идут через `X-Organization-Id` header (вводится в B2d-2); middleware резолвит его в `organization_operators.id` с approval-gate. Оба approval-pipeline'а (profile + hire) работают по правилу #11. Пока шим B2d-1 — `OperatorRepository` отдаёт legacy `Operator` shape JOIN'ом и создаёт обе строки `approved` сразу. Детали — [authorization.md §4.2c](docs/architecture/authorization.md) + ADR [0003](docs/architecture/adr/0003-operators-multi-org-model.md).
+
 ---
 
 ## 7. Ссылки и ресурсы

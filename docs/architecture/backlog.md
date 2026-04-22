@@ -140,16 +140,40 @@
 
 ## Operators (from B2b)
 
-### Operator transfer between organizations
+### B2d-2: `X-Organization-Id` header for operator per-org actions
 
-Сейчас `operators.organization_id` — fixed после create: изменить нельзя ни через admin-update (поле отсутствует в `updateOperatorAdminSchema`), ни через repository. Кейс «крановщик увольняется из org A и устраивается в org B» сегодня решается через soft-delete в A + create заново в B (новый `operators.id`, новый history).
+B2d-1 раздробил операторов на `crane_profiles` + `organization_operators` и убрал `organizationId` из operator JWT. Per-org операции operator'а (смены в конкретной дочке, баланс, документы) требуют явного выбора дочки — по header'у `X-Organization-Id: <org_uuid>`.
 
-Пост-MVP — явный flow transfer:
-- API `POST /api/v1/operators/:id/transfer` с `{ targetOrganizationId, effectiveDate }`, доступен только superadmin (между orgs своей платформы).
-- Сохраняет historical audit: `transferred_from_org_id`, дата.
-- Операционные данные (shifts, documents) остаются в org A (история), новые — в org B.
+Нужен в B2d-2:
+- Middleware resolve'ит header → `organization_operators.id` с проверкой `approval_status='approved' AND status<>'terminated' AND deleted_at IS NULL`. Miss → 400 `ORGANIZATION_CONTEXT_REQUIRED` или 403 `NOT_HIRED_IN_ORGANIZATION`.
+- Добавить `request.operatorOrgCtx?: { organizationOperatorId, organizationId }` поверх `AuthContext`.
+- `findByUserId` в OperatorRepository перестаёт быть «первый живой hire» и начинает выбирать по header'у.
+- Endpoints `/me/shifts`, `/me/balance`, `/me/documents` (B3+) принимают header обязательно; `/me` (профиль) — по-прежнему без header'а (identity live на `crane_profiles`).
 
-Триггер: реальный запрос от заказчика на cross-org movement (до этого acceptable workaround — через soft-delete + recreate).
+Триггер: начало B2d-2 (сразу после B2d-1).
+
+### B2d-3: crane_profile approval workflow + hire-request
+
+B2d-1 создаёт обе approval-строки `approved` через compat-shim. Real approval-flow (ADR 0003):
+- `POST /crane-profiles` (owner) → создаёт pending `crane_profiles`. Holdingsuperadmin approve'ит через `/crane-profiles/:id/approve`.
+- `POST /organizations/:id/operators/hire` с `{ craneProfileId }` → создаёт pending `organization_operators`. Superadmin approve'ит через `/organizations/:id/operators/:hireId/approve`.
+- Existing `/operators` endpoint либо редиректит на новый flow, либо удаляется в B2d-3 вместе с compat-shim'ом.
+
+Триггер: B2d-3 — реальный approval UX для холдинга.
+
+### Operator transfer between organizations — РЕШЕНО B2d-1
+
+~~Сейчас `operators.organization_id` — fixed после create...~~
+
+ADR 0003 решил это через M:N `organization_operators`: один человек (`crane_profiles`) может одновременно работать в N дочках. «Transfer» теперь — hire в новой дочке + terminate в старой, без потери identity и audit-continuity. Вопрос закрыт.
+
+### Crane_profile merge (duplicate resolution)
+
+При переходе на `crane_profiles.iin GLOBAL UNIQUE` возможны legacy дубликаты: один и тот же человек заведён в двух дочках под немного разным написанием ФИО/с опечаткой в ИИН. В рамках B2d-1 данные пустые (dev/staging), collision'ов нет; на prod-миграции 0007 есть pre-check в SQL-комментарии.
+
+Post-MVP: `POST /crane-profiles/:winner/merge` с `{ loserProfileId }`, доступен superadmin'у. Переносит все `organization_operators` с loser → winner, soft-delete'ит loser, audit с обеими id'шками. Нужно для cleanup'а после миграции и в случае OCR-ошибок при onboarding'е.
+
+Триггер: первый реальный duplicate-report (скорее всего при onboarding'е крупного клиента).
 
 ### Rehire workflow (`rehired_at` column)
 

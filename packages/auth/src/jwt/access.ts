@@ -32,9 +32,13 @@ export async function signAccessToken(
   const exp = iat + cfg.ttlSeconds
   const jti = randomUUID()
 
+  // B2d-1 (ADR 0003): operator JWT не несёт organizationId — нормализуем
+  // здесь, чтобы callers (тесты, token-issuer) могли передавать организацию
+  // из users-row не заботясь о роли.
+  const normalizedOrg = input.role === 'operator' ? null : input.organizationId
   const payload: JWTPayload = {
     sub: input.userId,
-    org: input.organizationId,
+    org: normalizedOrg,
     role: input.role,
     tv: input.tokenVersion,
   }
