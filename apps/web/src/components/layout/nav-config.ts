@@ -21,17 +21,27 @@ export interface NavItem {
 }
 
 /**
- * Nav items по ролям. В B3-UI-1 все указывают на "/" (welcome placeholder);
- * реальные routes добавляются в B3-UI-2/3/4 по мере реализации кабинетов.
+ * Nav items по ролям. Superadmin кабинет реализован в B3-UI-2;
+ * owner / operator — placeholder на "/" (B3-UI-3/4).
  */
 export const navItemsByRole: Record<UserRole, NavItem[]> = {
   superadmin: [
-    { labelKey: 'nav.dashboard', href: '/', icon: LayoutDashboard, section: 'operations' },
-    { labelKey: 'nav.approvals', href: '/', icon: ShieldCheck, section: 'operations' },
-    { labelKey: 'nav.organizations', href: '/', icon: Building2, section: 'management' },
-    { labelKey: 'nav.cranes', href: '/', icon: IconCrane as LucideIcon, section: 'operations' },
-    { labelKey: 'nav.craneProfiles', href: '/', icon: HardHat, section: 'people' },
-    { labelKey: 'nav.operators', href: '/', icon: Users, section: 'people' },
+    { labelKey: 'nav.dashboard', href: '/dashboard', icon: LayoutDashboard, section: 'operations' },
+    { labelKey: 'nav.approvals', href: '/approvals', icon: ShieldCheck, section: 'operations' },
+    {
+      labelKey: 'nav.organizations',
+      href: '/organizations',
+      icon: Building2,
+      section: 'management',
+    },
+    {
+      labelKey: 'nav.cranes',
+      href: '/cranes',
+      icon: IconCrane as LucideIcon,
+      section: 'operations',
+    },
+    { labelKey: 'nav.craneProfiles', href: '/crane-profiles', icon: HardHat, section: 'people' },
+    { labelKey: 'nav.operators', href: '/organization-operators', icon: Users, section: 'people' },
   ],
   owner: [
     { labelKey: 'nav.dashboard', href: '/', icon: LayoutDashboard, section: 'operations' },

@@ -78,6 +78,31 @@
     "owner": "Владелец",
     "operator": "Крановщик"
   },
+  "dashboard": {
+    "title": "Обзор платформы",
+    "subtitle": "Ключевые метрики и очередь заявок.",
+    "pending": {
+      "title": "Ожидают модерации",
+      "craneProfiles": "Профили крановщиков",
+      "organizationOperators": "Найм",
+      "cranes": "Краны",
+      "empty": "Очередь пуста",
+      "review": "Рассмотреть"
+    },
+    "active": {
+      "title": "Активные",
+      "organizations": "Организации",
+      "craneProfiles": "Крановщики",
+      "cranes": "Краны",
+      "memberships": "Активные найма"
+    },
+    "thisWeek": {
+      "title": "Новые регистрации (7 дней)",
+      "value": "{count}"
+    },
+    "errorTitle": "Не удалось загрузить метрики",
+    "retry": "Повторить"
+  },
   "language": {
     "ru": "Русский",
     "kz": "Қазақша"

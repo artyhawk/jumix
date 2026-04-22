@@ -9,6 +9,7 @@ import licenseExpiryJobPlugin from './jobs/license-expiry/plugin'
 import authPlugin from './modules/auth/auth.plugin'
 import craneProfilePlugin from './modules/crane-profile/crane-profile.plugin'
 import cranePlugin from './modules/crane/crane.plugin'
+import dashboardPlugin from './modules/dashboard/dashboard.plugin'
 import organizationOperatorPlugin from './modules/organization-operator/organization-operator.plugin'
 import organizationPlugin from './modules/organization/organization.plugin'
 import registrationPlugin from './modules/registration/registration.plugin'
@@ -79,6 +80,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(craneProfilePlugin)
   await app.register(organizationOperatorPlugin)
   await app.register(registrationPlugin)
+  await app.register(dashboardPlugin)
 
   return app
 }

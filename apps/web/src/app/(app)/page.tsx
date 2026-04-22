@@ -7,14 +7,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/hooks/use-auth'
 import { t } from '@/lib/i18n'
 import { ArrowUpRight, Building2, HardHat, ShieldCheck } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
 /**
- * Welcome placeholder. B3-UI-1 shipment — shell работает, но функциональных
- * кабинетов ещё нет. Роль-специфичные dashboard'ы появятся в B3-UI-2/3/4.
+ * Root `/` разветвляется по роли:
+ *  - superadmin → /dashboard (функциональный кабинет, B3-UI-2)
+ *  - owner / operator → welcome placeholder (кабинеты в B3-UI-3/4)
  */
-export default function WelcomePage() {
+export default function RootPage() {
   const { user } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (user?.role === 'superadmin') router.replace('/dashboard')
+  }, [user, router])
+
   if (!user) return null
+  if (user.role === 'superadmin') return null
 
   return (
     <PageTransition>
@@ -45,7 +55,7 @@ export default function WelcomePage() {
           <StatusCard
             icon={<HardHat className="size-5 text-brand-500" strokeWidth={1.5} />}
             title="API"
-            value="614 тестов"
+            value="Готов"
             description="9 миграций · 5 ADR · backend MVP."
           />
         </StaggerItem>
@@ -66,8 +76,8 @@ export default function WelcomePage() {
         <div className="flex-1">
           <div className="text-sm font-semibold text-text-primary mb-1">Следующая веха</div>
           <p className="text-sm text-text-secondary">
-            Функциональные кабинеты (superadmin · owner · operator) реализуются в B3-UI-2/3/4.
-            Текущий релиз — scaffold + auth flow.
+            Функциональные кабинеты {user.role === 'owner' ? 'владельца' : 'крановщика'} реализуются
+            в следующих итерациях.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 text-sm font-medium text-text-tertiary">

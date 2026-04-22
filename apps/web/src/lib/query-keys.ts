@@ -1,0 +1,31 @@
+import type { ListCraneProfilesQuery } from './api/crane-profiles'
+import type { ListCranesQuery } from './api/cranes'
+import type { ListOrganizationOperatorsQuery } from './api/organization-operators'
+import type { ListOrganizationsQuery } from './api/organizations'
+
+/**
+ * Query keys — namespaced tuples. Используем массивы-префиксы чтобы
+ * invalidate'ить группы (например, все списки crane-profiles независимо
+ * от фильтров).
+ */
+export const qk = {
+  dashboard: ['dashboard'] as const,
+  dashboardStats: ['dashboard', 'stats'] as const,
+
+  organizations: ['organizations'] as const,
+  organizationsList: (query: ListOrganizationsQuery) => ['organizations', 'list', query] as const,
+  organizationDetail: (id: string) => ['organizations', 'detail', id] as const,
+
+  craneProfiles: ['crane-profiles'] as const,
+  craneProfilesList: (query: ListCraneProfilesQuery) => ['crane-profiles', 'list', query] as const,
+  craneProfileDetail: (id: string) => ['crane-profiles', 'detail', id] as const,
+
+  cranes: ['cranes'] as const,
+  cranesList: (query: ListCranesQuery) => ['cranes', 'list', query] as const,
+  craneDetail: (id: string) => ['cranes', 'detail', id] as const,
+
+  organizationOperators: ['organization-operators'] as const,
+  organizationOperatorsList: (query: ListOrganizationOperatorsQuery) =>
+    ['organization-operators', 'list', query] as const,
+  organizationOperatorDetail: (id: string) => ['organization-operators', 'detail', id] as const,
+}
