@@ -5,10 +5,11 @@ import { operatorPolicy } from '../src/modules/operator/operator.policy'
 
 /**
  * Unit-тесты чистых функций operatorPolicy. БД/fastify не трогают, только
- * AuthContext + минимальный Pick<Operator>. Цель — зафиксировать матрицу прав:
- * admin-scope (canList/canRead/canCreate/canUpdate/canChangeStatus/canDelete)
- * и self-scope (canReadSelf/canUpdateSelf, где canReadSelf живёт для всех
- * статусов, а canUpdateSelf требует status='active').
+ * AuthContext + минимальный Pick<Operator>. Цель — зафиксировать матрицу прав
+ * admin-scope (canList/canRead/canCreate/canUpdate/canChangeStatus/canDelete).
+ *
+ * Self-scope предикаты (canReadSelf/canUpdateSelf) переехали в crane-profile
+ * module (ADR 0003); тесты для них — `crane-profile.policy.test.ts`.
  */
 
 const userA = '00000000-0000-0000-0000-000000000001'
@@ -140,53 +141,5 @@ describe('operatorPolicy.canDelete', () => {
   })
   it('operator cannot delete', () => {
     expect(operatorPolicy.canDelete(operatorA, opInOrgA)).toBe(false)
-  })
-})
-
-describe('operatorPolicy.canReadSelf', () => {
-  it('operator with userId match can read self — active', () => {
-    expect(operatorPolicy.canReadSelf(operatorA, { userId: userA })).toBe(true)
-  })
-  it('operator with userId match can read self — blocked (PDL РК)', () => {
-    expect(operatorPolicy.canReadSelf(operatorA, { userId: userA })).toBe(true)
-  })
-  it('operator with userId match can read self — terminated (PDL РК)', () => {
-    expect(operatorPolicy.canReadSelf(operatorA, { userId: userA })).toBe(true)
-  })
-  it('operator with different userId cannot read', () => {
-    expect(operatorPolicy.canReadSelf(operatorA, { userId: userB })).toBe(false)
-  })
-  it('owner cannot use canReadSelf', () => {
-    expect(operatorPolicy.canReadSelf(ownerA, { userId: userA })).toBe(false)
-  })
-  it('superadmin cannot use canReadSelf', () => {
-    expect(operatorPolicy.canReadSelf(superadmin, { userId: userA })).toBe(false)
-  })
-})
-
-describe('operatorPolicy.canUpdateSelf', () => {
-  it('operator active can update self', () => {
-    expect(operatorPolicy.canUpdateSelf(operatorA, { userId: userA, status: 'active' })).toBe(true)
-  })
-  it('operator blocked cannot update self', () => {
-    expect(operatorPolicy.canUpdateSelf(operatorA, { userId: userA, status: 'blocked' })).toBe(
-      false,
-    )
-  })
-  it('operator terminated cannot update self', () => {
-    expect(operatorPolicy.canUpdateSelf(operatorA, { userId: userA, status: 'terminated' })).toBe(
-      false,
-    )
-  })
-  it('operator with different userId cannot update', () => {
-    expect(operatorPolicy.canUpdateSelf(operatorA, { userId: userB, status: 'active' })).toBe(false)
-  })
-  it('owner cannot use canUpdateSelf', () => {
-    expect(operatorPolicy.canUpdateSelf(ownerA, { userId: userA, status: 'active' })).toBe(false)
-  })
-  it('superadmin cannot use canUpdateSelf', () => {
-    expect(operatorPolicy.canUpdateSelf(superadmin, { userId: userA, status: 'active' })).toBe(
-      false,
-    )
   })
 })

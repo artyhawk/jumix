@@ -52,34 +52,11 @@ export const updateOperatorAdminSchema = z
   .refine((v) => Object.keys(v).length > 0, { message: 'No fields to update' })
 export type UpdateOperatorAdminInput = z.infer<typeof updateOperatorAdminSchema>
 
-/**
- * PATCH /api/v1/operators/me — self update. Whitelist полей: только ФИО.
- * Всё остальное (ИИН, hiredAt, status, organizationId) меняет admin.
- */
-export const updateOperatorSelfSchema = z
-  .object({
-    firstName: firstNameSchema.optional(),
-    lastName: lastNameSchema.optional(),
-    patronymic: patronymicSchema.nullable().optional(),
-  })
-  .refine((v) => Object.keys(v).length > 0, { message: 'No fields to update' })
-export type UpdateOperatorSelfInput = z.infer<typeof updateOperatorSelfSchema>
-
 export const changeOperatorStatusSchema = z.object({
   status: z.enum(['active', 'blocked', 'terminated']),
   reason: reasonSchema.optional(),
 })
 export type ChangeOperatorStatusInput = z.infer<typeof changeOperatorStatusSchema>
-
-export const avatarUploadUrlRequestSchema = z.object({
-  contentType: z.enum(['image/jpeg', 'image/png']),
-})
-export type AvatarUploadUrlRequest = z.infer<typeof avatarUploadUrlRequestSchema>
-
-export const confirmAvatarSchema = z.object({
-  key: z.string().min(1).max(512),
-})
-export type ConfirmAvatarInput = z.infer<typeof confirmAvatarSchema>
 
 /**
  * GET /api/v1/operators — список. Cursor = last seen id (id DESC).

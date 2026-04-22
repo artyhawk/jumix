@@ -12,35 +12,35 @@ import {
 import { type SQL, and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm'
 
 /**
- * OperatorRepository — data access для operator-модуля.
+ * OperatorRepository — data access для admin-операций над наймом
+ * (organization_operator + crane_profile join). Self-scope (`/me`) и avatar
+ * flow переехали в CraneProfileRepository (ADR 0003).
  *
- * ### B2d-1 compat-shim (ADR 0003)
+ * ### B2d-2a compat-shim (ADR 0003)
  *
  * Таблица `operators` разделена на `crane_profiles` (global identity) +
  * `organization_operators` (M:N membership). Этот repo продолжает отдавать
- * единый hydrated `Operator` shape наверх — service/routes/tests модифицировать
- * массово нецелесообразно внутри одного коммита. Чтение — INNER JOIN между
- * двумя таблицами; мутации, затрагивающие оба сегмента (updateFields,
- * softDelete), — две UPDATE в одной транзакции.
+ * единый hydrated `Operator` shape наверх ради минимального diff'а в admin
+ * surface. Чтение — INNER JOIN между двумя таблицами; мутации, затрагивающие
+ * оба сегмента (updateFields, softDelete), — две UPDATE в одной транзакции.
  *
- * Все записи, создаваемые шимом, сразу `approval_status='approved'` в обеих
- * таблицах. Реальный approval-workflow (два pipeline'а из ADR 0003) приходит
- * в B2d-3 отдельным модулем; тогда create будет создавать pending и шим
- * уйдёт вместе с этим файлом.
+ * Все записи, создаваемые шимом через `createUserAndOperator`, сразу
+ * `approval_status='approved'` в обеих таблицах. Реальный approval-workflow
+ * (два pipeline'а из ADR 0003) приходит в B2d-2b отдельным путём: admin-create
+ * переедет на `POST /api/v1/crane-profiles` и будет создавать pending.
  *
- * Assumptions шима (валидны, пока не появится B2d-2 multi-org path):
+ * Assumptions шима (валидны, пока не появился multi-org путь):
  *   - один user → ровно один crane_profile → ровно одна organization_operator;
- *   - soft-delete operator'а soft-delete'ит ОБЕ строки (иначе iin/user_id
- *     unique-slot'ы остаются занятыми, recreate падает).
+ *   - soft-delete organization_operator'а soft-delete'ит ОБЕ строки (иначе
+ *     iin/user_id unique-slot'ы остаются занятыми, recreate падает).
  *
  * Reads:
- *   - findInScope — owner/superadmin; soft-deleted игнорируется.
- *   - findByUserId — self-scope lookup по user_id → первый (и, пока шим,
- *     единственный) живой hire. B2d-2 заменит первый-живой на hire,
- *     выбранный X-Organization-Id header'ом.
+ *   - findInScope / findInScopeWithUser — owner/superadmin; soft-deleted
+ *     игнорируется. findInScopeWithUser джоинит users для phone.
  *   - findAnyById — service-internal, включая soft-deleted.
- *   - findActiveByIin — conflict-detection перед create/update в пределах
- *     одной org (legacy semantics; в post-B2d-3 iin будет global-scope).
+ *   - findActiveByIin — conflict-detection перед create/update. `iin` уже
+ *     глобально уникален (ADR 0003), `organizationId` оставлен в сигнатуре
+ *     для минимального diff'а.
  *   - list — cursor-based, DESC по organization_operators.id.
  *
  * Mutations: все в транзакции с audit_log (проектный инвариант).
@@ -101,12 +101,6 @@ export type OperatorUpdateFields = {
   specialization?: Record<string, unknown>
 }
 
-export type OperatorSelfUpdateFields = {
-  firstName?: string
-  lastName?: string
-  patronymic?: string | null
-}
-
 export type UserCreateForOperator = {
   phone: string
   organizationId: string
@@ -160,49 +154,6 @@ export class OperatorRepository {
       .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
       .innerJoin(users, eq(craneProfiles.userId, users.id))
       .where(and(...conds))
-      .limit(1)
-    const row = rows[0]
-    if (!row) return null
-    return { operator: hydrate({ oo: row.oo, cp: row.cp }), userPhone: row.phone }
-  }
-
-  /**
-   * Self-scope lookup по user_id.
-   *
-   * TODO B2d-2: когда один user сможет иметь несколько active hire'ов, эта
-   * логика «первый живой» превращается в «выбери hire по X-Organization-Id
-   * header из request». Пока шим — один user ↔ один crane_profile ↔ один
-   * live hire, «первый» == «единственный».
-   */
-  async findByUserId(userId: string): Promise<Operator | null> {
-    const rows = await this.database.db
-      .select({ oo: organizationOperators, cp: craneProfiles })
-      .from(organizationOperators)
-      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
-      .where(
-        and(
-          eq(craneProfiles.userId, userId),
-          isNull(organizationOperators.deletedAt),
-          isNull(craneProfiles.deletedAt),
-        ),
-      )
-      .limit(1)
-    return rows[0] ? hydrate(rows[0]) : null
-  }
-
-  async findByUserIdWithUser(userId: string): Promise<OperatorWithUser | null> {
-    const rows = await this.database.db
-      .select({ oo: organizationOperators, cp: craneProfiles, phone: users.phone })
-      .from(organizationOperators)
-      .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
-      .innerJoin(users, eq(craneProfiles.userId, users.id))
-      .where(
-        and(
-          eq(craneProfiles.userId, userId),
-          isNull(organizationOperators.deletedAt),
-          isNull(craneProfiles.deletedAt),
-        ),
-      )
       .limit(1)
     const row = rows[0]
     if (!row) return null
@@ -287,9 +238,10 @@ export class OperatorRepository {
    * Атомарный create: user + crane_profile + organization_operator + audit.
    * Если любой insert падает (дубликат phone/iin), всё rollback'ается.
    *
-   * Compat-shim (ADR 0003 / B2d-1): обе approval-строки создаются сразу
+   * Compat-shim (ADR 0003 / B2d-2a): обе approval-строки создаются сразу
    * `approved` — owner в этой ветке создаёт готового к работе оператора
-   * бесшовно. B2d-3 заменит это на pending + superadmin approve-flow.
+   * бесшовно. B2d-2b заменит это на pending + superadmin approve-flow
+   * через перенос admin-create в `POST /api/v1/crane-profiles`.
    */
   async createUserAndOperator(
     user: UserCreateForOperator,
@@ -425,65 +377,6 @@ export class OperatorRepository {
     })
   }
 
-  async updateSelfFields(
-    id: string,
-    organizationId: string,
-    patch: OperatorSelfUpdateFields,
-    audit: AuditMeta,
-  ): Promise<Operator | null> {
-    return this.database.db.transaction(async (tx) => {
-      const existing = await tx
-        .select({ oo: organizationOperators, cp: craneProfiles })
-        .from(organizationOperators)
-        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
-        .where(
-          and(
-            eq(organizationOperators.id, id),
-            isNull(organizationOperators.deletedAt),
-            isNull(craneProfiles.deletedAt),
-          ),
-        )
-        .limit(1)
-      const existingRow = existing[0]
-      if (!existingRow) return null
-
-      const now = new Date()
-      const cpSet: Record<string, unknown> = { updatedAt: now }
-      if (patch.firstName !== undefined) cpSet.firstName = patch.firstName
-      if (patch.lastName !== undefined) cpSet.lastName = patch.lastName
-      if (patch.patronymic !== undefined) cpSet.patronymic = patch.patronymic
-
-      await tx.update(craneProfiles).set(cpSet).where(eq(craneProfiles.id, existingRow.cp.id))
-      // Зеркалируем updatedAt на hire-строке, чтобы hydrated.updatedAt двигался.
-      await tx
-        .update(organizationOperators)
-        .set({ updatedAt: now })
-        .where(eq(organizationOperators.id, id))
-
-      const updated = await tx
-        .select({ oo: organizationOperators, cp: craneProfiles })
-        .from(organizationOperators)
-        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
-        .where(eq(organizationOperators.id, id))
-        .limit(1)
-      const updatedRow = updated[0]
-      if (!updatedRow) return null
-
-      await tx.insert(auditLog).values({
-        actorUserId: audit.actorUserId,
-        actorRole: audit.actorRole,
-        action: 'operator.self_update',
-        targetType: 'operator',
-        targetId: id,
-        organizationId,
-        metadata: audit.metadata,
-        ipAddress: audit.ipAddress,
-      })
-
-      return hydrate(updatedRow)
-    })
-  }
-
   /**
    * setStatus: service передаёт status + terminated_at явно. Затрагивает
    * только organization_operators — crane_profile остаётся как есть
@@ -538,117 +431,6 @@ export class OperatorRepository {
     })
   }
 
-  async setAvatarKey(
-    id: string,
-    organizationId: string,
-    key: string,
-    audit: AuditMeta,
-  ): Promise<Operator | null> {
-    return this.database.db.transaction(async (tx) => {
-      const existing = await tx
-        .select({ oo: organizationOperators, cp: craneProfiles })
-        .from(organizationOperators)
-        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
-        .where(
-          and(
-            eq(organizationOperators.id, id),
-            isNull(organizationOperators.deletedAt),
-            isNull(craneProfiles.deletedAt),
-          ),
-        )
-        .limit(1)
-      const existingRow = existing[0]
-      if (!existingRow) return null
-
-      const now = new Date()
-      await tx
-        .update(craneProfiles)
-        .set({ avatarKey: key, updatedAt: now })
-        .where(eq(craneProfiles.id, existingRow.cp.id))
-      await tx
-        .update(organizationOperators)
-        .set({ updatedAt: now })
-        .where(eq(organizationOperators.id, id))
-
-      const updated = await tx
-        .select({ oo: organizationOperators, cp: craneProfiles })
-        .from(organizationOperators)
-        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
-        .where(eq(organizationOperators.id, id))
-        .limit(1)
-      const updatedRow = updated[0]
-      if (!updatedRow) return null
-
-      await tx.insert(auditLog).values({
-        actorUserId: audit.actorUserId,
-        actorRole: audit.actorRole,
-        action: 'operator.avatar.set',
-        targetType: 'operator',
-        targetId: id,
-        organizationId,
-        metadata: audit.metadata,
-        ipAddress: audit.ipAddress,
-      })
-
-      return hydrate(updatedRow)
-    })
-  }
-
-  async clearAvatarKey(
-    id: string,
-    organizationId: string,
-    audit: AuditMeta,
-  ): Promise<Operator | null> {
-    return this.database.db.transaction(async (tx) => {
-      const existing = await tx
-        .select({ oo: organizationOperators, cp: craneProfiles })
-        .from(organizationOperators)
-        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
-        .where(
-          and(
-            eq(organizationOperators.id, id),
-            isNull(organizationOperators.deletedAt),
-            isNull(craneProfiles.deletedAt),
-          ),
-        )
-        .limit(1)
-      const existingRow = existing[0]
-      if (!existingRow) return null
-
-      const now = new Date()
-      await tx
-        .update(craneProfiles)
-        .set({ avatarKey: null, updatedAt: now })
-        .where(eq(craneProfiles.id, existingRow.cp.id))
-      await tx
-        .update(organizationOperators)
-        .set({ updatedAt: now })
-        .where(eq(organizationOperators.id, id))
-
-      const updated = await tx
-        .select({ oo: organizationOperators, cp: craneProfiles })
-        .from(organizationOperators)
-        .innerJoin(craneProfiles, eq(organizationOperators.craneProfileId, craneProfiles.id))
-        .where(eq(organizationOperators.id, id))
-        .limit(1)
-      const updatedRow = updated[0]
-      if (!updatedRow) return null
-
-      await tx.insert(auditLog).values({
-        actorUserId: audit.actorUserId,
-        actorRole: audit.actorRole,
-        action: 'operator.avatar.clear',
-        targetType: 'operator',
-        targetId: id,
-        organizationId,
-        metadata: audit.metadata,
-        ipAddress: audit.ipAddress,
-      })
-
-      return hydrate(updatedRow)
-    })
-  }
-
   /**
    * softDelete шимит legacy-семантику: обе таблицы помечаются deleted_at'ом
    * в одной транзакции. Причины:
@@ -658,7 +440,7 @@ export class OperatorRepository {
    *     (хотя createUserAndOperator всегда берёт свежего user'а, но это
    *     «broad strokes» гарантия).
    *
-   * B2d-2+: когда один crane_profile начнёт иметь несколько hire'ов,
+   * B2d-2b+: когда один crane_profile начнёт иметь несколько hire'ов,
    * softDelete должен трогать только ту organization_operator, которую
    * удаляют. Профиль остаётся (он — платформенный). До того момента —
    * шим грубый, но согласованный с B2b-тестами.

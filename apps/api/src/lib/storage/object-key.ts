@@ -3,14 +3,18 @@ import { StorageKeyError } from './errors'
 /**
  * Канонические object keys для Jumix storage.
  *
- *   orgs/{orgId}/operators/{operatorId}/avatar/{filename}
  *   orgs/{orgId}/operators/{operatorId}/documents/{documentId}/v{version}/{filename}
+ *   crane-profiles/{craneProfileId}/avatar/{filename}   ← platform-level identity (ADR 0003)
  *
  * Конвенция (docs/architecture/storage.md):
- *  - Single bucket, tenant-isolation через prefix `orgs/{orgId}/`.
+ *  - Single bucket; org-scoped артефакты — под `orgs/{orgId}/...`,
+ *    платформенные (crane_profiles identity — ADR 0003) — под
+ *    `crane-profiles/{craneProfileId}/...`. Последние описывают человека,
+ *    а не факт работы в конкретной дочке, поэтому tenant-prefix был бы
+ *    искусственной привязкой к «первой» org.
  *  - Versioning явно в ключе: новая версия = новый объект, старая остаётся
  *    для аудита и revert. Retention отложена в backlog.
- *  - UUID'ы для orgId/operatorId/documentId — безопасны в path.
+ *  - UUID'ы для orgId/operatorId/craneProfileId/documentId — безопасны в path.
  *  - Filename из user-input — санитизируется (только [a-z0-9._-], иначе
  *    fallback на `file`).
  *
@@ -43,6 +47,11 @@ export function sanitizeFilename(raw: string): string {
   return trimmed
 }
 
+/**
+ * Legacy org-scoped avatar helper (operator module B2a-B2d-1 flow). Оставлен
+ * для документов и переходного периода; новые avatar uploads используют
+ * `buildCraneProfileAvatarKey` (identity — platform-level).
+ */
 export function buildAvatarKey(params: {
   organizationId: string
   operatorId: string
@@ -51,6 +60,19 @@ export function buildAvatarKey(params: {
   assertUuid(params.organizationId, 'organizationId')
   assertUuid(params.operatorId, 'operatorId')
   return `orgs/${params.organizationId}/operators/${params.operatorId}/avatar/${sanitizeFilename(params.filename)}`
+}
+
+/**
+ * Platform-level identity prefix (ADR 0003). Avatar принадлежит
+ * crane_profile, а не organization_operator — человек в N дочках
+ * показывает одну и ту же фотку, нет «org А видит другой аватар».
+ */
+export function buildCraneProfileAvatarKey(params: {
+  craneProfileId: string
+  filename: string
+}): string {
+  assertUuid(params.craneProfileId, 'craneProfileId')
+  return `crane-profiles/${params.craneProfileId}/avatar/${sanitizeFilename(params.filename)}`
 }
 
 export function buildDocumentKey(params: {

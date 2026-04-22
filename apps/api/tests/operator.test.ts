@@ -5,9 +5,8 @@ import { type TestAppHandle, buildTestApp } from './helpers/build-test-app'
 import { createOrganization, createUser, signTokenFor } from './helpers/fixtures'
 
 /**
- * Integration-тесты operators-модуля. Покрывают:
+ * Integration-тесты operators-модуля (admin surface в B2d-2a). Покрывают:
  *   - admin CRUD (create/list/get/update/changeStatus/delete);
- *   - self-service (/me: read, update, avatar flow);
  *   - cross-tenant isolation (404 вместо 403, CLAUDE.md §4.3);
  *   - terminated_at семантика (historical record, НЕ очищается при recovery);
  *   - availability CHECK constraint (только при status='active');
@@ -16,6 +15,9 @@ import { createOrganization, createUser, signTokenFor } from './helpers/fixtures
  *   - cursor pagination, search;
  *   - DTO: phone masking, avatarUrl — presigned GET;
  *   - CHECK constraint на формат ИИН (12 цифр).
+ *
+ * Self-service endpoints (`/me`, `/me/avatar/*`) переехали в crane-profile
+ * модуль (ADR 0003) — тесты для них живут в `crane-profile.test.ts`.
  *
  * Один Postgres-контейнер на весь файл. BIN-серия 63xxxx (не пересекается
  * с crane 62xxxx и organization 61xxxx).
@@ -153,11 +155,14 @@ async function createOperator(
   }
 }
 
-async function tokenForOperator(userId: string, organizationId: string): Promise<string> {
+// B2d-1 (ADR 0003): operator JWT больше не несёт organizationId — signTokenFor
+// нормализует org=null для role=operator. Хелпер оставлен лишь для обёртки
+// createUser → sign.
+async function tokenForOperator(userId: string): Promise<string> {
   return signTokenFor(handle.app, {
     id: userId,
     role: 'operator',
-    organizationId,
+    organizationId: null,
     tokenVersion: 0,
   })
 }
@@ -523,7 +528,7 @@ describe('GET /api/v1/operators (list)', () => {
 
   it('403: operator cannot list', async () => {
     const op = await createOperator(ownerAToken)
-    const operatorToken = await tokenForOperator(op.userId, orgAId)
+    const operatorToken = await tokenForOperator(op.userId)
     const res = await handle.app.inject({
       method: 'GET',
       url: '/api/v1/operators',
@@ -686,7 +691,7 @@ describe('GET /api/v1/operators/:id', () => {
 
   it('404: operator cannot access /operators/:id (even own row)', async () => {
     const op = await createOperator(ownerAToken)
-    const opToken = await tokenForOperator(op.userId, orgAId)
+    const opToken = await tokenForOperator(op.userId)
     const res = await handle.app.inject({
       method: 'GET',
       url: `/api/v1/operators/${op.id}`,
@@ -1186,493 +1191,6 @@ describe('DELETE /api/v1/operators/:id (soft-delete)', () => {
   })
 })
 
-describe('GET /api/v1/operators/me', () => {
-  it('200: operator reads own profile (active)', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'GET',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-    })
-    expect(res.statusCode).toBe(200)
-    expect(res.json().id).toBe(op.id)
-    expect(res.json().phone).toContain('*')
-  })
-
-  it('200: operator blocked can STILL read own profile (PDL РК)', async () => {
-    const op = await createOperator(ownerAToken)
-    await handle.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/operators/${op.id}/status`,
-      headers: { authorization: `Bearer ${ownerAToken}` },
-      payload: { status: 'blocked' },
-    })
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'GET',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-    })
-    expect(res.statusCode).toBe(200)
-    expect(res.json().status).toBe('blocked')
-  })
-
-  it('200: operator terminated can STILL read own profile', async () => {
-    const op = await createOperator(ownerAToken)
-    await handle.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/operators/${op.id}/status`,
-      headers: { authorization: `Bearer ${ownerAToken}` },
-      payload: { status: 'terminated' },
-    })
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'GET',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-    })
-    expect(res.statusCode).toBe(200)
-    expect(res.json().status).toBe('terminated')
-  })
-
-  it('403: owner cannot access /me (not an operator)', async () => {
-    const res = await handle.app.inject({
-      method: 'GET',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${ownerAToken}` },
-    })
-    expect(res.statusCode).toBe(403)
-  })
-
-  it('403: superadmin cannot access /me', async () => {
-    const res = await handle.app.inject({
-      method: 'GET',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${superadminToken}` },
-    })
-    expect(res.statusCode).toBe(403)
-  })
-
-  it('404: operator user with no operator record — 404 (not 500)', async () => {
-    // Создаём прямо user'а с role='operator' БЕЗ operator-записи (обходим
-    // createOperator который делает пару user+operator). Такая рассинхронизация
-    // не должна случаться в реальной жизни, но если вдруг (например, operator
-    // был soft-deleted, а user остался) — /me вернёт 404, не 500.
-    const loneUser = await createUser(handle.app, {
-      role: 'operator',
-      phone: nextPhone(),
-      organizationId: orgAId,
-      name: 'Lone',
-    })
-    const loneToken = await tokenForOperator(loneUser.id, orgAId)
-    const res = await handle.app.inject({
-      method: 'GET',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${loneToken}` },
-    })
-    expect(res.statusCode).toBe(404)
-  })
-
-  it('401: unauthenticated rejected', async () => {
-    const res = await handle.app.inject({ method: 'GET', url: '/api/v1/operators/me' })
-    expect(res.statusCode).toBe(401)
-  })
-})
-
-describe('PATCH /api/v1/operators/me (self update)', () => {
-  it('200: active operator updates own firstName/lastName/patronymic', async () => {
-    const op = await createOperator(ownerAToken, { firstName: 'Old' })
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'PATCH',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { firstName: 'Self-New' },
-    })
-    expect(res.statusCode).toBe(200)
-    expect(res.json().firstName).toBe('Self-New')
-
-    const audits = await handle.app.db.db
-      .select()
-      .from(auditLog)
-      .where(and(eq(auditLog.targetId, op.id), eq(auditLog.action, 'operator.self_update')))
-    expect(audits).toHaveLength(1)
-  })
-
-  it('403: blocked operator CANNOT update own profile', async () => {
-    const op = await createOperator(ownerAToken)
-    await handle.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/operators/${op.id}/status`,
-      headers: { authorization: `Bearer ${ownerAToken}` },
-      payload: { status: 'blocked' },
-    })
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'PATCH',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { firstName: 'Banned-Update' },
-    })
-    expect(res.statusCode).toBe(403)
-  })
-
-  it('403: terminated operator CANNOT update own profile', async () => {
-    const op = await createOperator(ownerAToken)
-    await handle.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/operators/${op.id}/status`,
-      headers: { authorization: `Bearer ${ownerAToken}` },
-      payload: { status: 'terminated' },
-    })
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'PATCH',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { firstName: 'Terminated-Update' },
-    })
-    expect(res.statusCode).toBe(403)
-  })
-
-  it('422: iin NOT accepted in self-update (admin-only field)', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'PATCH',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { iin: iin(999_999_999) },
-    })
-    expect(res.statusCode).toBe(422)
-  })
-
-  it('422: status NOT accepted in self-update', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'PATCH',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { status: 'terminated' },
-    })
-    expect(res.statusCode).toBe(422)
-  })
-
-  it('422: hiredAt NOT accepted in self-update', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'PATCH',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { hiredAt: '2020-01-01' },
-    })
-    expect(res.statusCode).toBe(422)
-  })
-
-  it('422: empty self-patch rejected', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'PATCH',
-      url: '/api/v1/operators/me',
-      headers: { authorization: `Bearer ${token}` },
-      payload: {},
-    })
-    expect(res.statusCode).toBe(422)
-  })
-
-  it('401: unauthenticated rejected', async () => {
-    const res = await handle.app.inject({
-      method: 'PATCH',
-      url: '/api/v1/operators/me',
-      payload: { firstName: 'X' },
-    })
-    expect(res.statusCode).toBe(401)
-  })
-})
-
-describe('Avatar flow (/me/avatar/*)', () => {
-  it('200: active operator requests upload URL → получает presigned + headers', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/upload-url',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { contentType: 'image/jpeg' },
-    })
-    expect(res.statusCode).toBe(200)
-    const json = res.json()
-    expect(json.uploadUrl).toEqual(expect.any(String))
-    expect(json.key).toContain(`orgs/${orgAId}/operators/${op.id}/avatar/`)
-    expect(json.key).toMatch(/\.jpg$/)
-    expect(json.headers['Content-Type'] ?? json.headers['content-type']).toBe('image/jpeg')
-    expect(json.expiresAt).toEqual(expect.any(String))
-  })
-
-  it('200: image/png → key ends with .png', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/upload-url',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { contentType: 'image/png' },
-    })
-    expect(res.statusCode).toBe(200)
-    expect(res.json().key).toMatch(/\.png$/)
-  })
-
-  it('422: contentType other than jpeg/png rejected', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/upload-url',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { contentType: 'image/webp' },
-    })
-    expect(res.statusCode).toBe(422)
-  })
-
-  it('403: blocked operator cannot request upload URL', async () => {
-    const op = await createOperator(ownerAToken)
-    await handle.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/operators/${op.id}/status`,
-      headers: { authorization: `Bearer ${ownerAToken}` },
-      payload: { status: 'blocked' },
-    })
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/upload-url',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { contentType: 'image/jpeg' },
-    })
-    expect(res.statusCode).toBe(403)
-  })
-
-  it('200: full flow — upload-url → PUT to InMemory storage → confirm → avatarUrl non-null', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-
-    const issued = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/upload-url',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { contentType: 'image/jpeg' },
-    })
-    const { key } = issued.json()
-
-    // InMemory storage: имитируем PUT — положим объект напрямую.
-    await handle.app.storage.createPresignedPutUrl(key, {
-      contentType: 'image/jpeg',
-      maxBytes: 5 * 1024 * 1024,
-    })
-    // Для InMemory — putObject напрямую (через storage client).
-    await writeFakeObject(key, Buffer.from('x'.repeat(100)), 'image/jpeg')
-
-    const confirm = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { key },
-    })
-    expect(confirm.statusCode).toBe(200)
-    expect(confirm.json().avatarUrl).toEqual(expect.any(String))
-
-    const audits = await handle.app.db.db
-      .select()
-      .from(auditLog)
-      .where(and(eq(auditLog.targetId, op.id), eq(auditLog.action, 'operator.avatar.set')))
-    expect(audits).toHaveLength(1)
-  })
-
-  it('400: confirm rejects key with WRONG prefix (другой operatorId)', async () => {
-    const op = await createOperator(ownerAToken)
-    const other = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-
-    const foreignKey = `orgs/${orgAId}/operators/${other.id}/avatar/1.jpg`
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { key: foreignKey },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error.code).toBe('STORAGE_KEY_INVALID')
-  })
-
-  it('400: confirm rejects key with WRONG organizationId prefix', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-
-    const foreignKey = `orgs/${orgBId}/operators/${op.id}/avatar/1.jpg`
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { key: foreignKey },
-    })
-    expect(res.statusCode).toBe(400)
-  })
-
-  it('404: confirm when object not uploaded → OBJECT_NOT_FOUND', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const key = `orgs/${orgAId}/operators/${op.id}/avatar/ghost.jpg`
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { key },
-    })
-    expect(res.statusCode).toBe(404)
-    expect(res.json().error.code).toBe('OBJECT_NOT_FOUND')
-  })
-
-  it('400: confirm rejects object with WRONG content-type + cleans up', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const key = `orgs/${orgAId}/operators/${op.id}/avatar/bad.jpg`
-    // Кладём объект неправильного content-type.
-    await writeFakeObject(key, Buffer.from('x'), 'application/octet-stream')
-
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { key },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error.code).toBe('AVATAR_CONTENT_TYPE_INVALID')
-
-    // Битый объект вычищен.
-    const head = await handle.app.storage.headObject(key)
-    expect(head).toBeNull()
-  })
-
-  it('400: confirm rejects oversize object + cleans up', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const key = `orgs/${orgAId}/operators/${op.id}/avatar/huge.jpg`
-    await writeFakeObject(key, Buffer.alloc(6 * 1024 * 1024, 1), 'image/jpeg')
-
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { key },
-    })
-    expect(res.statusCode).toBe(400)
-    expect(res.json().error.code).toBe('AVATAR_TOO_LARGE')
-
-    const head = await handle.app.storage.headObject(key)
-    expect(head).toBeNull()
-  })
-
-  it('200: second confirm replaces avatarKey AND deletes old object', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-
-    // first avatar
-    const key1 = `orgs/${orgAId}/operators/${op.id}/avatar/first.jpg`
-    await writeFakeObject(key1, Buffer.from('first'), 'image/jpeg')
-    await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { key: key1 },
-    })
-
-    // second avatar
-    const key2 = `orgs/${orgAId}/operators/${op.id}/avatar/second.jpg`
-    await writeFakeObject(key2, Buffer.from('second'), 'image/jpeg')
-    const res = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { key: key2 },
-    })
-    expect(res.statusCode).toBe(200)
-
-    // Старый key должен быть очищен.
-    const head1 = await handle.app.storage.headObject(key1)
-    expect(head1).toBeNull()
-    const head2 = await handle.app.storage.headObject(key2)
-    expect(head2).not.toBeNull()
-  })
-
-  it('200: DELETE /me/avatar clears avatarKey + storage object; audit row', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-
-    const key = `orgs/${orgAId}/operators/${op.id}/avatar/todelete.jpg`
-    await writeFakeObject(key, Buffer.from('x'), 'image/jpeg')
-    await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      headers: { authorization: `Bearer ${token}` },
-      payload: { key },
-    })
-
-    const del = await handle.app.inject({
-      method: 'DELETE',
-      url: '/api/v1/operators/me/avatar',
-      headers: { authorization: `Bearer ${token}` },
-    })
-    expect(del.statusCode).toBe(200)
-    expect(del.json().avatarUrl).toBeNull()
-
-    const head = await handle.app.storage.headObject(key)
-    expect(head).toBeNull()
-
-    const audits = await handle.app.db.db
-      .select()
-      .from(auditLog)
-      .where(and(eq(auditLog.targetId, op.id), eq(auditLog.action, 'operator.avatar.clear')))
-    expect(audits).toHaveLength(1)
-  })
-
-  it('200: DELETE /me/avatar works when operator has no avatar (no-op)', async () => {
-    const op = await createOperator(ownerAToken)
-    const token = await tokenForOperator(op.userId, orgAId)
-    const res = await handle.app.inject({
-      method: 'DELETE',
-      url: '/api/v1/operators/me/avatar',
-      headers: { authorization: `Bearer ${token}` },
-    })
-    expect(res.statusCode).toBe(200)
-  })
-
-  it('401: unauthenticated avatar endpoints rejected', async () => {
-    const res1 = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/upload-url',
-      payload: { contentType: 'image/jpeg' },
-    })
-    expect(res1.statusCode).toBe(401)
-
-    const res2 = await handle.app.inject({
-      method: 'POST',
-      url: '/api/v1/operators/me/avatar/confirm',
-      payload: { key: 'x' },
-    })
-    expect(res2.statusCode).toBe(401)
-
-    const res3 = await handle.app.inject({
-      method: 'DELETE',
-      url: '/api/v1/operators/me/avatar',
-    })
-    expect(res3.statusCode).toBe(401)
-  })
-})
-
 describe('Data layer guarantees', () => {
   // B2d-1 (ADR 0003): таблица operators разделена на crane_profiles +
   // organization_operators. Inserts направлены на новые таблицы напрямую;
@@ -1817,18 +1335,3 @@ describe('Data layer guarantees', () => {
     expect(row[0]?.specialization).toEqual({})
   })
 })
-
-/**
- * Helper: кладём объект напрямую в InMemoryStorageClient (имитация успешного
- * presigned PUT). Реальный сетевой PUT по fake-URL'у in-memory драйвер не
- * симулирует сознательно — см. memory-storage-client.ts §Tests-utility.
- */
-async function writeFakeObject(key: string, body: Buffer, contentType: string): Promise<void> {
-  const storage = handle.app.storage as unknown as {
-    putObjectRaw?: (k: string, b: Buffer, ct: string) => void
-  }
-  if (typeof storage.putObjectRaw !== 'function') {
-    throw new Error('expected InMemoryStorageClient with putObjectRaw; got foreign driver')
-  }
-  storage.putObjectRaw(key, body, contentType)
-}

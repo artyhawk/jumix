@@ -2,7 +2,6 @@ import type { AuthContext } from '@jumix/auth'
 import type { DatabaseClient, Operator, OperatorStatus } from '@jumix/db'
 import type { FastifyBaseLogger } from 'fastify'
 import { AppError } from '../../lib/errors'
-import type { StorageClient } from '../../lib/storage/types'
 import type { UserRepository } from '../auth/repositories'
 import { operatorPolicy } from './operator.policy'
 import { type AuditMeta, OperatorRepository, type OperatorWithUser } from './operator.repository'
@@ -10,22 +9,21 @@ import type {
   CreateOperatorInput,
   ListOperatorsQuery,
   UpdateOperatorAdminInput,
-  UpdateOperatorSelfInput,
 } from './operator.schemas'
 
 /**
- * OperatorService — orchestration для operators-модуля.
+ * OperatorService — admin orchestration для hydrated Operator shape (organization_operators
+ * + crane_profiles JOIN). Self-service методы переехали в CraneProfileService (ADR 0003).
  *
  * Обязанности:
  *   - policy checks (operatorPolicy) до I/O;
  *   - phone conflict detection (409 PHONE_ALREADY_REGISTERED);
  *   - ИИН conflict detection (409 IIN_ALREADY_EXISTS_IN_ORG) + fallback
- *     на pg unique_violation от race;
+ *     на pg unique_violation от race. Error code сохранён для MVP API stability
+ *     даже если в ADR 0003 ИИН уже глобально уникален.
  *   - 404 вместо 403 для скрытия существования (CLAUDE.md §4.3);
  *   - `terminated_at` semantics (historical record, см. JSDoc
- *     `changeStatus` + `computeTerminatedAt`);
- *   - avatar flow: presigned PUT / confirm (prefix verify + headObject) /
- *     delete — всё под canUpdateSelf.
+ *     `changeStatus` + `computeTerminatedAt`).
  *
  * Singleton. Per-call OperatorRepository с ctx из request.
  */
@@ -59,18 +57,10 @@ function conflict(code: string, message: string): AppError {
   return new AppError({ statusCode: 409, code, message })
 }
 
-const AVATAR_MAX_BYTES = 5 * 1024 * 1024
-const AVATAR_ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png'])
-
-function extensionFor(contentType: string): string {
-  return contentType === 'image/jpeg' ? 'jpg' : 'png'
-}
-
 export class OperatorService {
   constructor(
     private readonly database: DatabaseClient,
     private readonly users: UserRepository,
-    private readonly storage: StorageClient,
     private readonly logger: FastifyBaseLogger,
   ) {}
 
@@ -96,21 +86,6 @@ export class OperatorService {
     return found
   }
 
-  /** GET /operators/me — operator's own profile. Loaded by ctx.userId. */
-  async getOwn(ctx: AuthContext): Promise<OperatorWithUser> {
-    if (ctx.role !== 'operator') {
-      throw forbidden('FORBIDDEN', '/me is available to operators only')
-    }
-    const found = await this.repoFor(ctx).findByUserIdWithUser(ctx.userId)
-    if (!found) throw operatorNotFound()
-    if (!operatorPolicy.canReadSelf(ctx, found.operator)) {
-      // Belt-and-suspenders: policy tautology при role=operator + userId match,
-      // но держим invariant эксплицитным на случай будущих правок ctx-builder'а.
-      throw operatorNotFound()
-    }
-    return found
-  }
-
   // ---------- admin mutations ----------
 
   async create(
@@ -130,7 +105,8 @@ export class OperatorService {
       throw conflict('PHONE_ALREADY_REGISTERED', 'This phone is already registered')
     }
 
-    // ИИН conflict в пределах своей org (живые).
+    // ИИН conflict глобально (ADR 0003 — iin globally unique). Error-code
+    // оставлен legacy-совместимым ради MVP API stability.
     const iinConflict = await this.repoFor(ctx).findActiveByIin(organizationId, input.iin)
     if (iinConflict) {
       throw conflict(
@@ -248,39 +224,6 @@ export class OperatorService {
     }
   }
 
-  async updateSelf(
-    ctx: AuthContext,
-    patch: UpdateOperatorSelfInput,
-    meta: RequestMeta,
-  ): Promise<OperatorWithUser> {
-    const repo = this.repoFor(ctx)
-    const existingWithUser = await repo.findByUserIdWithUser(ctx.userId)
-    if (!existingWithUser) throw operatorNotFound()
-    const existing = existingWithUser.operator
-
-    if (!operatorPolicy.canUpdateSelf(ctx, existing)) {
-      throw forbidden('FORBIDDEN', 'Only active operators can update their profile')
-    }
-
-    const updated = await repo.updateSelfFields(
-      existing.id,
-      existing.organizationId,
-      {
-        firstName: patch.firstName,
-        lastName: patch.lastName,
-        patronymic: patch.patronymic,
-      },
-      {
-        actorUserId: ctx.userId,
-        actorRole: ctx.role,
-        ipAddress: meta.ipAddress,
-        metadata: { fields: Object.keys(patch) },
-      },
-    )
-    if (!updated) throw operatorNotFound()
-    return { operator: updated, userPhone: existingWithUser.userPhone }
-  }
-
   /**
    * changeStatus. Логика terminated_at:
    *   - если current.status === next (идемпотентность) — no-op, возвращаем как
@@ -359,143 +302,6 @@ export class OperatorService {
     }
     return { operator: deleted, userPhone: existingWithUser.userPhone }
   }
-
-  // ---------- avatar flow (self) ----------
-
-  async requestAvatarUpload(
-    ctx: AuthContext,
-    contentType: string,
-  ): Promise<{
-    uploadUrl: string
-    key: string
-    headers: Record<string, string>
-    expiresAt: string
-  }> {
-    const repo = this.repoFor(ctx)
-    const found = await repo.findByUserId(ctx.userId)
-    if (!found) throw operatorNotFound()
-    if (!operatorPolicy.canUpdateSelf(ctx, found)) {
-      throw forbidden('FORBIDDEN', 'Only active operators can update their avatar')
-    }
-    if (!AVATAR_ALLOWED_CONTENT_TYPES.has(contentType)) {
-      throw new AppError({
-        statusCode: 400,
-        code: 'AVATAR_CONTENT_TYPE_INVALID',
-        message: 'Avatar content type must be image/jpeg or image/png',
-      })
-    }
-
-    const { buildAvatarKey } = await import('../../lib/storage/object-key')
-    // Уникальное имя: timestamp + ext. Подтверждение после upload заменит
-    // avatarKey в записи; старый объект подчистится best-effort в confirm.
-    const filename = `${Date.now()}.${extensionFor(contentType)}`
-    const key = buildAvatarKey({
-      organizationId: found.organizationId,
-      operatorId: found.id,
-      filename,
-    })
-
-    const { url, headers, expiresAt } = await this.storage.createPresignedPutUrl(key, {
-      contentType,
-      maxBytes: AVATAR_MAX_BYTES,
-    })
-
-    return { uploadUrl: url, key, headers, expiresAt: expiresAt.toISOString() }
-  }
-
-  async confirmAvatar(ctx: AuthContext, key: string, meta: RequestMeta): Promise<OperatorWithUser> {
-    const repo = this.repoFor(ctx)
-    const existingWithUser = await repo.findByUserIdWithUser(ctx.userId)
-    if (!existingWithUser) throw operatorNotFound()
-    const existing = existingWithUser.operator
-
-    if (!operatorPolicy.canUpdateSelf(ctx, existing)) {
-      throw forbidden('FORBIDDEN', 'Only active operators can update their avatar')
-    }
-
-    const expectedPrefix = `orgs/${existing.organizationId}/operators/${existing.id}/avatar/`
-    if (!key.startsWith(expectedPrefix)) {
-      throw new AppError({
-        statusCode: 400,
-        code: 'STORAGE_KEY_INVALID',
-        message: 'Key does not match this operator',
-      })
-    }
-
-    const headMeta = await this.storage.headObject(key)
-    if (!headMeta) {
-      throw new AppError({
-        statusCode: 404,
-        code: 'OBJECT_NOT_FOUND',
-        message: 'Uploaded avatar object not found',
-      })
-    }
-
-    if (!AVATAR_ALLOWED_CONTENT_TYPES.has(headMeta.contentType)) {
-      // Подчищаем битый объект (best-effort; не падаем если storage не отдал delete).
-      await this.safeDeleteObject(key, 'confirmAvatar content-type mismatch')
-      throw new AppError({
-        statusCode: 400,
-        code: 'AVATAR_CONTENT_TYPE_INVALID',
-        message: 'Uploaded content type is not allowed',
-      })
-    }
-
-    if (headMeta.size > AVATAR_MAX_BYTES) {
-      await this.safeDeleteObject(key, 'confirmAvatar size too large')
-      throw new AppError({
-        statusCode: 400,
-        code: 'AVATAR_TOO_LARGE',
-        message: 'Uploaded avatar exceeds size limit',
-      })
-    }
-
-    const oldKey = existing.avatarKey
-    if (oldKey && oldKey !== key) {
-      await this.safeDeleteObject(oldKey, 'confirmAvatar old key cleanup')
-    }
-
-    const updated = await repo.setAvatarKey(existing.id, existing.organizationId, key, {
-      actorUserId: ctx.userId,
-      actorRole: ctx.role,
-      ipAddress: meta.ipAddress,
-      metadata: { key, previousKey: oldKey },
-    })
-    if (!updated) throw operatorNotFound()
-    return { operator: updated, userPhone: existingWithUser.userPhone }
-  }
-
-  async deleteAvatar(ctx: AuthContext, meta: RequestMeta): Promise<OperatorWithUser> {
-    const repo = this.repoFor(ctx)
-    const existingWithUser = await repo.findByUserIdWithUser(ctx.userId)
-    if (!existingWithUser) throw operatorNotFound()
-    const existing = existingWithUser.operator
-
-    if (!operatorPolicy.canUpdateSelf(ctx, existing)) {
-      throw forbidden('FORBIDDEN', 'Only active operators can update their avatar')
-    }
-
-    if (existing.avatarKey) {
-      await this.safeDeleteObject(existing.avatarKey, 'deleteAvatar')
-    }
-
-    const updated = await repo.clearAvatarKey(existing.id, existing.organizationId, {
-      actorUserId: ctx.userId,
-      actorRole: ctx.role,
-      ipAddress: meta.ipAddress,
-      metadata: { previousKey: existing.avatarKey },
-    })
-    if (!updated) throw operatorNotFound()
-    return { operator: updated, userPhone: existingWithUser.userPhone }
-  }
-
-  private async safeDeleteObject(key: string, context: string): Promise<void> {
-    try {
-      await this.storage.deleteObject(key)
-    } catch (err) {
-      this.logger.warn({ err, key, context }, 'avatar delete best-effort failed')
-    }
-  }
 }
 
 function computeTerminatedAt(
@@ -503,12 +309,8 @@ function computeTerminatedAt(
   next: OperatorStatus,
 ): Date | null {
   if (next === 'terminated') {
-    // current.status !== 'terminated' тут — идемпотентность отфильтрована в
-    // service'е. Значит это первый терминейт ИЛИ терминейт после
-    // восстановления: в обоих случаях — свежая дата.
     return new Date()
   }
-  // Восстановление в active/blocked: сохраняем историческое значение.
   return current.terminatedAt
 }
 

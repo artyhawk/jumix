@@ -2,33 +2,29 @@ import type { Operator } from '@jumix/db'
 import { maskPhone } from '@jumix/shared'
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify'
 import {
-  avatarUploadUrlRequestSchema,
   changeOperatorStatusSchema,
-  confirmAvatarSchema,
   createOperatorSchema,
   listOperatorsQuerySchema,
   operatorIdParamsSchema,
   updateOperatorAdminSchema,
-  updateOperatorSelfSchema,
 } from './operator.schemas'
 
 /**
- * Operators REST endpoints.
+ * Operators REST endpoints (admin-only в B2d-2a).
+ *
+ * Self-endpoints (`/me`, `/me/avatar/*`) переехали в crane-profile-модуль
+ * (ADR 0003): `/api/v1/crane-profiles/me` + `/me/avatar/*` + `/me/memberships`.
+ * Сюда попадают только owner/superadmin админ-операции над конкретным
+ * наймом (organization_operator). Id, возвращаемые этими endpoints, —
+ * `organization_operators.id`.
  *
  * Admin (owner своей org / superadmin любой):
  *   POST   /api/v1/operators                  create (owner only — у superadmin нет org)
- *   GET    /api/v1/operators                  cursor-list, strict query schema
+ *   GET    /api/v1/operators                  cursor-list
  *   GET    /api/v1/operators/:id              read in scope
- *   PATCH  /api/v1/operators/:id              update (не status, не avatar, не phone)
+ *   PATCH  /api/v1/operators/:id              update (не status, не phone, не avatar)
  *   PATCH  /api/v1/operators/:id/status       change status (+ terminated_at semantics)
  *   DELETE /api/v1/operators/:id              soft-delete
- *
- * Self (только role=operator, субъект — ЭКСКЛЮЗИВНО `ctx.userId`, см. CLAUDE.md §6 rule #10):
- *   GET    /api/v1/operators/me               read own profile (любой status)
- *   PATCH  /api/v1/operators/me               update whitelist ФИО (status='active' required)
- *   POST   /api/v1/operators/me/avatar/upload-url  presigned PUT (active only)
- *   POST   /api/v1/operators/me/avatar/confirm     подтверждение upload'а (active only)
- *   DELETE /api/v1/operators/me/avatar             удалить свой аватар (active only)
  *
  * Все под app.authenticate. Policy/scope/tenant — в service, handler'ы только
  * парсят, мапят в DTO. `phone` из users маскируется на boundary через
@@ -38,45 +34,6 @@ export const registerOperatorRoutes: FastifyPluginAsync = async (app: FastifyIns
   app.register(
     async (scoped) => {
       scoped.addHook('preHandler', app.authenticate)
-
-      // -------- self endpoints: регистрируются ДО :id чтобы не коллидировать --------
-
-      scoped.get('/me', async (request) => {
-        const { operator, userPhone } = await app.operatorService.getOwn(request.ctx)
-        return toPublicDTO(app, operator, userPhone)
-      })
-
-      scoped.patch('/me', async (request) => {
-        const patch = updateOperatorSelfSchema.parse(request.body)
-        const { operator, userPhone } = await app.operatorService.updateSelf(request.ctx, patch, {
-          ipAddress: request.ip,
-        })
-        return toPublicDTO(app, operator, userPhone)
-      })
-
-      scoped.post('/me/avatar/upload-url', async (request) => {
-        const body = avatarUploadUrlRequestSchema.parse(request.body)
-        return app.operatorService.requestAvatarUpload(request.ctx, body.contentType)
-      })
-
-      scoped.post('/me/avatar/confirm', async (request) => {
-        const body = confirmAvatarSchema.parse(request.body)
-        const { operator, userPhone } = await app.operatorService.confirmAvatar(
-          request.ctx,
-          body.key,
-          { ipAddress: request.ip },
-        )
-        return toPublicDTO(app, operator, userPhone)
-      })
-
-      scoped.delete('/me/avatar', async (request) => {
-        const { operator, userPhone } = await app.operatorService.deleteAvatar(request.ctx, {
-          ipAddress: request.ip,
-        })
-        return toPublicDTO(app, operator, userPhone)
-      })
-
-      // -------- admin endpoints --------
 
       scoped.get('/', async (request) => {
         const query = listOperatorsQuerySchema.parse(request.query)
@@ -157,9 +114,6 @@ type PublicOperatorDTO = {
 
 type PublicOperatorListItemDTO = Omit<PublicOperatorDTO, 'phone'>
 
-/**
- * Async — avatarUrl генерируется через presigned GET (IO).
- */
 async function toPublicDTO(
   app: FastifyInstance,
   op: Operator,
@@ -222,6 +176,5 @@ async function resolveAvatarUrl(
 function dateOnly(value: Date | string | null): string | null {
   if (value === null) return null
   if (value instanceof Date) return value.toISOString().slice(0, 10)
-  // Drizzle `date`-колонки возвращают строку 'YYYY-MM-DD' — просто пробрасываем.
   return value
 }

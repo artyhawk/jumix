@@ -6,6 +6,7 @@ import type { DatabaseClient } from '@jumix/db'
 import { type FastifyInstance, fastify } from 'fastify'
 import type { Env } from './config/env'
 import authPlugin from './modules/auth/auth.plugin'
+import craneProfilePlugin from './modules/crane-profile/crane-profile.plugin'
 import cranePlugin from './modules/crane/crane.plugin'
 import operatorPlugin from './modules/operator/operator.plugin'
 import organizationPlugin from './modules/organization/organization.plugin'
@@ -13,6 +14,7 @@ import sitePlugin from './modules/site/site.plugin'
 import authenticatePlugin from './plugins/authenticate'
 import { registerErrorHandler } from './plugins/error-handler'
 import jwtPlugin from './plugins/jwt'
+import organizationContextPlugin from './plugins/organization-context'
 import redisPlugin from './plugins/redis'
 import storagePlugin from './plugins/storage'
 import { registerHealthRoutes } from './routes/health'
@@ -62,12 +64,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(redisPlugin)
   await app.register(storagePlugin)
   await app.register(authenticatePlugin)
+  await app.register(organizationContextPlugin)
 
   await app.register(registerHealthRoutes)
   await app.register(authPlugin)
   await app.register(organizationPlugin)
   await app.register(sitePlugin)
   await app.register(cranePlugin)
+  await app.register(craneProfilePlugin)
   await app.register(operatorPlugin)
 
   return app
