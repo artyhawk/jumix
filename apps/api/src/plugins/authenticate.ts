@@ -67,8 +67,11 @@ export async function authenticate(request: FastifyRequest, _reply: FastifyReply
   if (user.status !== 'active') {
     throw unauthorized('USER_BLOCKED', 'User account is blocked')
   }
-  // superadmin не привязан к организации, поэтому статусы чужих org его не касаются.
-  if (user.role !== 'superadmin' && user.organizationStatus !== 'active') {
+  // superadmin и operator живут без primary organization (ADR 0003 — identity
+  // pool). Для owner'а наличие active-организации обязательно. Для operator'а
+  // per-org-проверки делает requireOrganizationContext (plugin'ом) на каждом
+  // per-org endpoint'е — там своя tenant-scoping-логика.
+  if (user.role === 'owner' && user.organizationStatus !== 'active') {
     throw unauthorized('ORGANIZATION_INACTIVE', 'Organization is not active')
   }
 

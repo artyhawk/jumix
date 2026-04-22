@@ -209,6 +209,19 @@ deprecate'ится в пользу явного `findMembershipsByUserId` + `X-O
 - Audit action'ы: `organization_operator.submit` / `.approve` / `.reject` /
   `.update` / `.activate` / `.block` / `.terminate` / `.delete`.
 
+**B2d-3** (текущий коммит) — public registration flow:
+
+- `apps/api/src/modules/registration/` — `POST /api/v1/registration/{start,verify}`
+  как тонкий orchestration-слой поверх `SmsAuthService` + `TokenIssuerService`.
+  Migration 0008 ослабила `users_org_role_consistency_chk` чтобы разрешить
+  `role='operator' + organization_id IS NULL` (identity-only user до hire).
+  `authenticate.ts` скорректирован симметрично: org-status проверка теперь
+  только для `role='owner'` (superadmin и operator вне primary org).
+- `GET /api/v1/crane-profiles/me/status` — mobile screen routing:
+  `{profile, memberships[], canWork}` где `canWork = profile.approved &&
+  some(hire: approved+active)`. Анти-N+1 через JOIN на organizations.name.
+- Подробности — ADR [0004](0004-public-registration-flow.md).
+
 ## Альтернативы которые рассматривали
 
 ### 1. Одна таблица `operators` с массивом org_ids (jsonb)

@@ -146,6 +146,12 @@
 
 B2d-2a отгрузил plugin `organization-context` (header → `request.organizationContext` с approval/status-гейтом). B2d-2b переименовал `operator/` → `organization-operator/`, убрал compat-shim `createUserAndOperator` и развернул pipeline 2: POST hire принимает только `{craneProfileId, hiredAt?}` и создаёт **pending** hire; `POST /:id/approve` / `POST /:id/reject` (superadmin-only) завершают pайплайн. `canChangeStatus` требует `approval_status='approved'` (ENTITY_NOT_APPROVED / ENTITY_REJECTED_READONLY специализированы как `ORGANIZATION_OPERATOR_*`). Оба approval-pipeline'а (profile + hire) работают по § 4.2b. Вопрос закрыт.
 
+### B2d-3 — РЕШЕНО (public SMS-registration + /me/status)
+
+~~Публичный self-serve flow регистрации крановщиков через мобилку~~
+
+B2d-3 отгрузил ADR [0004](adr/0004-public-registration-flow.md): `POST /api/v1/registration/start` + `/verify` как тонкий orchestration-слой поверх `SmsAuthService` + `TokenIssuerService` (переиспользуем OTP store, 1/60s + 5/hour phone + 20/hour IP rate-limit, `auth_events.sms_*` audit). Verify транзакционно создаёт `users{role:'operator', organizationId:null}` + `crane_profiles{approvalStatus:'pending'}` + `audit_log.registration.complete`, потом выдаёт JWT-пару. Migration 0008 ослабила `users_org_role_consistency_chk`. `GET /api/v1/crane-profiles/me/status` возвращает `{profile, memberships[], canWork}` для mobile screen routing. `authenticate.ts` скорректирован: org-status проверка теперь только для `role='owner'` (superadmin и operator вне primary org). Вопрос закрыт.
+
 ### Operator transfer between organizations — РЕШЕНО B2d-1
 
 ~~Сейчас `operators.organization_id` — fixed после create...~~
@@ -238,6 +244,56 @@ Marketplace (Этап 4) — operators, согласившиеся быть ви
 Post-MVP: `GET /public/operators/:token` где `token` — short-lived JWT или UUID из БД с TTL, генерируется operator'ом через `POST /me/public-link`. DTO — ограниченный (без phone, без IIN), только ФИО + avatar + specialization + rating.
 
 Триггер: запрос от заказчика для marketplace UX.
+
+---
+
+## Registration (from B2d-3)
+
+### Resend OTP endpoint
+
+Сейчас `/registration/start` подчиняется тому же cooldown'у (1/60s per phone), что и `/auth/sms/request` — чтобы запросить повторный код, клиент ждёт 60 секунд и дёргает `/start` ещё раз. Это работает, но UX-неочевидно: таймер на экране, кнопка «Отправить ещё раз», потом ошибка 429 если юзер забыл подождать.
+
+Post-MVP — `POST /api/v1/registration/resend` как explicit action: тот же rate-limit, но с human-readable error сообщением «подождите N секунд» + возможно кнопка disabled до истечения cooldown. Не блокер — текущий `/start` покрывает функциональность.
+
+Триггер: первый UX-report от заказчика или пользовательской группы.
+
+### Re-registration after profile rejection
+
+Сейчас если superadmin отклонил crane_profile, у user'а остаётся запись в `users` + `crane_profiles{approvalStatus:'rejected'}`. Phone и ИИН заняты — повторная регистрация с теми же данными даст 409. Для легитимного кейса «приложили неправильные документы, исправили, хотят попробовать снова» нужен отдельный flow.
+
+Post-MVP options:
+- **Soft-delete + new registration:** superadmin при reject'е также soft-delete'ит profile (освобождая ИИН) + user (освобождая phone). Registration flow работает как есть. Минус — `users.id` разный, нет continuity audit.
+- **Re-submit endpoint:** `POST /api/v1/crane-profiles/me/resubmit` — operator меняет identity-поля (ФИО/ИИН/specialization) на rejected-profile'е и переводит обратно в `pending`. Continuity сохраняется, но требует расширения state machine (rejected → pending transition, сейчас запрещён).
+
+Триггер: первый реальный отказ + запрос на повторную регистрацию.
+
+### SMS templates i18n (RU / KZ)
+
+Сейчас текст SMS hardcoded в `DevStubSmsProvider` / `MobizonSmsProvider`. Пользователь выбирает язык мобилки, но OTP-SMS приходит на том языке, который заложил backend. Для казахско-язычных крановщиков — UX-проблема.
+
+Post-MVP:
+- `users.preferred_language` (общая backlog-item, см. Operators выше) — источник языка.
+- Но в registration flow user'а ещё нет (start вызывается ДО insert). Решение — брать язык из заголовка `Accept-Language` или из body (`{phone, lang: 'ru' | 'kz'}`).
+- Templates: `ru: "Ваш код для регистрации Jumix: XXXXXX"`, `kz: "Jumix-ке тіркелу коды: XXXXXX"`.
+
+Триггер: запрос от заказчика или пользовательской группы.
+
+### Mobizon integration completion
+
+Сейчас `/registration/start` использует тот же `SmsAuthService`, что и login-flow — если `MOBIZON_API_KEY` задан, провайдер реальный, иначе `DevStubSmsProvider` пишет в лог. Production блокирован на заказчике (получение Mobizon account + API key + sender name).
+
+Триггер: заказчик выдаёт Mobizon credentials.
+
+### Per-IP limit tuning for production
+
+Текущий лимит — 20 SMS-запросов в час с одного IP. Это разумно для mobile traffic через operator LTE (разные клиенты с разными IP), но может быть жёстким для корпоративной сети (вся компания за одним NAT'ом). Для registration flow это особенно чувствительно: onboarding партии крановщиков из офиса компании → 21й отправка 429.
+
+Post-MVP options:
+- Поднять лимит до 50/hour (достаточно для любых legitimate use cases, всё ещё ловит спам-боты).
+- Whitelist известных корпоративных IP'шников (от заказчика).
+- Отдельные лимитеры для `/registration/*` vs `/auth/sms/*` — сейчас один shared.
+
+Триггер: первый реальный 429-report от legitimate пользователя.
 
 ---
 

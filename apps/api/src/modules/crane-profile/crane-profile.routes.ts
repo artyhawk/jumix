@@ -1,6 +1,7 @@
 import type { CraneProfile, OrganizationOperator } from '@jumix/db'
 import { maskPhone } from '@jumix/shared'
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify'
+import type { MembershipWithOrganization } from './crane-profile.repository'
 import {
   avatarUploadUrlRequestSchema,
   confirmAvatarSchema,
@@ -26,6 +27,8 @@ import {
  *   GET    /api/v1/crane-profiles/me              own profile (любой status)
  *   PATCH  /api/v1/crane-profiles/me              whitelist ФИО
  *   GET    /api/v1/crane-profiles/me/memberships  список найма этого профиля
+ *   GET    /api/v1/crane-profiles/me/status       screen routing (ADR 0004):
+ *                                                  profile+memberships+canWork
  *   POST   /api/v1/crane-profiles/me/avatar/upload-url
  *   POST   /api/v1/crane-profiles/me/avatar/confirm
  *   DELETE /api/v1/crane-profiles/me/avatar
@@ -55,6 +58,21 @@ export const registerCraneProfileRoutes: FastifyPluginAsync = async (app: Fastif
       scoped.get('/me/memberships', async (request) => {
         const { rows } = await app.craneProfileService.listOwnMemberships(request.ctx)
         return { items: rows.map(toMembershipDTO) }
+      })
+
+      scoped.get('/me/status', async (request) => {
+        const { profile, memberships, canWork } = await app.craneProfileService.getMeStatus(
+          request.ctx,
+        )
+        return {
+          profile: {
+            id: profile.id,
+            approvalStatus: profile.approvalStatus,
+            rejectionReason: profile.rejectionReason,
+          },
+          memberships: memberships.map(toMembershipStatusDTO),
+          canWork,
+        }
       })
 
       scoped.post('/me/avatar/upload-url', async (request) => {
@@ -223,6 +241,24 @@ function toMembershipDTO(row: OrganizationOperator): PublicMembershipDTO {
     approvalStatus: row.approvalStatus,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+type MeStatusMembershipDTO = {
+  id: string
+  organizationId: string
+  organizationName: string
+  approvalStatus: 'pending' | 'approved' | 'rejected'
+  status: 'active' | 'blocked' | 'terminated'
+}
+
+function toMembershipStatusDTO(row: MembershipWithOrganization): MeStatusMembershipDTO {
+  return {
+    id: row.hire.id,
+    organizationId: row.hire.organizationId,
+    organizationName: row.organizationName,
+    approvalStatus: row.hire.approvalStatus,
+    status: row.hire.status,
   }
 }
 

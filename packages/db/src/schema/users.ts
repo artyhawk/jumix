@@ -43,11 +43,15 @@ export const users = pgTable(
       .on(t.organizationId)
       .where(sql`status = 'active' AND deleted_at IS NULL`),
     check('users_phone_format_chk', sql`${t.phone} ~ '^\\+7[0-9]{10}$'`),
-    // Инвариант: у superadmin organization_id = NULL; у остальных ролей — NOT NULL
+    // Инвариант (ADR 0003): superadmin — org IS NULL; owner — org IS NOT NULL;
+    // operator — org IS NULL (идентичность живёт на crane_profiles;
+    // per-org context резолвится через organization_operators + X-Organization-Id
+    // header, не на уровне users).
     check(
       'users_org_role_consistency_chk',
       sql`(${t.role} = 'superadmin' AND ${t.organizationId} IS NULL)
-          OR (${t.role} <> 'superadmin' AND ${t.organizationId} IS NOT NULL)`,
+          OR (${t.role} = 'owner' AND ${t.organizationId} IS NOT NULL)
+          OR (${t.role} = 'operator')`,
     ),
   ],
 )

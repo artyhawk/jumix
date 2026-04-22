@@ -7,6 +7,7 @@ import {
   auditLog,
   craneProfiles,
   organizationOperators,
+  organizations,
   users,
 } from '@jumix/db'
 import { type SQL, and, asc, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm'
@@ -32,6 +33,16 @@ export type AuditMeta = {
 }
 
 export type CraneProfileWithUser = { profile: CraneProfile; userPhone: string }
+
+/**
+ * Членство с nested organization name — используется в /me/status чтобы
+ * мобилка могла показывать человеко-читаемые имена организаций в pending/
+ * approved состоянии без второго round-trip'а (анти-N+1).
+ */
+export type MembershipWithOrganization = {
+  hire: OrganizationOperator
+  organizationName: string
+}
 
 type CraneProfileRow = typeof craneProfiles.$inferSelect
 
@@ -202,6 +213,35 @@ export class CraneProfileRepository {
       )
       .orderBy(desc(organizationOperators.createdAt))
     return { rows: rows as OrganizationOperator[] }
+  }
+
+  /**
+   * Same scope что `listMembershipsForProfile`, но JOIN'ит `organizations.name`.
+   * Для /me/status: клиент хочет показать «ТОО Кран-15 — pending» а не UUID.
+   * Deleted_at IS NULL на обеих сторонах — soft-deleted orgs / hire'ы не
+   * всплывают.
+   */
+  async listMembershipsForProfileWithOrg(
+    profileId: string,
+  ): Promise<{ rows: MembershipWithOrganization[] }> {
+    const rows = await this.database.db
+      .select({ hire: organizationOperators, organizationName: organizations.name })
+      .from(organizationOperators)
+      .innerJoin(organizations, eq(organizationOperators.organizationId, organizations.id))
+      .where(
+        and(
+          eq(organizationOperators.craneProfileId, profileId),
+          isNull(organizationOperators.deletedAt),
+        ),
+      )
+      .orderBy(desc(organizationOperators.createdAt))
+
+    return {
+      rows: rows.map((row) => ({
+        hire: row.hire as OrganizationOperator,
+        organizationName: row.organizationName,
+      })),
+    }
   }
 
   async updateFields(

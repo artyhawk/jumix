@@ -207,8 +207,9 @@ export class RefreshAuthService {
       await this.logRefreshFail(record.userId, user.phone, ipAddress, userAgent, 'user_blocked')
       throw this.invalidRefresh()
     }
-    // non-superadmin ролям нужна активная организация
-    if (user.role !== 'superadmin' && user.organizationStatus !== 'active') {
+    // owner'у нужна active primary organization. superadmin и operator
+    // вне организаций (ADR 0003 — operator живёт через organization_operators).
+    if (user.role === 'owner' && user.organizationStatus !== 'active') {
       await this.logRefreshFail(record.userId, user.phone, ipAddress, userAgent, 'org_inactive')
       throw this.invalidRefresh()
     }

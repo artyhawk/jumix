@@ -73,7 +73,7 @@ describe('auth schema', () => {
     ).rejects.toThrow(/users_phone_format_chk/)
   })
 
-  test('CHECK: superadmin без org, owner с org', async () => {
+  test('CHECK: superadmin без org, owner с org, operator без org (ADR 0003)', async () => {
     const [org] = await client.db
       .insert(organizations)
       .values({ name: 'Org2', bin: '555444333222' })
@@ -99,16 +99,17 @@ describe('auth schema', () => {
       }),
     ).rejects.toThrow(/users_org_role_consistency_chk/)
 
-    // оба валидных варианта проходят
+    // superadmin без org, owner с org, operator без org (регистрация B2d-3) — все валидны
     const inserted = await client.db
       .insert(users)
       .values([
         { phone: '+77050000003', role: 'superadmin', organizationId: null, name: 'OK admin' },
         { phone: '+77050000004', role: 'owner', organizationId: org!.id, name: 'OK owner' },
+        { phone: '+77050000005', role: 'operator', organizationId: null, name: 'OK operator' },
       ])
       .returning()
 
-    expect(inserted).toHaveLength(2)
+    expect(inserted).toHaveLength(3)
   })
 
   test('FK cascade: удаление user удаляет его refresh_tokens', async () => {

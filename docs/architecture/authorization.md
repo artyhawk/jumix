@@ -10,6 +10,7 @@
 - **Owner** видит только свою организацию (scope через `organization_id`)
 - **Operator** видит только свои данные (scope через `user_id`)
 - **Marketplace** — единственное легальное место межтенантной видимости, с ограниченным DTO
+- **Public endpoints** — `POST /api/v1/registration/start` и `POST /api/v1/registration/verify` (ADR [0004](adr/0004-public-registration-flow.md)) намеренно идут БЕЗ `app.authenticate`: это точка входа для крановщика, у которого ещё нет аккаунта. Verify создаёт users-запись с `role='operator'`, `organization_id=null` и crane_profiles с `approval_status='pending'`. Аккаунт не даёт никаких per-org привилегий до одобрения superadmin'ом + найма (`organization_operators`).
 
 ## 4.2 Four-layer defense
 

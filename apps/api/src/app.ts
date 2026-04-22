@@ -10,6 +10,7 @@ import craneProfilePlugin from './modules/crane-profile/crane-profile.plugin'
 import cranePlugin from './modules/crane/crane.plugin'
 import organizationOperatorPlugin from './modules/organization-operator/organization-operator.plugin'
 import organizationPlugin from './modules/organization/organization.plugin'
+import registrationPlugin from './modules/registration/registration.plugin'
 import sitePlugin from './modules/site/site.plugin'
 import authenticatePlugin from './plugins/authenticate'
 import { registerErrorHandler } from './plugins/error-handler'
@@ -73,6 +74,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(cranePlugin)
   await app.register(craneProfilePlugin)
   await app.register(organizationOperatorPlugin)
+  await app.register(registrationPlugin)
 
   return app
 }

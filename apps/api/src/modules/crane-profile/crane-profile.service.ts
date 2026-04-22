@@ -9,6 +9,7 @@ import {
   CraneProfileRepository,
   type CraneProfileWithUser,
   type ListCraneProfileApprovalFilter,
+  type MembershipWithOrganization,
 } from './crane-profile.repository'
 import type {
   ListCraneProfilesQuery,
@@ -169,6 +170,34 @@ export class CraneProfileService {
     if (!profile) throw profileNotFound()
     const { rows } = await repo.listMembershipsForProfile(profile.id)
     return { profile, rows }
+  }
+
+  /**
+   * GET /crane-profiles/me/status (ADR 0004 §/me/status) — mobile screen
+   * routing. Возвращает минимально необходимое клиенту:
+   *   - профиль (id / approvalStatus / rejectionReason),
+   *   - membership'ы с nested organizationName (анти-N+1 JOIN),
+   *   - derived `canWork` — true если профиль approved И есть хоть один
+   *     approved+active hire.
+   *
+   * Subject EXCLUSIVELY ctx.userId (§4.2a). Operator-only.
+   */
+  async getMeStatus(ctx: AuthContext): Promise<{
+    profile: CraneProfile
+    memberships: MembershipWithOrganization[]
+    canWork: boolean
+  }> {
+    if (ctx.role !== 'operator') {
+      throw forbidden('FORBIDDEN', '/me is available to operators only')
+    }
+    const repo = this.repoFor(ctx)
+    const profile = await repo.findByUserId(ctx.userId)
+    if (!profile) throw profileNotFound()
+    const { rows } = await repo.listMembershipsForProfileWithOrg(profile.id)
+    const canWork =
+      profile.approvalStatus === 'approved' &&
+      rows.some((m) => m.hire.approvalStatus === 'approved' && m.hire.status === 'active')
+    return { profile, memberships: rows, canWork }
   }
 
   // ---------- admin mutations (superadmin) ----------
