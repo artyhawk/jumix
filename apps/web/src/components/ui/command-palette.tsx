@@ -1,21 +1,32 @@
 'use client'
 
+import { useAuth } from '@/hooks/use-auth'
 import { useKeyboard } from '@/hooks/use-keyboard'
 import { cn } from '@/lib/utils'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import { Command } from 'cmdk'
-import { Search } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { LayoutDashboard, LogOut, Search, ShieldCheck } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import { DialogOverlay, DialogRoot } from './dialog'
 
 /**
- * Cmd+K палитра. В B3-UI-1 это scaffold с empty state — реальные команды
- * появляются в последующих вертикалях (B3-UI-2/3/4) когда у нас есть routes.
+ * Cmd+K палитра. Superadmin commands добавлены в B3-UI-2b; full role-aware
+ * registry — в B3-UI-2d.
  *
  * Keyboard binding Cmd+K / Ctrl+K открывает палитру глобально.
  */
+interface PaletteCommand {
+  id: string
+  label: string
+  icon?: React.ReactNode
+  action: () => void
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false)
+  const router = useRouter()
+  const { user, logout } = useAuth()
 
   useKeyboard('cmd+k', (e) => {
     e.preventDefault()
@@ -30,6 +41,42 @@ export function CommandPalette() {
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [open])
+
+  const commands = useMemo<PaletteCommand[]>(() => {
+    const run = (fn: () => void) => () => {
+      setOpen(false)
+      fn()
+    }
+    const list: PaletteCommand[] = []
+    if (user?.role === 'superadmin') {
+      list.push(
+        {
+          id: 'nav:dashboard',
+          label: 'Перейти к обзору',
+          icon: <LayoutDashboard className="size-4" strokeWidth={1.5} aria-hidden />,
+          action: run(() => router.push('/dashboard')),
+        },
+        {
+          id: 'nav:approvals',
+          label: 'Перейти к заявкам',
+          icon: <ShieldCheck className="size-4" strokeWidth={1.5} aria-hidden />,
+          action: run(() => router.push('/approvals')),
+        },
+      )
+    }
+    if (user) {
+      list.push({
+        id: 'session:logout',
+        label: 'Выйти',
+        icon: <LogOut className="size-4" strokeWidth={1.5} aria-hidden />,
+        action: run(() => {
+          void logout()
+          router.push('/login')
+        }),
+      })
+    }
+    return list
+  }, [user, logout, router])
 
   return (
     <DialogRoot open={open} onOpenChange={setOpen}>
@@ -58,8 +105,19 @@ export function CommandPalette() {
             </div>
             <Command.List className="max-h-[320px] overflow-auto p-2">
               <Command.Empty className="py-8 text-center text-sm text-text-tertiary">
-                Команды появятся в следующих релизах.
+                Ничего не найдено
               </Command.Empty>
+              {commands.map((cmd) => (
+                <Command.Item
+                  key={cmd.id}
+                  value={cmd.label}
+                  onSelect={cmd.action}
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-text-primary data-[selected=true]:bg-layer-3 cursor-pointer"
+                >
+                  <span className="text-text-tertiary">{cmd.icon}</span>
+                  <span>{cmd.label}</span>
+                </Command.Item>
+              ))}
             </Command.List>
           </Command>
         </RadixDialog.Content>
