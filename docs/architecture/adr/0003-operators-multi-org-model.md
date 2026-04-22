@@ -4,9 +4,11 @@
 - **Статус:** Accepted
 - **Автор:** Yerbol
 - **Scope:** B2d (operators refactor). Этот ADR — архитектурный, реализуется в
-  четырёх вертикалях: B2d-1 (этот коммит — схема + AuthContext), B2d-2 (split
-  модуля на crane-profile + organization-operator), B2d-3 (public SMS
-  регистрация + hire-approval), B2d-4 (документы + expiry cron).
+  четырёх вертикалях: B2d-1 (схема + AuthContext), B2d-2 (split модуля на
+  crane-profile + organization-operator), B2d-3 (public SMS регистрация +
+  hire-approval), B2d-4 (документы + expiry cron — см. ADR
+  [0005](0005-license-document-flow.md)). **Все четыре вертикали закрыты
+  по состоянию на 2026-04-22.**
 
 ## Контекст
 

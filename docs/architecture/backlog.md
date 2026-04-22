@@ -297,6 +297,60 @@ Post-MVP options:
 
 ---
 
+## License document flow (from B2d-4)
+
+### Notification delivery — push/SMS для expiry warnings
+
+`LicenseExpiryWorker` пишет audit `license.warning_sent` {variant, expiresAt} и проставляет `warning_*_sent_at` флаги, но **фактическую доставку** push/SMS не делает. В MVP это достаточно: mobile считает `licenseStatus` на boundary и показывает красный бейдж при `expiring_critical`/`expired`, оператор видит при открытии приложения.
+
+Post-MVP — когда появится notifications-слой (push через FCM + fallback SMS через Mobizon):
+
+- Worker после транзакции UPDATE+audit вызывает `notifications.send({userId, template: 'license.expiring_30d' | 'license.expiring_7d' | 'license.expired', variables: {expiresAt, profileId}})`.
+- Идемпотентность уже обеспечена `warning_*_sent_at` (повторный run skipped).
+- SMS-fallback если push failed (мобилка не онлайн 24 часа — оператор мог удалить приложение).
+
+Триггер: готовность notifications-модуля (Этап 4 ТЗ — рейтинги + запуск).
+
+### Retention policy для старых версий license
+
+Сейчас `crane-profiles/{id}/license/v{N}/{file}` — все версии остаются в bucket навсегда. Compliance требует хранить документ, который был валидным на момент смены (спор о праве на работу). Но через 5 лет хранить v1 от 2026 — overkill.
+
+Post-MVP:
+- MinIO lifecycle rule: удалять объекты в `crane-profiles/*/license/v*/` с `age > N лет` (N согласовать с юристом — типично 3-5 лет).
+- ИЛИ: retention через БД — `license_versions` таблица (версия + дата expired + reference на object), cron удаляет expired-старше-N-лет.
+
+Триггер: consultation с юристом заказчика по compliance OR bucket превысит 10 GiB license data.
+
+### Orphan cleanup — presigned-но-не-confirmed объекты
+
+Оператор получил `/me/license/upload-url`, PUT'нул файл, но `/confirm` не вызвал (сеть пропала, crash, забыл). Объект остаётся в bucket без ссылки в БД.
+
+Post-MVP:
+- MinIO lifecycle: удалять объекты в `crane-profiles/*/license/v*/` с `last-modified > 24h` и без matching row в `crane_profiles.license_key`. Нужен cron reconciler (MinIO lifecycle сам не умеет фильтровать по внешней БД).
+- ИЛИ: client retry (mobile при следующем запуске проверяет local pending confirm и шлёт).
+
+Триггер: bucket начинает расти быстрее чем количество подтверждённых license.
+
+### Upload rate-limit
+
+Общий API rate-limit покрывает презентационный abuse. Но оператор может spam'ить `/me/license/upload-url + confirm` (каждый confirm — новая версия + объект). Не критично для MVP (объём мал), но:
+
+Post-MVP: `1 успешный confirm / 24h / crane_profile`. Реализация через `@fastify/rate-limit` с custom key `license:${profileId}`.
+
+Триггер: первый реальный случай злоупотребления или заказчик решит ограничить частоту.
+
+### Multi-document extension — медосмотр, СИЗ-журнал, допуски
+
+MVP: один документ (license). Когда появится второй (медосмотр — уже в ТЗ §5.1.5.1 упоминается), rule of three сработает:
+
+- Вынести в `crane_profile_documents {id, crane_profile_id, kind, version, key, expires_at, warning_*_sent_at, ...}`.
+- `LicenseExpiryWorker` → `DocumentExpiryWorker` с фильтром по kind.
+- `canWork` gate расширяется: все required документы должны быть valid.
+
+Триггер: ТЗ-допсоглашение с заказчиком про второй документ ИЛИ новая вертикаль в post-MVP.
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:

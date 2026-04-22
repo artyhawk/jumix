@@ -96,6 +96,16 @@ function hydrateProfile(row: typeof craneProfiles.$inferSelect): CraneProfile {
     rejectedByUserId: row.rejectedByUserId,
     rejectedAt: row.rejectedAt,
     rejectionReason: row.rejectionReason,
+    licenseKey: row.licenseKey,
+    licenseExpiresAt: row.licenseExpiresAt
+      ? row.licenseExpiresAt instanceof Date
+        ? row.licenseExpiresAt
+        : new Date(row.licenseExpiresAt)
+      : null,
+    licenseVersion: row.licenseVersion,
+    licenseWarning30dSentAt: row.licenseWarning30dSentAt,
+    licenseWarning7dSentAt: row.licenseWarning7dSentAt,
+    licenseExpiredAt: row.licenseExpiredAt,
     deletedAt: row.deletedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

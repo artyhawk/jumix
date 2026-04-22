@@ -222,6 +222,16 @@ export class RegistrationService {
             rejectedByUserId: profileRow.rejectedByUserId,
             rejectedAt: profileRow.rejectedAt,
             rejectionReason: profileRow.rejectionReason,
+            licenseKey: profileRow.licenseKey,
+            licenseExpiresAt: profileRow.licenseExpiresAt
+              ? profileRow.licenseExpiresAt instanceof Date
+                ? profileRow.licenseExpiresAt
+                : new Date(profileRow.licenseExpiresAt)
+              : null,
+            licenseVersion: profileRow.licenseVersion,
+            licenseWarning30dSentAt: profileRow.licenseWarning30dSentAt,
+            licenseWarning7dSentAt: profileRow.licenseWarning7dSentAt,
+            licenseExpiredAt: profileRow.licenseExpiredAt,
             deletedAt: profileRow.deletedAt,
             createdAt: profileRow.createdAt,
             updatedAt: profileRow.updatedAt,

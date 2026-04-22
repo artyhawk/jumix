@@ -90,6 +90,14 @@ function nextIin(): string {
   return iin(iinSeq)
 }
 
+function futureDate(daysFromNow: number): Date {
+  return new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000)
+}
+
+function pastDate(daysAgo: number): Date {
+  return new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
+}
+
 type Approval = 'pending' | 'approved' | 'rejected'
 type HireStatus = 'active' | 'blocked' | 'terminated'
 
@@ -98,6 +106,9 @@ async function createOperator(options: {
   rejectionReason?: string | null
   firstName?: string
   lastName?: string
+  /** ADR 0005: включая license-поля поддерживаем полный 3-gate canWork-scan. */
+  licenseKey?: string | null
+  licenseExpiresAt?: Date | null
 }): Promise<{ userId: string; profileId: string; accessToken: string }> {
   const user = await createUser(handle.app, {
     role: 'operator',
@@ -106,19 +117,20 @@ async function createOperator(options: {
     name: `${options.firstName ?? 'Op'} ${options.lastName ?? 'Erator'}`,
   })
   const approvalStatus = options.approvalStatus ?? 'pending'
-  const values: Parameters<typeof handle.app.db.db.insert<typeof craneProfiles>>[0] extends never
-    ? never
-    : {
-        userId: string
-        firstName: string
-        lastName: string
-        iin: string
-        specialization: Record<string, unknown>
-        approvalStatus: Approval
-        approvedAt?: Date | null
-        rejectedAt?: Date | null
-        rejectionReason?: string | null
-      } = {
+  const values: {
+    userId: string
+    firstName: string
+    lastName: string
+    iin: string
+    specialization: Record<string, unknown>
+    approvalStatus: Approval
+    approvedAt?: Date | null
+    rejectedAt?: Date | null
+    rejectionReason?: string | null
+    licenseKey?: string | null
+    licenseExpiresAt?: Date | null
+    licenseVersion?: number
+  } = {
     userId: user.id,
     firstName: options.firstName ?? 'Op',
     lastName: options.lastName ?? 'Erator',
@@ -130,6 +142,11 @@ async function createOperator(options: {
   if (approvalStatus === 'rejected') {
     values.rejectedAt = new Date()
     values.rejectionReason = options.rejectionReason ?? 'Документы неполные'
+  }
+  if (options.licenseExpiresAt !== undefined) {
+    values.licenseKey = options.licenseKey ?? 'crane-profiles/fake/license/v1/test.pdf'
+    values.licenseExpiresAt = options.licenseExpiresAt
+    values.licenseVersion = 1
   }
   const inserted = await handle.app.db.db.insert(craneProfiles).values(values).returning()
   const profile = inserted[0]
@@ -167,6 +184,8 @@ async function createHire(
   return row
 }
 
+type LicenseStatusKind = 'missing' | 'valid' | 'expiring_soon' | 'expiring_critical' | 'expired'
+
 async function meStatus(token: string | null): Promise<{
   statusCode: number
   body: {
@@ -178,6 +197,7 @@ async function meStatus(token: string | null): Promise<{
       approvalStatus: Approval
       status: HireStatus
     }>
+    licenseStatus?: LicenseStatusKind
     canWork?: boolean
     error?: { code: string }
   }
@@ -303,8 +323,11 @@ describe('GET /api/v1/crane-profiles/me/status — hire state combinations', () 
     expect(body.canWork).toBe(false)
   })
 
-  it('approved profile + approved+active hire → canWork=true, org name surfaced', async () => {
-    const { accessToken, profileId } = await createOperator({ approvalStatus: 'approved' })
+  it('approved profile + approved+active hire + valid license → canWork=true, org name surfaced', async () => {
+    const { accessToken, profileId } = await createOperator({
+      approvalStatus: 'approved',
+      licenseExpiresAt: futureDate(365),
+    })
     await createHire(profileId, { approvalStatus: 'approved', status: 'active' })
     const { body } = await meStatus(accessToken)
     expect(body.memberships).toHaveLength(1)
@@ -312,6 +335,7 @@ describe('GET /api/v1/crane-profiles/me/status — hire state combinations', () 
     expect(body.memberships?.[0]?.organizationName).toBe(orgName)
     expect(body.memberships?.[0]?.approvalStatus).toBe('approved')
     expect(body.memberships?.[0]?.status).toBe('active')
+    expect(body.licenseStatus).toBe('valid')
     expect(body.canWork).toBe(true)
   })
 })
@@ -322,7 +346,10 @@ describe('GET /api/v1/crane-profiles/me/status — multiple memberships', () => 
       name: 'Secondary Org',
       bin: '660000000002',
     })
-    const { accessToken, profileId } = await createOperator({ approvalStatus: 'approved' })
+    const { accessToken, profileId } = await createOperator({
+      approvalStatus: 'approved',
+      licenseExpiresAt: futureDate(200),
+    })
     await createHire(profileId, { approvalStatus: 'approved', status: 'active' })
     await createHire(profileId, {
       organizationId: org2.id,
@@ -341,7 +368,10 @@ describe('GET /api/v1/crane-profiles/me/status — multiple memberships', () => 
       name: 'Third Org',
       bin: '660000000003',
     })
-    const { accessToken, profileId } = await createOperator({ approvalStatus: 'approved' })
+    const { accessToken, profileId } = await createOperator({
+      approvalStatus: 'approved',
+      licenseExpiresAt: futureDate(200),
+    })
     await createHire(profileId, { approvalStatus: 'rejected', status: 'active' })
     await createHire(profileId, {
       organizationId: org2.id,
@@ -377,8 +407,17 @@ describe('GET /api/v1/crane-profiles/me/status — DTO shape', () => {
     ])
   })
 
+  it('top-level keys include licenseStatus alongside profile/memberships/canWork', async () => {
+    const { accessToken } = await createOperator({ approvalStatus: 'pending' })
+    const { body } = await meStatus(accessToken)
+    expect(Object.keys(body).sort()).toEqual(['canWork', 'licenseStatus', 'memberships', 'profile'])
+  })
+
   it('membership DTO contains {id, organizationId, organizationName, approvalStatus, status}', async () => {
-    const { accessToken, profileId } = await createOperator({ approvalStatus: 'approved' })
+    const { accessToken, profileId } = await createOperator({
+      approvalStatus: 'approved',
+      licenseExpiresAt: futureDate(365),
+    })
     await createHire(profileId, { approvalStatus: 'approved', status: 'active' })
     const { body } = await meStatus(accessToken)
     expect(body.memberships).toHaveLength(1)
@@ -389,5 +428,68 @@ describe('GET /api/v1/crane-profiles/me/status — DTO shape', () => {
       'organizationName',
       'status',
     ])
+  })
+})
+
+/**
+ * ADR 0005 — license-gate как третья компонента canWork.
+ * profile.approved && some(approved+active hire) уже закрыты выше;
+ * этот блок фиксирует поведение самого license-gate.
+ */
+describe('GET /api/v1/crane-profiles/me/status — license-gate (ADR 0005)', () => {
+  async function setup(licenseExpiresAt: Date | null): Promise<{
+    accessToken: string
+  }> {
+    const { accessToken, profileId } = await createOperator({
+      approvalStatus: 'approved',
+      licenseExpiresAt: licenseExpiresAt ?? undefined,
+    })
+    await createHire(profileId, { approvalStatus: 'approved', status: 'active' })
+    return { accessToken }
+  }
+
+  it('license missing → licenseStatus=missing, canWork=false даже с approved+active hire', async () => {
+    const { accessToken } = await setup(null)
+    const { body } = await meStatus(accessToken)
+    expect(body.licenseStatus).toBe('missing')
+    expect(body.canWork).toBe(false)
+  })
+
+  it('license valid (>30d) → licenseStatus=valid, canWork=true', async () => {
+    const { accessToken } = await setup(futureDate(90))
+    const { body } = await meStatus(accessToken)
+    expect(body.licenseStatus).toBe('valid')
+    expect(body.canWork).toBe(true)
+  })
+
+  it('license expiring_soon (>7d, ≤30d) → canWork=true (warning, not block)', async () => {
+    const { accessToken } = await setup(futureDate(15))
+    const { body } = await meStatus(accessToken)
+    expect(body.licenseStatus).toBe('expiring_soon')
+    expect(body.canWork).toBe(true)
+  })
+
+  it('license expiring_critical (≤7d) → canWork=true (warning, not block)', async () => {
+    const { accessToken } = await setup(futureDate(3))
+    const { body } = await meStatus(accessToken)
+    expect(body.licenseStatus).toBe('expiring_critical')
+    expect(body.canWork).toBe(true)
+  })
+
+  it('license expired → canWork=false', async () => {
+    const { accessToken } = await setup(pastDate(1))
+    const { body } = await meStatus(accessToken)
+    expect(body.licenseStatus).toBe('expired')
+    expect(body.canWork).toBe(false)
+  })
+
+  it('pending profile + valid license → canWork=false (profile-gate wins)', async () => {
+    const { accessToken } = await createOperator({
+      approvalStatus: 'pending',
+      licenseExpiresAt: futureDate(365),
+    })
+    const { body } = await meStatus(accessToken)
+    expect(body.licenseStatus).toBe('valid')
+    expect(body.canWork).toBe(false)
   })
 })

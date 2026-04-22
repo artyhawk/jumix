@@ -111,6 +111,21 @@ export const envSchema = z.object({
     .string()
     .optional()
     .transform((raw) => (raw === undefined ? undefined : raw === 'true')),
+
+  /**
+   * Блокирует регистрацию cron'ов (BullMQ repeatable jobs). Нужно для тестов:
+   * Testcontainers не поднимает Redis, а BullMQ при попытке add-а repeatable
+   * job падает с connection error. По умолчанию true в test, false в
+   * dev/prod — cron'ы регистрируются автоматически при старте.
+   *
+   * Вопрос «как запускать worker в prod» — decision в ADR 0005: inline в
+   * API-контейнере (single process). Scaling на отдельный worker-container
+   * отложен в backlog.
+   */
+  DISABLE_CRONS: z
+    .string()
+    .optional()
+    .transform((raw) => (raw === undefined ? undefined : raw === 'true')),
 })
 
 export type Env = z.infer<typeof envSchema>

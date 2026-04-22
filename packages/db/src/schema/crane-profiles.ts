@@ -1,7 +1,9 @@
 import { sql } from 'drizzle-orm'
 import {
   check,
+  date,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -59,6 +61,25 @@ export const craneProfiles = pgTable(
     rejectedByUserId: uuid().references(() => users.id, { onDelete: 'set null' }),
     rejectedAt: timestamp({ withTimezone: true, mode: 'date' }),
     rejectionReason: text(),
+    // ---------- license (ADR 0005) ----------
+    // license_status НЕ хранится: computed на boundary из (licenseExpiresAt, NOW()) —
+    // меняется со временем без action'а, хранение в БД потребовало бы daily UPDATE.
+    licenseKey: text(),
+    licenseExpiresAt: date({ mode: 'date' }),
+    licenseVersion: integer().notNull().default(0),
+    // drizzle's snake_case converter не вставляет underscore между буквой и
+    // цифрой (`Warning30d` → `warning30d`). Миграция 0009 завела колонки с
+    // явными разделителями (`license_warning_30d_sent_at`) — фиксируем имена
+    // через .name() чтобы schema и БД не расходились.
+    licenseWarning30dSentAt: timestamp('license_warning_30d_sent_at', {
+      withTimezone: true,
+      mode: 'date',
+    }),
+    licenseWarning7dSentAt: timestamp('license_warning_7d_sent_at', {
+      withTimezone: true,
+      mode: 'date',
+    }),
+    licenseExpiredAt: timestamp({ withTimezone: true, mode: 'date' }),
     deletedAt: timestamp({ withTimezone: true, mode: 'date' }),
     createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
@@ -79,8 +100,20 @@ export const craneProfiles = pgTable(
       .where(sql`approval_status = 'pending' AND deleted_at IS NULL`),
     // Быстрый self-scope lookup по user_id (/me endpoints).
     index('crane_profiles_user_idx').on(t.userId),
+    // Hot path для license-expiry cron — только профили с указанным expires_at,
+    // которые могут когда-либо попасть в warning-scan (ADR 0005).
+    index('crane_profiles_license_expiry_scan_idx')
+      .on(t.licenseExpiresAt)
+      .where(sql`license_expires_at IS NOT NULL AND deleted_at IS NULL`),
     // Format check уровня БД — страховка если Zod обошли.
     check('crane_profiles_iin_format_chk', sql`${t.iin} ~ '^[0-9]{12}$'`),
+    // License consistency: либо всё NULL (не загружено), либо всё заполнено
+    // (загружено). Частичные состояния невозможны (ADR 0005).
+    check(
+      'crane_profiles_license_consistency_chk',
+      sql`(${t.licenseKey} IS NULL AND ${t.licenseExpiresAt} IS NULL)
+          OR (${t.licenseKey} IS NOT NULL AND ${t.licenseExpiresAt} IS NOT NULL)`,
+    ),
   ],
 )
 
@@ -102,6 +135,12 @@ export type CraneProfile = {
   rejectedByUserId: string | null
   rejectedAt: Date | null
   rejectionReason: string | null
+  licenseKey: string | null
+  licenseExpiresAt: Date | null
+  licenseVersion: number
+  licenseWarning30dSentAt: Date | null
+  licenseWarning7dSentAt: Date | null
+  licenseExpiredAt: Date | null
   deletedAt: Date | null
   createdAt: Date
   updatedAt: Date

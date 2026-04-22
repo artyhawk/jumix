@@ -118,6 +118,29 @@ status:          'active' | 'maintenance' | 'retired'   ← operational
 
 **B2d-2b complete (текущий коммит):** operator-модуль переименован в `organization-operator/`, маршруты — `/api/v1/organization-operators/*`. Admin-surface: POST/GET/PATCH/DELETE `/:id` + PATCH `/:id/status` + **POST `/:id/approve` + POST `/:id/reject`** (pipeline 2, superadmin-only). POST hire принимает только `{craneProfileId, hiredAt?}` — identity должна уже существовать и быть approved на уровне платформы; создаётся pending `organization_operator`. `softDelete` затрагивает только hire-запись (identity на crane_profile сохраняется — тот же человек может быть перенанят в эту же или другую дочку). Compat-shim `createUserAndOperator` удалён, hydrated shape теперь `{ hire: OrganizationOperator, profile: CraneProfile }`, DTO отдаёт `craneProfile` nested'ом (id, userId, firstName, lastName, patronymic, iin, avatarUrl, approvalStatus) для list + detail; phone (masked) — только в detail endpoint.
 
+## 4.2d License document flow (ADR 0005)
+
+Удостоверение крановщика — третий gate в `canWork` (plus profile approved + ≥1 approved+active hire). Подробности механики — ADR [0005](adr/0005-license-document-flow.md) и CLAUDE.md §6 rule #15; ниже только authz-измерение.
+
+**Authz-matrix license endpoints (`/api/v1/crane-profiles/*`):**
+
+| Endpoint | operator (self) | owner | superadmin |
+|---|---|---|---|
+| `POST /me/license/upload-url` | ✓ (approved only; 409 иначе) | — | — |
+| `POST /me/license/confirm` | ✓ (approved only) | — | — |
+| `POST /:id/license/upload-url` | — | 404 (вне scope) | ✓ (любой status — override) |
+| `POST /:id/license/confirm` | — | 404 | ✓ |
+
+**Self-path инвариант:** subject — ТОЛЬКО `ctx.userId` (CLAUDE.md rule #10). Никакого `operatorId` / `profileId` в URL/query/body для `/me/*`.
+
+**Profile approval-gate на self-path:** upload/confirm **требует** `profile.approvalStatus === 'approved'`. Pending/rejected профили получают 409 `CRANE_PROFILE_NOT_APPROVED`. Мотивация: пока identity не подтверждена платформой, принимать документ преждевременно — rejected-профиль в итоге вообще не должен существовать в работе. Admin override (`/:id/license/*`) игнорирует approval-state: ТЗ допускает superadmin'у дозагрузить документ для pending-профиля при ручном onboarding.
+
+**Prefix check на confirm** — часть authz-слоя: `key` в payload ДОЛЖЕН начинаться с `crane-profiles/{subject-profile-id}/license/v{licenseVersion+1}/`. Защищает от cross-profile injection (оператор A подсовывает ключ оператора B в confirm; presign выдаётся per-profile, но без prefix-check на confirm ключ можно было бы переподменить). 400 `LICENSE_KEY_MISMATCH` иначе.
+
+**Audit distinctness.** Self-path пишет `license.upload_self`, admin-path — `license.upload_admin`. Cron-worker — `license.warning_sent` actor=system (userId=null, actorRole='system'). Это даёт compliance-трейл: кто именно загрузил (сам оператор vs админ-override), и что cron отработал в положенное время.
+
+**licenseUrl в DTO** — presigned GET URL, expires 15 минут. Генерируется на boundary при каждом GET profile. Не кешируется на клиенте как постоянная ссылка.
+
 **Layer 3: Repository с обязательным AuthContext**
 
 ```typescript

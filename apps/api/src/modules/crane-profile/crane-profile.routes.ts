@@ -5,12 +5,15 @@ import type { MembershipWithOrganization } from './crane-profile.repository'
 import {
   avatarUploadUrlRequestSchema,
   confirmAvatarSchema,
+  confirmLicenseSchema,
   craneProfileIdParamsSchema,
+  licenseUploadUrlRequestSchema,
   listCraneProfilesQuerySchema,
   rejectCraneProfileSchema,
   updateCraneProfileAdminSchema,
   updateCraneProfileSelfSchema,
 } from './crane-profile.schemas'
+import { type LicenseStatus, computeLicenseStatus } from './license-status'
 
 /**
  * Crane profiles REST endpoints (ADR 0003 + authorization.md §4.2c).
@@ -61,9 +64,8 @@ export const registerCraneProfileRoutes: FastifyPluginAsync = async (app: Fastif
       })
 
       scoped.get('/me/status', async (request) => {
-        const { profile, memberships, canWork } = await app.craneProfileService.getMeStatus(
-          request.ctx,
-        )
+        const { profile, memberships, licenseStatus, canWork } =
+          await app.craneProfileService.getMeStatus(request.ctx)
         return {
           profile: {
             id: profile.id,
@@ -71,6 +73,7 @@ export const registerCraneProfileRoutes: FastifyPluginAsync = async (app: Fastif
             rejectionReason: profile.rejectionReason,
           },
           memberships: memberships.map(toMembershipStatusDTO),
+          licenseStatus,
           canWork,
         }
       })
@@ -95,6 +98,57 @@ export const registerCraneProfileRoutes: FastifyPluginAsync = async (app: Fastif
           ipAddress: request.ip,
         })
         return toPublicDTO(app, profile, userPhone)
+      })
+
+      // -------- license flow (ADR 0005) --------
+
+      scoped.post('/me/license/upload-url', async (request) => {
+        const body = licenseUploadUrlRequestSchema.parse(request.body)
+        return app.craneProfileService.requestLicenseUpload(
+          request.ctx,
+          body.contentType,
+          body.filename,
+        )
+      })
+
+      scoped.post('/me/license/confirm', async (request) => {
+        const body = confirmLicenseSchema.parse(request.body)
+        const profile = await app.craneProfileService.confirmLicense(
+          request.ctx,
+          body.key,
+          body.expiresAt,
+          { ipAddress: request.ip },
+        )
+        // Phone нужен для self DTO; dans getOwn repo выдаёт phone, но confirm
+        // возвращает чистый profile — дополнительный lookup через repo'не
+        // нужен: /me/license/confirm ≠ /me (resource-централизован на license
+        // изменение). Отдаём list DTO (без phone) — client после confirm вызывает
+        // GET /me чтобы получить полный DTO с phone, как и для avatar.
+        return toPublicListDTO(app, profile)
+      })
+
+      scoped.post('/:id/license/upload-url', async (request) => {
+        const { id } = craneProfileIdParamsSchema.parse(request.params)
+        const body = licenseUploadUrlRequestSchema.parse(request.body)
+        return app.craneProfileService.requestLicenseUploadAsAdmin(
+          request.ctx,
+          id,
+          body.contentType,
+          body.filename,
+        )
+      })
+
+      scoped.post('/:id/license/confirm', async (request) => {
+        const { id } = craneProfileIdParamsSchema.parse(request.params)
+        const body = confirmLicenseSchema.parse(request.body)
+        const profile = await app.craneProfileService.confirmLicenseAsAdmin(
+          request.ctx,
+          id,
+          body.key,
+          body.expiresAt,
+          { ipAddress: request.ip },
+        )
+        return toPublicListDTO(app, profile)
       })
 
       // -------- admin endpoints (superadmin) --------
@@ -164,6 +218,15 @@ type PublicCraneProfileDTO = {
   approvedAt: string | null
   rejectedAt: string | null
   rejectionReason: string | null
+  // ADR 0005: license surface. `licenseUrl` — presigned GET (null если документ
+  // не загружен); `licenseExpiresAt` — ISO date; `licenseStatus` — computed
+  // градация для UI (missing / valid / expiring_soon / expiring_critical /
+  // expired); `licenseVersion` — для клиента, который хочет отследить свою
+  // последнюю загрузку. Warning_*_sent_at НЕ публикуется (internal cron state).
+  licenseUrl: string | null
+  licenseExpiresAt: string | null
+  licenseStatus: LicenseStatus
+  licenseVersion: number
   createdAt: string
   updatedAt: string
 }
@@ -187,7 +250,11 @@ async function toPublicDTO(
   profile: CraneProfile,
   userPhone: string,
 ): Promise<PublicCraneProfileDTO> {
-  const avatarUrl = await resolveAvatarUrl(app, profile.avatarKey)
+  const [avatarUrl, licenseUrl] = await Promise.all([
+    resolveStorageGetUrl(app, profile.avatarKey),
+    resolveStorageGetUrl(app, profile.licenseKey),
+  ])
+  const licenseStatus = computeLicenseStatus(profile.licenseExpiresAt, new Date())
   return {
     id: profile.id,
     userId: profile.userId,
@@ -202,6 +269,10 @@ async function toPublicDTO(
     approvedAt: profile.approvedAt ? profile.approvedAt.toISOString() : null,
     rejectedAt: profile.rejectedAt ? profile.rejectedAt.toISOString() : null,
     rejectionReason: profile.rejectionReason,
+    licenseUrl,
+    licenseExpiresAt: profile.licenseExpiresAt ? dateOnly(profile.licenseExpiresAt) : null,
+    licenseStatus,
+    licenseVersion: profile.licenseVersion,
     createdAt: profile.createdAt.toISOString(),
     updatedAt: profile.updatedAt.toISOString(),
   }
@@ -211,7 +282,11 @@ async function toPublicListDTO(
   app: FastifyInstance,
   profile: CraneProfile,
 ): Promise<PublicCraneProfileListItemDTO> {
-  const avatarUrl = await resolveAvatarUrl(app, profile.avatarKey)
+  const [avatarUrl, licenseUrl] = await Promise.all([
+    resolveStorageGetUrl(app, profile.avatarKey),
+    resolveStorageGetUrl(app, profile.licenseKey),
+  ])
+  const licenseStatus = computeLicenseStatus(profile.licenseExpiresAt, new Date())
   return {
     id: profile.id,
     userId: profile.userId,
@@ -225,6 +300,10 @@ async function toPublicListDTO(
     approvedAt: profile.approvedAt ? profile.approvedAt.toISOString() : null,
     rejectedAt: profile.rejectedAt ? profile.rejectedAt.toISOString() : null,
     rejectionReason: profile.rejectionReason,
+    licenseUrl,
+    licenseExpiresAt: profile.licenseExpiresAt ? dateOnly(profile.licenseExpiresAt) : null,
+    licenseStatus,
+    licenseVersion: profile.licenseVersion,
     createdAt: profile.createdAt.toISOString(),
     updatedAt: profile.updatedAt.toISOString(),
   }
@@ -262,12 +341,12 @@ function toMembershipStatusDTO(row: MembershipWithOrganization): MeStatusMembers
   }
 }
 
-async function resolveAvatarUrl(
+async function resolveStorageGetUrl(
   app: FastifyInstance,
-  avatarKey: string | null,
+  key: string | null,
 ): Promise<string | null> {
-  if (!avatarKey) return null
-  const { url } = await app.storage.createPresignedGetUrl(avatarKey)
+  if (!key) return null
+  const { url } = await app.storage.createPresignedGetUrl(key)
   return url
 }
 

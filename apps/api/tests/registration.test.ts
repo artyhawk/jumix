@@ -646,6 +646,17 @@ describe('end-to-end: registration → /me/status → approval → canWork', () 
     })
     expect(approveHire.statusCode).toBe(200)
 
+    // 4. загружаем валидную license (ADR 0005: canWork требует license valid).
+    const oneYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+    await handle.app.db.db
+      .update(craneProfiles)
+      .set({
+        licenseKey: `crane-profiles/${profileId}/license/v1/doc.pdf`,
+        licenseExpiresAt: oneYear,
+        licenseVersion: 1,
+      })
+      .where(eq(craneProfiles.id, profileId))
+
     const status = await handle.app.inject({
       method: 'GET',
       url: '/api/v1/crane-profiles/me/status',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { InMemoryStorageClient } from '../src/lib/storage/memory-storage-client'
 import {
   buildAvatarKey,
+  buildCraneProfileLicenseKey,
   buildDocumentKey,
   extractOrgIdFromKey,
   sanitizeFilename,
@@ -144,6 +145,52 @@ describe('buildAvatarKey / buildDocumentKey', () => {
     expect(extractOrgIdFromKey(keyA)).toBe(ORG_A)
     expect(extractOrgIdFromKey(keyB)).toBe(ORG_B)
     expect(extractOrgIdFromKey(keyA)).not.toBe(extractOrgIdFromKey(keyB))
+  })
+})
+
+describe('buildCraneProfileLicenseKey (ADR 0005)', () => {
+  const CP = '77777777-8888-9999-aaaa-bbbbbbbbbbbb'
+
+  it('builds crane-profiles/{id}/license/v{N}/{file}', () => {
+    expect(
+      buildCraneProfileLicenseKey({ craneProfileId: CP, version: 1, filename: 'driver.pdf' }),
+    ).toBe(`crane-profiles/${CP}/license/v1/driver.pdf`)
+  })
+
+  it('rejects non-UUID craneProfileId', () => {
+    expect(() =>
+      buildCraneProfileLicenseKey({ craneProfileId: 'bad', version: 1, filename: 'x.pdf' }),
+    ).toThrow(/craneProfileId/)
+  })
+
+  it('rejects version 0 / negative / fractional', () => {
+    expect(() =>
+      buildCraneProfileLicenseKey({ craneProfileId: CP, version: 0, filename: 'x.pdf' }),
+    ).toThrow(/version/)
+    expect(() =>
+      buildCraneProfileLicenseKey({ craneProfileId: CP, version: -1, filename: 'x.pdf' }),
+    ).toThrow(/version/)
+    expect(() =>
+      buildCraneProfileLicenseKey({ craneProfileId: CP, version: 1.5, filename: 'x.pdf' }),
+    ).toThrow(/version/)
+  })
+
+  it('sanitizes unsafe filename inside key', () => {
+    const key = buildCraneProfileLicenseKey({
+      craneProfileId: CP,
+      version: 2,
+      filename: '../../../etc/passwd',
+    })
+    expect(key).toContain('/v2/etc_passwd')
+    expect(key).not.toContain('..')
+  })
+
+  it('versioning puts different v{N} under same profile prefix', () => {
+    const v1 = buildCraneProfileLicenseKey({ craneProfileId: CP, version: 1, filename: 'a.pdf' })
+    const v2 = buildCraneProfileLicenseKey({ craneProfileId: CP, version: 2, filename: 'a.pdf' })
+    expect(v1).not.toBe(v2)
+    expect(v1.startsWith(`crane-profiles/${CP}/license/v1/`)).toBe(true)
+    expect(v2.startsWith(`crane-profiles/${CP}/license/v2/`)).toBe(true)
   })
 })
 

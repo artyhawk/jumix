@@ -75,6 +75,28 @@ export function buildCraneProfileAvatarKey(params: {
   return `crane-profiles/${params.craneProfileId}/avatar/${sanitizeFilename(params.filename)}`
 }
 
+/**
+ * Platform-level license storage (ADR 0005). Versioned path — при замене
+ * документа (re-upload) создаётся v{N+1}; старые версии остаются в bucket
+ * для audit/compliance. Retention — отложена в backlog.
+ *
+ * Версия строится с единицы (0 зарезервирован в schema как «не загружено»),
+ * чтобы `licenseVersion + 1` давал человекочитаемое v1 при первой загрузке.
+ */
+export function buildCraneProfileLicenseKey(params: {
+  craneProfileId: string
+  version: number
+  filename: string
+}): string {
+  assertUuid(params.craneProfileId, 'craneProfileId')
+  if (!Number.isInteger(params.version) || params.version < 1) {
+    throw new StorageKeyError('version must be a positive integer', {
+      version: params.version,
+    })
+  }
+  return `crane-profiles/${params.craneProfileId}/license/v${params.version}/${sanitizeFilename(params.filename)}`
+}
+
 export function buildDocumentKey(params: {
   organizationId: string
   operatorId: string

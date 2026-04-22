@@ -62,6 +62,16 @@ function hydrate(row: CraneProfileRow): CraneProfile {
     rejectedByUserId: row.rejectedByUserId,
     rejectedAt: row.rejectedAt,
     rejectionReason: row.rejectionReason,
+    licenseKey: row.licenseKey,
+    licenseExpiresAt: row.licenseExpiresAt
+      ? row.licenseExpiresAt instanceof Date
+        ? row.licenseExpiresAt
+        : new Date(row.licenseExpiresAt)
+      : null,
+    licenseVersion: row.licenseVersion,
+    licenseWarning30dSentAt: row.licenseWarning30dSentAt,
+    licenseWarning7dSentAt: row.licenseWarning7dSentAt,
+    licenseExpiredAt: row.licenseExpiredAt,
     deletedAt: row.deletedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -331,6 +341,57 @@ export class CraneProfileRepository {
         action: 'crane_profile.avatar.set',
         targetType: 'crane_profile',
         targetId: id,
+        metadata: audit.metadata,
+        ipAddress: audit.ipAddress,
+      })
+
+      return hydrate(row)
+    })
+  }
+
+  /**
+   * License upload confirmation (ADR 0005). Сохраняет key+expires+version
+   * и ЯВНО сбрасывает все warning/expired flags — новый документ = новая
+   * линия warnings, prior state больше не релевантен. Action в audit
+   * передаётся caller'ом (self vs admin pipeline) — чтобы различить кто
+   * инициировал загрузку (audit-invariant).
+   */
+  async updateLicense(
+    input: {
+      id: string
+      licenseKey: string
+      licenseExpiresAt: Date
+      licenseVersion: number
+    },
+    audit: AuditMeta & { action: 'license.upload_self' | 'license.upload_admin' },
+  ): Promise<CraneProfile | null> {
+    return this.database.db.transaction(async (tx) => {
+      const now = new Date()
+      const rows = await tx
+        .update(craneProfiles)
+        .set({
+          licenseKey: input.licenseKey,
+          licenseExpiresAt: input.licenseExpiresAt,
+          licenseVersion: input.licenseVersion,
+          // Reset warning state — новый документ, старые предупреждения больше
+          // не релевантны (cron при следующем запуске пересчитает с нуля).
+          licenseWarning30dSentAt: null,
+          licenseWarning7dSentAt: null,
+          licenseExpiredAt: null,
+          updatedAt: now,
+        })
+        .where(and(eq(craneProfiles.id, input.id), isNull(craneProfiles.deletedAt)))
+        .returning()
+
+      const row = rows[0]
+      if (!row) return null
+
+      await tx.insert(auditLog).values({
+        actorUserId: audit.actorUserId,
+        actorRole: audit.actorRole,
+        action: audit.action,
+        targetType: 'crane_profile',
+        targetId: input.id,
         metadata: audit.metadata,
         ipAddress: audit.ipAddress,
       })

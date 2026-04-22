@@ -16,6 +16,7 @@ import type {
   UpdateCraneProfileAdminInput,
   UpdateCraneProfileSelfInput,
 } from './crane-profile.schemas'
+import { type LicenseStatus, computeLicenseStatus, isLicenseValidForWork } from './license-status'
 
 /**
  * CraneProfileService — orchestration для crane-profiles-модуля (ADR 0003 +
@@ -67,6 +68,13 @@ const AVATAR_ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png'])
 function extensionFor(contentType: string): string {
   return contentType === 'image/jpeg' ? 'jpg' : 'png'
 }
+
+// ТЗ §5.1.5.1: удостоверение JPG / PNG / PDF, ≤10 MB. Enforce на boundary:
+//  1) presign с maxBytes (minio хедер content-length-range)
+//  2) confirm HeadObject size / content-type check — последняя линия, на
+//     случай если клиент обошёл content-length-range (minio S3 API strict).
+const LICENSE_MAX_BYTES = 10 * 1024 * 1024
+const LICENSE_ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf'])
 
 export class CraneProfileService {
   constructor(
@@ -185,6 +193,7 @@ export class CraneProfileService {
   async getMeStatus(ctx: AuthContext): Promise<{
     profile: CraneProfile
     memberships: MembershipWithOrganization[]
+    licenseStatus: LicenseStatus
     canWork: boolean
   }> {
     if (ctx.role !== 'operator') {
@@ -194,10 +203,15 @@ export class CraneProfileService {
     const profile = await repo.findByUserId(ctx.userId)
     if (!profile) throw profileNotFound()
     const { rows } = await repo.listMembershipsForProfileWithOrg(profile.id)
+    const licenseStatus = computeLicenseStatus(profile.licenseExpiresAt, new Date())
+    // canWork — 3-gate (ADR 0005): identity approved + ≥1 approved+active hire
+    // + license либо valid, либо в одной из "expiring" градаций (ТЗ §5.1.5.1
+    // блокирует только при missing/expired; предупреждения не останавливают).
     const canWork =
       profile.approvalStatus === 'approved' &&
-      rows.some((m) => m.hire.approvalStatus === 'approved' && m.hire.status === 'active')
-    return { profile, memberships: rows, canWork }
+      rows.some((m) => m.hire.approvalStatus === 'approved' && m.hire.status === 'active') &&
+      isLicenseValidForWork(licenseStatus)
+    return { profile, memberships: rows, licenseStatus, canWork }
   }
 
   // ---------- admin mutations (superadmin) ----------
@@ -504,6 +518,234 @@ export class CraneProfileService {
     } catch (err) {
       this.logger.warn({ err, key, context }, 'avatar delete best-effort failed')
     }
+  }
+
+  // ---------- license flow (ADR 0005) ----------
+
+  /**
+   * POST /me/license/upload-url — operator requests presigned PUT для своего
+   * удостоверения. Requires approvalStatus='approved' (symmetric с avatar:
+   * документ ≠ identity, но пока identity не подтверждена platform'ой,
+   * принимать документы преждевременно — 0004 pipeline ещё не закрылся).
+   * Admin path (`requestLicenseUploadAsAdmin`) разрешает загрузку за pending.
+   */
+  async requestLicenseUpload(
+    ctx: AuthContext,
+    contentType: string,
+    filename: string,
+  ): Promise<{
+    uploadUrl: string
+    key: string
+    version: number
+    headers: Record<string, string>
+    expiresAt: string
+  }> {
+    if (ctx.role !== 'operator') {
+      throw forbidden('FORBIDDEN', '/me/license is operator-only; admins use /:id/license')
+    }
+    if (!LICENSE_ALLOWED_CONTENT_TYPES.has(contentType)) {
+      throw new AppError({
+        statusCode: 400,
+        code: 'LICENSE_CONTENT_TYPE_INVALID',
+        message: 'License content type must be image/jpeg, image/png, or application/pdf',
+      })
+    }
+    const repo = this.repoFor(ctx)
+    const profile = await repo.findByUserId(ctx.userId)
+    if (!profile) throw profileNotFound()
+    if (profile.approvalStatus !== 'approved') {
+      throw conflict(
+        'CRANE_PROFILE_NOT_APPROVED',
+        'Cannot upload license until profile is approved by holding',
+      )
+    }
+    return this.buildLicensePresign(profile.id, profile.licenseVersion, contentType, filename)
+  }
+
+  /**
+   * POST /:id/license/upload-url — superadmin override (ТЗ допускает, когда
+   * operator не может сам: технические сбои, ручной onboarding). Работает и
+   * с pending profile — platform может выдать документ до одобрения identity
+   * (обратное: approve без документа возможно по ADR 0005 — license
+   * независимый от approval).
+   */
+  async requestLicenseUploadAsAdmin(
+    ctx: AuthContext,
+    craneProfileId: string,
+    contentType: string,
+    filename: string,
+  ): Promise<{
+    uploadUrl: string
+    key: string
+    version: number
+    headers: Record<string, string>
+    expiresAt: string
+  }> {
+    if (ctx.role !== 'superadmin') {
+      throw forbidden('FORBIDDEN', 'Only superadmin can upload license for another profile')
+    }
+    if (!LICENSE_ALLOWED_CONTENT_TYPES.has(contentType)) {
+      throw new AppError({
+        statusCode: 400,
+        code: 'LICENSE_CONTENT_TYPE_INVALID',
+        message: 'License content type must be image/jpeg, image/png, or application/pdf',
+      })
+    }
+    const repo = this.repoFor(ctx)
+    const profile = await repo.findInScope(craneProfileId)
+    if (!profile) throw profileNotFound()
+    return this.buildLicensePresign(profile.id, profile.licenseVersion, contentType, filename)
+  }
+
+  async confirmLicense(
+    ctx: AuthContext,
+    key: string,
+    expiresAt: Date,
+    meta: RequestMeta,
+  ): Promise<CraneProfile> {
+    if (ctx.role !== 'operator') {
+      throw forbidden('FORBIDDEN', '/me/license is operator-only; admins use /:id/license')
+    }
+    const repo = this.repoFor(ctx)
+    const profile = await repo.findByUserId(ctx.userId)
+    if (!profile) throw profileNotFound()
+    if (profile.approvalStatus !== 'approved') {
+      throw conflict(
+        'CRANE_PROFILE_NOT_APPROVED',
+        'Cannot upload license until profile is approved by holding',
+      )
+    }
+    return this.finalizeLicenseConfirmation({
+      ctx,
+      profile,
+      key,
+      expiresAt,
+      action: 'license.upload_self',
+      meta,
+    })
+  }
+
+  async confirmLicenseAsAdmin(
+    ctx: AuthContext,
+    craneProfileId: string,
+    key: string,
+    expiresAt: Date,
+    meta: RequestMeta,
+  ): Promise<CraneProfile> {
+    if (ctx.role !== 'superadmin') {
+      throw forbidden('FORBIDDEN', 'Only superadmin can confirm license for another profile')
+    }
+    const repo = this.repoFor(ctx)
+    const profile = await repo.findInScope(craneProfileId)
+    if (!profile) throw profileNotFound()
+    return this.finalizeLicenseConfirmation({
+      ctx,
+      profile,
+      key,
+      expiresAt,
+      action: 'license.upload_admin',
+      meta,
+    })
+  }
+
+  private async buildLicensePresign(
+    craneProfileId: string,
+    currentVersion: number,
+    contentType: string,
+    rawFilename: string,
+  ): Promise<{
+    uploadUrl: string
+    key: string
+    version: number
+    headers: Record<string, string>
+    expiresAt: string
+  }> {
+    const { buildCraneProfileLicenseKey } = await import('../../lib/storage/object-key')
+    const nextVersion = currentVersion + 1
+    const key = buildCraneProfileLicenseKey({
+      craneProfileId,
+      version: nextVersion,
+      filename: rawFilename,
+    })
+    const { url, headers, expiresAt } = await this.storage.createPresignedPutUrl(key, {
+      contentType,
+      maxBytes: LICENSE_MAX_BYTES,
+    })
+    return {
+      uploadUrl: url,
+      key,
+      version: nextVersion,
+      headers,
+      expiresAt: expiresAt.toISOString(),
+    }
+  }
+
+  private async finalizeLicenseConfirmation(params: {
+    ctx: AuthContext
+    profile: CraneProfile
+    key: string
+    expiresAt: Date
+    action: 'license.upload_self' | 'license.upload_admin'
+    meta: RequestMeta
+  }): Promise<CraneProfile> {
+    const { ctx, profile, key, expiresAt, action, meta } = params
+    const nextVersion = profile.licenseVersion + 1
+    const expectedPrefix = `crane-profiles/${profile.id}/license/v${nextVersion}/`
+    if (!key.startsWith(expectedPrefix)) {
+      throw new AppError({
+        statusCode: 400,
+        code: 'LICENSE_KEY_MISMATCH',
+        message: 'License key does not match profile or expected version',
+      })
+    }
+
+    const head = await this.storage.headObject(key)
+    if (!head) {
+      throw new AppError({
+        statusCode: 400,
+        code: 'LICENSE_NOT_UPLOADED',
+        message: 'License upload was not completed',
+      })
+    }
+    if (!LICENSE_ALLOWED_CONTENT_TYPES.has(head.contentType)) {
+      await this.safeDeleteObject(key, 'confirmLicense content-type mismatch')
+      throw new AppError({
+        statusCode: 400,
+        code: 'LICENSE_CONTENT_TYPE_INVALID',
+        message: 'Uploaded content type is not allowed',
+      })
+    }
+    if (head.size > LICENSE_MAX_BYTES) {
+      await this.safeDeleteObject(key, 'confirmLicense size too large')
+      throw new AppError({
+        statusCode: 400,
+        code: 'LICENSE_TOO_LARGE',
+        message: 'Uploaded license exceeds size limit',
+      })
+    }
+
+    // Старые versions НЕ удаляем из storage (ADR 0005 — преднамеренный audit
+    // trail; retention — backlog).
+    const updated = await this.repoFor(ctx).updateLicense(
+      {
+        id: profile.id,
+        licenseKey: key,
+        licenseExpiresAt: expiresAt,
+        licenseVersion: nextVersion,
+      },
+      {
+        actorUserId: ctx.userId,
+        actorRole: ctx.role,
+        ipAddress: meta.ipAddress,
+        action,
+        metadata: {
+          previousVersion: profile.licenseVersion,
+          expiresAt: expiresAt.toISOString(),
+        },
+      },
+    )
+    if (!updated) throw profileNotFound()
+    return updated
   }
 }
 

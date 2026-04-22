@@ -64,6 +64,44 @@ export const confirmAvatarSchema = z.object({
 export type ConfirmAvatarInput = z.infer<typeof confirmAvatarSchema>
 
 /**
+ * License upload (ADR 0005). Content-type whitelist соответствует ТЗ §5.1.5.1
+ * (JPG / PNG / PDF). Filename whitelist'нут на server-side через
+ * `sanitizeFilename` в object-key.ts — здесь достаточно non-empty bounds.
+ */
+const licenseFilenameSchema = z.string().trim().min(1).max(120)
+
+export const licenseUploadUrlRequestSchema = z
+  .object({
+    contentType: z.enum(['image/jpeg', 'image/png', 'application/pdf']),
+    filename: licenseFilenameSchema,
+  })
+  .strict()
+export type LicenseUploadUrlRequest = z.infer<typeof licenseUploadUrlRequestSchema>
+
+/**
+ * Confirm-license body. expiresAt приходит как ISO-date из клиента:
+ *   - future > now (нельзя загрузить уже просроченное удостоверение)
+ *   - ≤ now + 20 лет (sanity — удостоверение действует максимум 5 лет в РК,
+ *     но граница щедрая чтобы пропустить редкие edge-cases)
+ */
+const TWENTY_YEARS_MS = 20 * 365 * 24 * 60 * 60 * 1000
+
+export const confirmLicenseSchema = z
+  .object({
+    key: z.string().min(1).max(512),
+    expiresAt: z.coerce
+      .date()
+      .refine((d) => d.getTime() > Date.now(), {
+        message: 'License expiry must be in the future',
+      })
+      .refine((d) => d.getTime() < Date.now() + TWENTY_YEARS_MS, {
+        message: 'License expiry unreasonably far in the future (max 20 years)',
+      }),
+  })
+  .strict()
+export type ConfirmLicenseInput = z.infer<typeof confirmLicenseSchema>
+
+/**
  * GET /api/v1/crane-profiles — superadmin identity pool.
  * `approvalStatus` default не задаётся — superadmin сам решает, смотрит ли
  * он approved (по умолчанию «всех кроме pending» странное поведение, поэтому

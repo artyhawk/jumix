@@ -58,6 +58,9 @@ export async function buildTestApp(overrides: Partial<Env> = {}): Promise<TestAp
     STORAGE_PRESIGN_GET_TTL_SECONDS: 900,
     STORAGE_PRESIGN_PUT_TTL_SECONDS: 300,
     STORAGE_PRESIGN_PART_TTL_SECONDS: 900,
+    // Отключаем BullMQ repeatable-job регистрацию в тестах (Redis нет).
+    // Worker class инстанциируется всегда — его тесты вызывают process() напрямую.
+    DISABLE_CRONS: true,
     ...overrides,
   }
 
