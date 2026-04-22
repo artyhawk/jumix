@@ -25,6 +25,11 @@ describe('getActionIcon', () => {
     expect(result.accent).toBe('neutral')
     expect(result.icon).toBe(Clock)
   })
+
+  it('site.complete renders как success (CheckCircle2)', () => {
+    expect(getActionIcon('site.complete').accent).toBe('success')
+    expect(getActionIcon('site.complete').icon).toBe(CheckCircle2)
+  })
 })
 
 describe('formatActionLabel', () => {
@@ -40,5 +45,12 @@ describe('formatActionLabel', () => {
     expect(formatActionLabel({ action: 'some.new_unmapped_action' })).toBe(
       'some.new_unmapped_action',
     )
+  })
+
+  it('site action labels', () => {
+    expect(formatActionLabel({ action: 'site.create' })).toBe('Создал объект')
+    expect(formatActionLabel({ action: 'site.complete' })).toBe('Сдал объект')
+    expect(formatActionLabel({ action: 'site.archive' })).toBe('Архивировал объект')
+    expect(formatActionLabel({ action: 'site.activate' })).toBe('Вернул объект в работу')
   })
 })

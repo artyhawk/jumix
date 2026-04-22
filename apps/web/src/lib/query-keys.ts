@@ -2,6 +2,7 @@ import type { ListCraneProfilesQuery } from './api/crane-profiles'
 import type { ListCranesQuery } from './api/cranes'
 import type { ListOrganizationOperatorsQuery } from './api/organization-operators'
 import type { ListOrganizationsQuery } from './api/organizations'
+import type { ListSitesQuery } from './api/sites'
 
 /**
  * Query keys — namespaced tuples. Используем массивы-префиксы чтобы
@@ -39,4 +40,9 @@ export const qk = {
   organizationOperatorsInfinite: (query: Omit<ListOrganizationOperatorsQuery, 'cursor'>) =>
     ['organization-operators', 'infinite', query] as const,
   organizationOperatorDetail: (id: string) => ['organization-operators', 'detail', id] as const,
+
+  sites: ['sites'] as const,
+  sitesList: (query: ListSitesQuery) => ['sites', 'list', query] as const,
+  sitesInfinite: (query: Omit<ListSitesQuery, 'cursor'>) => ['sites', 'infinite', query] as const,
+  siteDetail: (id: string) => ['sites', 'detail', id] as const,
 }

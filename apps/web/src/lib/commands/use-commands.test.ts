@@ -65,6 +65,14 @@ describe('useCommands', () => {
     expect(push).toHaveBeenCalledWith('/organizations?create=true')
   })
 
+  it('owner: execute create-site navigates to /sites?create=true', () => {
+    authUser.user = { id: 'u-2', role: 'owner', organizationId: 'org-1', name: 'Owner' }
+    const { result } = renderHook(() => useCommands())
+    const createCmd = result.current.commands.find((c) => c.id === 'action.create-site')!
+    act(() => result.current.execute(createCmd))
+    expect(push).toHaveBeenCalledWith('/sites?create=true')
+  })
+
   it('execute with unknown action is a no-op', () => {
     const { result } = renderHook(() => useCommands())
     const fake: CommandEntry = {

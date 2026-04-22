@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   LogOut,
   type LucideIcon,
+  MapPin,
   Plus,
   Shield,
   Users,
@@ -35,7 +36,7 @@ export interface CommandEntry {
   action?: CommandAction
 }
 
-export type CommandAction = 'logout' | 'create-organization'
+export type CommandAction = 'logout' | 'create-organization' | 'create-site'
 
 export const COMMAND_REGISTRY: CommandEntry[] = [
   // ---- Navigation — superadmin ----
@@ -94,6 +95,26 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
     href: '/organization-operators',
   },
 
+  // ---- Navigation — owner ----
+  {
+    id: 'nav.owner-dashboard',
+    label: 'Обзор организации',
+    keywords: ['dashboard', 'обзор', 'главная'],
+    icon: LayoutDashboard,
+    group: 'navigation',
+    roles: ['owner'],
+    href: '/dashboard',
+  },
+  {
+    id: 'nav.sites',
+    label: 'Объекты',
+    keywords: ['sites', 'obyekty', 'объекты', 'стройки'],
+    icon: MapPin,
+    group: 'navigation',
+    roles: ['owner'],
+    href: '/sites',
+  },
+
   // ---- Actions — superadmin ----
   {
     id: 'action.create-organization',
@@ -103,6 +124,17 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
     group: 'actions',
     roles: ['superadmin'],
     action: 'create-organization',
+  },
+
+  // ---- Actions — owner ----
+  {
+    id: 'action.create-site',
+    label: 'Создать объект',
+    keywords: ['new', 'add', 'novyi', 'создать', 'объект', 'стройка'],
+    icon: Plus,
+    group: 'actions',
+    roles: ['owner'],
+    action: 'create-site',
   },
 
   // ---- System (all roles) ----

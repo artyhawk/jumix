@@ -44,9 +44,9 @@ export const navItemsByRole: Record<UserRole, NavItem[]> = {
     { labelKey: 'nav.operators', href: '/organization-operators', icon: Users, section: 'people' },
   ],
   owner: [
-    { labelKey: 'nav.dashboard', href: '/', icon: LayoutDashboard, section: 'operations' },
+    { labelKey: 'nav.dashboard', href: '/dashboard', icon: LayoutDashboard, section: 'operations' },
+    { labelKey: 'nav.sites', href: '/sites', icon: MapPin, section: 'operations' },
     { labelKey: 'nav.myCranes', href: '/', icon: IconCrane as LucideIcon, section: 'operations' },
-    { labelKey: 'nav.sites', href: '/', icon: MapPin, section: 'operations' },
     { labelKey: 'nav.myOperators', href: '/', icon: UsersRound, section: 'people' },
     { labelKey: 'nav.hireRequests', href: '/', icon: ShieldCheck, section: 'people' },
   ],

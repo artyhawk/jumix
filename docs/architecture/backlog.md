@@ -507,6 +507,28 @@ Post-MVP options:
 
 ---
 
+## Web — owner cabinet + maps (from B3-UI-3a)
+
+### Protomaps self-hosted tile service
+
+На MVP карта использует CARTO Dark raster tiles через публичный CDN (`basemaps.cartocdn.com`) — работает без API key, но зависимость от third-party и нет гарантий uptime/latency для РК. Post-MVP — развернуть Protomaps PMTiles на нашей инфраструктуре (Hetzner VPS + nginx raw-range или CloudFlare R2) + vector style (Positron/Dark variants). Даёт control над стилизацией, нет внешних зависимостей, дешевле чем MapBox/Maptiler commercial plan.
+
+Триггер: жалобы на latency с РК-IP или первое падение CDN в прод.
+
+### Server-side site filtering — computed fields
+
+`GET /api/v1/sites` сейчас фильтрует только по `status` + `organizationId`. На owner-кабинете (B3-UI-3a) client-side фильтры минимальны, но когда добавим поиск по имени/адресу, координатам-радиусу от центра карты — нужно переносить на server. Паттерн тот же что §Server-side license filter.
+
+### Reverse geocoding в MapPicker
+
+Сейчас MapPicker показывает только coordinates (`51.169, 71.449`). UX-улучшение — fetch reverse-geocode от OSM Nominatim / CARTO Geocoder → отображать human-readable address под координатами («ул. Абая, 15, Астана»). Rate-limit Nominatim 1 req/sec — нужен debounce + cache. Backlog: в связке с Protomaps выбрать final провайдера.
+
+### Custom archive confirmation dialog
+
+`SiteDrawer` использует native `confirm()` для подтверждения архивирования — работает везде, но визуально отличается от остального dialog-стека и не i18n. Заменить на кастомный `ConfirmDialog` (Radix AlertDialog wrapper) когда появится второй use-case (delete-org, terminate-hire).
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:

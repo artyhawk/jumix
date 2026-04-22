@@ -67,7 +67,7 @@ const ACTION_ICONS: Record<string, ActionIcon> = {
   'site.create': { icon: Plus, accent: 'neutral' },
   'site.update': { icon: Edit, accent: 'neutral' },
   'site.activate': { icon: Shield, accent: 'neutral' },
-  'site.suspend': { icon: Shield, accent: 'warning' },
+  'site.complete': { icon: CheckCircle2, accent: 'success' },
   'site.archive': { icon: Shield, accent: 'warning' },
 
   // License document
@@ -121,8 +121,8 @@ const ACTION_LABELS: Record<string, string> = {
 
   'site.create': 'Создал объект',
   'site.update': 'Обновил объект',
-  'site.activate': 'Активировал объект',
-  'site.suspend': 'Приостановил объект',
+  'site.activate': 'Вернул объект в работу',
+  'site.complete': 'Сдал объект',
   'site.archive': 'Архивировал объект',
 
   'license.upload_self': 'Загрузил удостоверение',

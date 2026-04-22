@@ -13,13 +13,33 @@ vi.mock('@/lib/api/organizations', () => ({
   listOrganizations: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
   getOrganization: vi.fn(),
 }))
+vi.mock('@/lib/api/sites', () => ({
+  listSites: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+  getSite: vi.fn(),
+  createSite: vi.fn(),
+  updateSite: vi.fn(),
+  completeSite: vi.fn(),
+  archiveSite: vi.fn(),
+  activateSite: vi.fn(),
+}))
+vi.mock('@/components/map/base-map', () => ({
+  BaseMap: () => <div data-testid="base-map" />,
+}))
+vi.mock('@/components/map/sites-layer', () => ({
+  SitesLayer: () => null,
+}))
 
 const replace = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace, push: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn() }),
 }))
 
-const authUser = { id: 'u-1', role: 'superadmin', organizationId: null, name: 'Админ Админович' }
+const authUser: {
+  id: string
+  role: 'superadmin' | 'owner' | 'operator'
+  organizationId: string | null
+  name: string
+} = { id: 'u-1', role: 'superadmin', organizationId: null, name: 'Админ Админович' }
 vi.mock('@/hooks/use-auth', () => ({
   useAuth: () => ({
     user: authUser,
@@ -44,6 +64,9 @@ function renderPage() {
 beforeEach(() => {
   stats.mockReset()
   replace.mockReset()
+  authUser.id = 'u-1'
+  authUser.role = 'superadmin'
+  authUser.organizationId = null
   authUser.name = 'Админ Админович'
 })
 
@@ -149,5 +172,27 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Последние события')).toBeInTheDocument()
     const grid = container.querySelector('.lg\\:grid-cols-\\[2fr_1fr\\]')
     expect(grid).not.toBeNull()
+  })
+
+  it('owner role → renders OwnerDashboard (map + recent sites), not SuperadminDashboard', async () => {
+    authUser.role = 'owner'
+    authUser.organizationId = 'org-1'
+    authUser.name = 'Owner'
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Карта объектов')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Недавние объекты')).toBeInTheDocument()
+    // Superadmin-specific элементы не рендерятся
+    expect(screen.queryByText('Обзор платформы')).toBeNull()
+    expect(screen.queryByText('Последние события')).toBeNull()
+  })
+
+  it('operator role → redirects to /', () => {
+    authUser.role = 'operator'
+    authUser.organizationId = null
+    authUser.name = 'Op'
+    renderPage()
+    expect(replace).toHaveBeenCalledWith('/')
   })
 })

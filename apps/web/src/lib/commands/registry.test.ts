@@ -33,11 +33,15 @@ describe('getCommandsForRole', () => {
     expect(commands.some((c) => c.id === 'system.logout')).toBe(true)
   })
 
-  it('owner sees only system commands (owner cabinet surface lives in B3-UI-3)', () => {
+  it('owner sees navigation (dashboard + sites) + actions + system', () => {
     const commands = getCommandsForRole('owner')
-    expect(commands.every((c) => c.group === 'system')).toBe(true)
-    expect(commands.length).toBeGreaterThanOrEqual(1)
+    expect(commands.some((c) => c.id === 'nav.owner-dashboard')).toBe(true)
+    expect(commands.some((c) => c.id === 'nav.sites')).toBe(true)
+    expect(commands.some((c) => c.id === 'action.create-site')).toBe(true)
     expect(commands.some((c) => c.id === 'system.logout')).toBe(true)
+    // owner НЕ видит superadmin-only команд
+    expect(commands.some((c) => c.id === 'action.create-organization')).toBe(false)
+    expect(commands.some((c) => c.id === 'nav.approvals')).toBe(false)
   })
 
   it('operator sees only system commands', () => {

@@ -13,18 +13,19 @@ import { useEffect } from 'react'
 /**
  * Root `/` разветвляется по роли:
  *  - superadmin → /dashboard (функциональный кабинет, B3-UI-2)
- *  - owner / operator → welcome placeholder (кабинеты в B3-UI-3/4)
+ *  - owner → /dashboard (функциональный кабинет, B3-UI-3a)
+ *  - operator → welcome placeholder (кабинет в B3-UI-4; реально operator живёт в мобилке)
  */
 export default function RootPage() {
   const { user } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (user?.role === 'superadmin') router.replace('/dashboard')
+    if (user?.role === 'superadmin' || user?.role === 'owner') router.replace('/dashboard')
   }, [user, router])
 
   if (!user) return null
-  if (user.role === 'superadmin') return null
+  if (user.role === 'superadmin' || user.role === 'owner') return null
 
   return (
     <PageTransition>
@@ -76,8 +77,7 @@ export default function RootPage() {
         <div className="flex-1">
           <div className="text-sm font-semibold text-text-primary mb-1">Следующая веха</div>
           <p className="text-sm text-text-secondary">
-            Функциональные кабинеты {user.role === 'owner' ? 'владельца' : 'крановщика'} реализуются
-            в следующих итерациях.
+            Функциональный кабинет крановщика реализуется в следующих итерациях.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 text-sm font-medium text-text-tertiary">

@@ -594,6 +594,82 @@ cmdk Item's `onSelect` не фаерится надёжно через `fireEven
 
 ---
 
+## 12c. Owner cabinet foundation (B3-UI-3a)
+
+Первая вертикаль owner-кабинета: role-aware dashboard + Sites CRUD + MapLibre foundation. Задаёт паттерны, которые повторят следующие вертикали owner'а (cranes 3b, operators+hire 3c).
+
+### Role-switch на `/dashboard`
+
+`app/(app)/dashboard/page.tsx` — тонкий switch:
+
+```tsx
+if (user.role === 'superadmin') return <SuperadminDashboard />
+if (user.role === 'owner')      return <OwnerDashboard />
+useEffect(() => { if (user.role === 'operator') router.replace('/') }, [...])
+```
+
+Один URL `/dashboard` для всех привилегированных ролей. Компоненты кабинетов (`components/dashboard/superadmin-dashboard.tsx`, `components/dashboard/owner-dashboard.tsx`) — полные verticals со своей загрузкой данных; page-файл не знает о конкретных props, только маршрутизирует.
+
+Root redirect (`app/(app)/page.tsx`): `if (user.role === 'superadmin' || 'owner') router.replace('/dashboard')`. Operator остаётся на `/` с welcome-card.
+
+### OwnerDashboard layout
+
+- **Hero** — `Здравствуйте, ${user.name}` (fallback `Обзор организации`) + plural subtitle `${n} ${pluralRu(n, SITES_FORMS)} активно`. `SITES_FORMS = ['объект','объекта','объектов'] as const`.
+- **Stats grid** — `grid-cols-2 lg:grid-cols-4 gap-3`: 1 реальный `StatCard` (Активные объекты, MapPin, href=/sites) + 3 `StatCardPlaceholder` (Краны / Крановщики / Финансы) с `"—"` + badge «Скоро». Placeholder-паттерн держит grid-shape стабильным при поэтапной доставке B3-UI-3b/3c.
+- **2-col body** — `grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4`: `OwnerSitesMap` (карта active-объектов) + `RecentSitesList` (последние 5).
+
+### Sites CRUD surface
+
+- **`/sites`** (`app/(app)/sites/page.tsx`) — список с `FilterBar` (status: active/completed/archived) + кнопка «Новый объект» (только для owner'а). URL-state через `useSearchParams` + `router.replace` (не push): `?status`, `?open`, `?create=true`. Row click → `?open=<id>` (drawer), Create click → `?create=true` (dialog).
+- **`CreateSiteDialog`** — двухшаговый wizard:
+  - Step 1 («Данные»): name (required, max 120), address (optional, trimmed → `undefined` если blank).
+  - Step 2 («Локация»): `MapPicker` — pin + radius-slider, onChange передаёт `{latitude, longitude, radiusM}` родителю. «Создать» disabled пока `value === null`.
+  - «Назад» возвращает на step 1 без потери form-state.
+- **`SiteDrawer`** — детали + status-specific footer: active → «Сдать объект» + «Архивировать»; completed → «Вернуть в работу» + «Архивировать»; archived → «Восстановить». Archive — inline confirmation (native `confirm()` в MVP, backlog — custom dialog).
+
+### MapLibre + CARTO tile stack
+
+`components/map/`:
+
+- **`base-map.tsx`** — MapLibre wrapper, CARTO Positron/Dark raster tiles (`https://{a-d}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png`) — no API key, good enough для MVP. `onReady(map)` callback для layers, `initialCenter` + defaultZoom 11.
+- **`map-style.ts`** — `DEFAULT_CENTER = [71.45, 51.17]` (Астана), tile-source config.
+- **`sites-layer.tsx`** — markers + geofence-polygon layer; click on marker → `onSiteClick(site)`.
+- **`map-picker.tsx`** — drop-pin UX для CreateSite: click on map → pin + circle; radius-slider (50–1000m). Reverse-geocoding в backlog.
+- **`geofence-polygon.ts`** — Haversine destination-formula → 64-point polygon approximating circle. Throws on `radiusM ≤ 0`. Pure-function, unit-tested (±0.5% radius accuracy).
+
+**Protomaps в backlog** — CARTO бесплатен но зависимость от third-party CDN; self-hosted Protomaps + custom style следующим шагом если возрастёт нагрузка.
+
+### Навигация + команды
+
+- `components/layout/nav-config.ts` — owner nav: `/dashboard` + `/sites` активированы (myCranes / myOperators / hireRequests остаются stubs).
+- `lib/commands/registry.ts` — новые commands для owner: `nav.owner-dashboard` (LayoutDashboard, /dashboard), `nav.sites` (MapPin, /sites), `action.create-site` (Plus, action).
+- `lib/commands/use-commands.ts` — branch `'create-site' → router.push('/sites?create=true')` (переиспользуем cross-page URL-state pattern из §12b).
+- `lib/format/audit.ts` — `site.complete` вместо несуществующего `site.suspend`; labels для `site.activate` / `site.complete`.
+
+### Site status transitions
+
+Backend emits `site.create`, `site.update`, `site.activate`, `site.complete`, `site.archive` (см. `apps/api/src/modules/site/site.repository.ts`). Допустимые переходы:
+
+- `active ↔ completed` (двусторонне: сдать / вернуть)
+- `active → archived`, `completed → archived` (односторонне)
+- `archived → active` (восстановить)
+
+Web API module (`lib/api/sites.ts`) предоставляет separate endpoints `completeSite` / `activateSite` / `archiveSite` — не общий `setStatus`. `useSites*` hooks (TanStack Query) invalidate `qk.sites.*` + `qk.dashboard.*` на success.
+
+### Testing caveats
+
+WebGL в jsdom **не работает** — каждый тест, который тащит BaseMap/MapPicker/SitesLayer, моккает их как no-op:
+
+```ts
+vi.mock('@/components/map/base-map', () => ({ BaseMap: () => <div data-testid="base-map" /> }))
+vi.mock('@/components/map/sites-layer', () => ({ SitesLayer: () => null }))
+vi.mock('@/components/map/map-picker', () => ({ MapPicker: ({onChange}) => <button onClick={() => onChange({latitude:51.17, longitude:71.45, radiusM:200})}>pick</button> }))
+```
+
+`geofence-polygon.ts` тестируется pure (без map), radius accuracy проверяется вычислением Haversine-distance от центра до каждой вершины → все в ±0.5% от заданного radius.
+
+---
+
 ## 13. Связанные документы
 
 - [design-system.md](design-system.md) — цвет, typography, иконки, spacing.

@@ -36,6 +36,10 @@ export function useCommands() {
         router.push('/organizations?create=true')
         return
       }
+      if (cmd.action === 'create-site') {
+        router.push('/sites?create=true')
+        return
+      }
     },
     [router, logout],
   )

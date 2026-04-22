@@ -74,11 +74,24 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Сотрудники')).toBeInTheDocument()
   })
 
-  it('role-aware: owner sees only system commands (logout)', () => {
+  it('role-aware: owner sees owner-cabinet nav + create-site + logout', () => {
     authState.user = { id: 'u-2', role: 'owner', organizationId: 'o-1', name: 'Owner' }
     render(<CommandPalette />)
     openPalette()
+    // Superadmin-only не показываются
     expect(screen.queryByText('Обзор платформы')).toBeNull()
+    expect(screen.queryByText('Заявки на рассмотрение')).toBeNull()
+    // Owner видит свой dashboard + sites + create-site + logout
+    expect(screen.getByText('Обзор организации')).toBeInTheDocument()
+    expect(screen.getByText('Объекты')).toBeInTheDocument()
+    expect(screen.getByText('Создать объект')).toBeInTheDocument()
+    expect(screen.getByText('Выйти')).toBeInTheDocument()
+  })
+
+  it('role-aware: operator sees only system commands (logout)', () => {
+    authState.user = { id: 'u-3', role: 'operator', organizationId: null, name: 'Op' }
+    render(<CommandPalette />)
+    openPalette()
     expect(screen.queryByText('Переход')).toBeNull()
     expect(screen.getByText('Выйти')).toBeInTheDocument()
   })

@@ -173,6 +173,42 @@ export interface Crane {
   updatedAt: string
 }
 
+// ---------- Sites ----------
+
+export type SiteStatus = 'active' | 'completed' | 'archived'
+
+export interface Site {
+  id: string
+  organizationId: string
+  name: string
+  address: string | null
+  latitude: number
+  longitude: number
+  radiusM: number
+  status: SiteStatus
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateSiteInput {
+  name: string
+  address?: string
+  latitude: number
+  longitude: number
+  radiusM?: number
+  notes?: string
+}
+
+export interface UpdateSiteInput {
+  name?: string
+  address?: string | null
+  latitude?: number
+  longitude?: number
+  radiusM?: number
+  notes?: string | null
+}
+
 // ---------- Organization operators (hires) ----------
 
 export type OperatorHireStatus = 'active' | 'blocked' | 'terminated'
