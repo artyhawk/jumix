@@ -3,13 +3,6 @@ import { describe, expect, it } from 'vitest'
 import { PendingAttentionCallout } from './pending-attention-callout'
 
 describe('PendingAttentionCallout', () => {
-  it('renders empty state (success icon + allClear text) when total pending is zero', () => {
-    render(<PendingAttentionCallout craneProfiles={0} organizationOperators={0} cranes={0} />)
-    expect(screen.getByText('Всё одобрено')).toBeInTheDocument()
-    expect(screen.getByText('Нет заявок на рассмотрение')).toBeInTheDocument()
-    expect(screen.queryAllByRole('link')).toHaveLength(0)
-  })
-
   it('renders three pending rows with links to /approvals tabs', () => {
     render(<PendingAttentionCallout craneProfiles={3} organizationOperators={2} cranes={1} />)
     const links = screen.getAllByRole('link')

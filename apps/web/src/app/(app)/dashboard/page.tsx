@@ -7,12 +7,15 @@ import { StaggerItem, StaggerList } from '@/components/motion/stagger-list'
 import { Card } from '@/components/ui/card'
 import { useAuth } from '@/hooks/use-auth'
 import { formatRuLongDate } from '@/lib/format/date'
+import { pluralRu } from '@/lib/format/plural'
 import { useDashboardStats } from '@/lib/hooks/use-dashboard'
 import { t } from '@/lib/i18n'
 import { IconCrane } from '@tabler/icons-react'
-import { AlertCircle, Building2, HardHat, type IdCard, Sparkles, UsersRound } from 'lucide-react'
+import { AlertCircle, Building2, HardHat, type IdCard, UsersRound } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
+
+const WEEK_FORMS = ['регистрация', 'регистрации', 'регистраций'] as const
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -27,16 +30,23 @@ export default function DashboardPage() {
 
   if (!user || user.role !== 'superadmin') return null
 
-  const displayName = user.name?.trim() || t('dashboard.hero.fallbackName')
+  const weekCount = stats.data?.thisWeek.newRegistrations ?? 0
+  const weekLabel = `${weekCount} ${pluralRu(weekCount, WEEK_FORMS)} за неделю`
+
+  const totalPending = stats.data
+    ? stats.data.pending.craneProfiles +
+      stats.data.pending.organizationOperators +
+      stats.data.pending.cranes
+    : 0
 
   return (
     <PageTransition>
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl md:text-[32px] md:leading-[40px] font-semibold tracking-tight text-text-primary">
-          {t('dashboard.hero.greeting', { name: displayName })}
+          {t('dashboard.hero.title')}
         </h1>
         <p className="text-sm text-text-secondary">
-          {t('dashboard.hero.subtitle', { date: formattedDate })}
+          {t('dashboard.hero.subtitle', { date: formattedDate, count: weekLabel })}
         </p>
       </div>
 
@@ -97,18 +107,13 @@ export default function DashboardPage() {
             </StaggerItem>
           </StaggerList>
 
-          <StatCard
-            icon={Sparkles}
-            label={t('dashboard.thisWeek.title')}
-            value={stats.data?.thisWeek.newRegistrations ?? 0}
-            loading={stats.isLoading}
-          />
-
-          <PendingAttentionCallout
-            craneProfiles={stats.data?.pending.craneProfiles ?? 0}
-            organizationOperators={stats.data?.pending.organizationOperators ?? 0}
-            cranes={stats.data?.pending.cranes ?? 0}
-          />
+          {totalPending > 0 && stats.data ? (
+            <PendingAttentionCallout
+              craneProfiles={stats.data.pending.craneProfiles}
+              organizationOperators={stats.data.pending.organizationOperators}
+              cranes={stats.data.pending.cranes}
+            />
+          ) : null}
         </>
       )}
     </PageTransition>

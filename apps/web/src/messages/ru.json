@@ -80,18 +80,15 @@
   },
   "dashboard": {
     "hero": {
-      "greeting": "Добро пожаловать, {name}",
-      "subtitle": "{date} · Обзор Jumix",
-      "fallbackName": "Администратор"
+      "title": "Обзор платформы",
+      "subtitle": "{date} · {count}"
     },
     "pending": {
       "title": "Ожидают модерации",
       "craneProfiles": "Профили крановщиков",
       "organizationOperators": "Найм",
       "cranes": "Краны",
-      "review": "Рассмотреть",
-      "allClear": "Всё одобрено",
-      "allClearSubtitle": "Нет заявок на рассмотрение"
+      "review": "Рассмотреть"
     },
     "active": {
       "organizations": "Организации",

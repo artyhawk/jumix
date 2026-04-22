@@ -41,66 +41,17 @@ beforeEach(() => {
 })
 
 describe('DashboardPage', () => {
-  it('renders hero greeting with user name', async () => {
+  it('renders hero title "Обзор платформы"', () => {
     stats.mockResolvedValue({
       pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
       active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
       thisWeek: { newRegistrations: 0 },
     })
     renderPage()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Добро пожаловать, Админ Админович',
-    )
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Обзор платформы')
   })
 
-  it('renders hero subtitle with formatted Russian date and "Обзор Jumix"', () => {
-    stats.mockResolvedValue({
-      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
-      active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
-      thisWeek: { newRegistrations: 0 },
-    })
-    renderPage()
-    const subtitle = screen.getByText(/Обзор Jumix/)
-    expect(subtitle).toBeInTheDocument()
-    // e.g. "Среда, 22 апреля 2026 г. · Обзор Jumix" — starts with capital
-    expect(subtitle.textContent?.charAt(0)).toMatch(/[А-ЯЁ]/)
-  })
-
-  it('falls back to "Администратор" when user.name is empty', () => {
-    authUser.name = ''
-    stats.mockResolvedValue({
-      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
-      active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
-      thisWeek: { newRegistrations: 0 },
-    })
-    renderPage()
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Добро пожаловать, Администратор',
-    )
-  })
-
-  it('does not render "АКТИВНЫЕ" section label', () => {
-    stats.mockResolvedValue({
-      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
-      active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
-      thisWeek: { newRegistrations: 0 },
-    })
-    renderPage()
-    // no <h2> section label above the grid
-    expect(screen.queryByRole('heading', { level: 2 })).toBeNull()
-  })
-
-  it('does not render welcome filler card', () => {
-    stats.mockResolvedValue({
-      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
-      active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
-      thisWeek: { newRegistrations: 0 },
-    })
-    renderPage()
-    expect(screen.queryByText(/Добро пожаловать, администратор\./i)).toBeNull()
-  })
-
-  it('renders PendingAttentionCallout empty state when all counts are zero', async () => {
+  it('hero subtitle includes date + pluralised week count (0 → "регистраций")', async () => {
     stats.mockResolvedValue({
       pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
       active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
@@ -108,12 +59,64 @@ describe('DashboardPage', () => {
     })
     renderPage()
     await waitFor(() => {
-      expect(screen.getByText('Всё одобрено')).toBeInTheDocument()
+      expect(screen.getByText(/0 регистраций за неделю/)).toBeInTheDocument()
     })
-    expect(screen.getByText('Нет заявок на рассмотрение')).toBeInTheDocument()
+    expect(screen.getByText(/· 0 регистраций за неделю/).textContent).toMatch(/[А-ЯЁ]/)
   })
 
-  it('renders PendingAttentionCallout populated when counts > 0', async () => {
+  it('hero subtitle — singular form for 1 registration', async () => {
+    stats.mockResolvedValue({
+      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
+      active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
+      thisWeek: { newRegistrations: 1 },
+    })
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText(/1 регистрация за неделю/)).toBeInTheDocument()
+    })
+  })
+
+  it('hero subtitle — few form for 3', async () => {
+    stats.mockResolvedValue({
+      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
+      active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
+      thisWeek: { newRegistrations: 3 },
+    })
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText(/3 регистрации за неделю/)).toBeInTheDocument()
+    })
+  })
+
+  it('renders exactly 4 stat cards in the grid (no New registrations card)', async () => {
+    stats.mockResolvedValue({
+      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
+      active: { organizations: 1, craneProfiles: 2, cranes: 3, memberships: 4 },
+      thisWeek: { newRegistrations: 7 },
+    })
+    renderPage()
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole('link', { name: /Организации|Крановщики|Краны|Активные найма/ }),
+      ).toHaveLength(4)
+    })
+    expect(screen.queryByText(/Новые регистрации \(7 дней\)/)).toBeNull()
+  })
+
+  it('does NOT render PendingAttentionCallout when all pending counts are zero', async () => {
+    stats.mockResolvedValue({
+      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
+      active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
+      thisWeek: { newRegistrations: 0 },
+    })
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Ожидают модерации')).toBeNull()
+  })
+
+  it('renders PendingAttentionCallout when any pending count > 0', async () => {
     stats.mockResolvedValue({
       pending: { craneProfiles: 3, organizationOperators: 0, cranes: 1 },
       active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
@@ -124,19 +127,5 @@ describe('DashboardPage', () => {
       expect(screen.getByText('Ожидают модерации')).toBeInTheDocument()
     })
     expect(screen.getByText(/— 4/)).toBeInTheDocument()
-  })
-
-  it('New registrations stat card has no brand accent border', async () => {
-    stats.mockResolvedValue({
-      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
-      active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
-      thisWeek: { newRegistrations: 5 },
-    })
-    const { container } = renderPage()
-    await waitFor(() => {
-      // NumberCounter renders the value as 5 once resolved
-      expect(screen.getByText('Новые регистрации (7 дней)')).toBeInTheDocument()
-    })
-    expect(container.querySelector('.border-brand-500\\/40')).toBeNull()
   })
 })
