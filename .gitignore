@@ -64,3 +64,4 @@ __pycache__/
 # Contract docs staying local (оригиналы заказчика не коммитим до согласования)
 docs/contract/*.docx
 docs/contract/*.pdf
+*.bundle
