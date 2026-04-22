@@ -3,7 +3,7 @@
 import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
-import { DARK_RASTER_STYLE, DEFAULT_CENTER, DEFAULT_ZOOM } from './map-style'
+import { DARK_VECTOR_STYLE, DEFAULT_CENTER, DEFAULT_ZOOM } from './map-style'
 
 export interface BaseMapProps {
   /** Начальный центр `[lng, lat]`. Astana по умолчанию. */
@@ -50,7 +50,7 @@ export function BaseMap({
 
     const map = new maplibregl.Map({
       container: container.current,
-      style: DARK_RASTER_STYLE,
+      style: DARK_VECTOR_STYLE,
       center: initialCenter ?? DEFAULT_CENTER,
       zoom: initialZoom,
       attributionControl: { compact: true },
