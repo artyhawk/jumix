@@ -6,6 +6,13 @@ import DashboardPage from './page'
 vi.mock('@/lib/api/dashboard', () => ({
   getDashboardStats: vi.fn(),
 }))
+vi.mock('@/lib/api/audit', () => ({
+  listRecentAudit: vi.fn().mockResolvedValue({ events: [] }),
+}))
+vi.mock('@/lib/api/organizations', () => ({
+  listOrganizations: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+  getOrganization: vi.fn(),
+}))
 
 const replace = vi.fn()
 vi.mock('next/navigation', () => ({
@@ -127,5 +134,20 @@ describe('DashboardPage', () => {
       expect(screen.getByText('Ожидают модерации')).toBeInTheDocument()
     })
     expect(screen.getByText(/— 4/)).toBeInTheDocument()
+  })
+
+  it('renders OrganizationsOverview + RecentActivity in a 2-col grid', async () => {
+    stats.mockResolvedValue({
+      pending: { craneProfiles: 0, organizationOperators: 0, cranes: 0 },
+      active: { organizations: 0, craneProfiles: 0, cranes: 0, memberships: 0 },
+      thisWeek: { newRegistrations: 0 },
+    })
+    const { container } = renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Недавние организации')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Последние события')).toBeInTheDocument()
+    const grid = container.querySelector('.lg\\:grid-cols-\\[2fr_1fr\\]')
+    expect(grid).not.toBeNull()
   })
 })

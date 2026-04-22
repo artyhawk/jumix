@@ -58,6 +58,33 @@ export interface DashboardStats {
   }
 }
 
+// ---------- Audit ----------
+
+export type AuditActorRole = UserRole | 'system'
+
+export interface RecentAuditEvent {
+  id: string
+  actor: {
+    userId: string | null
+    name: string | null
+    role: AuditActorRole | string | null
+  }
+  action: string
+  target: {
+    type: string | null
+    id: string | null
+  }
+  organizationId: string | null
+  organizationName: string | null
+  metadata: Record<string, unknown>
+  ipAddress: string | null
+  createdAt: string
+}
+
+export interface RecentAuditResponse {
+  events: RecentAuditEvent[]
+}
+
 // ---------- Shared approval / pagination ----------
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'

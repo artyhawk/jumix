@@ -80,11 +80,17 @@ describe('OrganizationsPage', () => {
     })
   })
 
-  it('clicking "Новая организация" opens CreateOrganizationDialog', async () => {
+  it('clicking "Новая организация" updates URL with ?create=true', async () => {
     renderPage()
     const btn = await screen.findByRole('button', { name: /Новая организация/ })
     await userEvent.click(btn)
-    expect(screen.getByText('Владелец')).toBeInTheDocument()
+    expect(replace).toHaveBeenCalledWith('/organizations?create=true', { scroll: false })
+  })
+
+  it('?create=true in URL opens CreateOrganizationDialog', async () => {
+    searchParams.get.mockImplementation((k: string) => (k === 'create' ? 'true' : null))
+    renderPage()
+    await waitFor(() => expect(screen.getByText('Владелец')).toBeInTheDocument())
   })
 
   it('clicking a row calls router.replace with ?open=<id>', async () => {

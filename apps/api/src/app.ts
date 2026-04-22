@@ -6,6 +6,7 @@ import type { DatabaseClient } from '@jumix/db'
 import { type FastifyInstance, fastify } from 'fastify'
 import type { Env } from './config/env'
 import licenseExpiryJobPlugin from './jobs/license-expiry/plugin'
+import auditPlugin from './modules/audit/audit.plugin'
 import authPlugin from './modules/auth/auth.plugin'
 import craneProfilePlugin from './modules/crane-profile/crane-profile.plugin'
 import cranePlugin from './modules/crane/crane.plugin'
@@ -81,6 +82,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(organizationOperatorPlugin)
   await app.register(registrationPlugin)
   await app.register(dashboardPlugin)
+  await app.register(auditPlugin)
 
   return app
 }

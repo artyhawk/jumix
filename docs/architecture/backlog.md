@@ -471,6 +471,42 @@ Post-MVP: API-param `?licenseStatus=expired|expiring_critical|...` → repositor
 
 ---
 
+## Web — dashboard audit-feed + palette (from B3-UI-2d)
+
+### Audit events — payload stability contract
+
+Registry `lib/format/audit.ts` содержит ~30 mapped action-типов. По мере роста backend'а (добавление новых событий в `auditLog`) registry будет отставать — новый action отрендерится через fallback (Clock icon + action-string as-is). Сейчас это acceptable: UI не ломается, просто выглядит менее informative.
+
+Post-MVP options:
+- **Source of truth — backend:** endpoint `GET /api/v1/audit/actions/registry` возвращает `{action, label_key, icon_hint}`-словарь. Frontend подтягивает на старте + кеширует.
+- **Compile-time union type:** audit-actions типизируются в `@jumix/api-types` как literal union, TypeScript проверяет compleiteness registry'а (exhaustiveness switch).
+
+Триггер: rule of three — когда появится третий недостающий action в registry (сейчас видно только на QA-обзорах).
+
+### Real-time audit feed через SSE
+
+`RecentActivity` сейчас — polling через React Query staleTime 30s. Для superadmin real-time dashboard'а (видеть события по мере появления) — SSE-stream `GET /api/v1/audit/stream` с server-sent события. Клиент держит eventsource + мёрджит в query-cache.
+
+Связано с общей backlog-item `Web / Real-time notifications (WebSocket / SSE)`.
+
+Триггер: superadmin жалуется на «надо F5 чтобы увидеть новые события» ИЛИ появление live-карты смен (Этап 2).
+
+### Command palette shortcuts — binding за пределами Cmd+K
+
+Сейчас доступен только Cmd+K toggle. `CommandEntry.shortcut` — metadata для UI (показываем `kbd` бейдж в row), но не wire'им клавиши глобально. Post-MVP:
+- Global binding через `useKeyboard` (уже есть hook): Cmd+Shift+D → dashboard, Cmd+Shift+O → organizations, etc.
+- Конфликты с браузерными shortcut'ами проверять явно (e.g., Cmd+S занят save-as).
+
+Триггер: superadmin-фидбек «хочу навигацию с клавиатуры».
+
+### Command palette — recent / pinned commands
+
+Сейчас команды в фиксированном порядке по `COMMAND_GROUP_ORDER`. Post-MVP — «Недавние» группа сверху (localStorage с последними 3 execute'ами) + «Закреплённые» (user-pinned через command menu). cmdk поддерживает custom sort через filter function.
+
+Триггер: 10+ команд в registry → scroll по списку становится pain-point.
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:

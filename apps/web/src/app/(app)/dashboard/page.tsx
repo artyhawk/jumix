@@ -2,6 +2,7 @@
 
 import { OrganizationsOverview } from '@/components/dashboard/organizations-overview'
 import { PendingAttentionCallout } from '@/components/dashboard/pending-attention-callout'
+import { RecentActivity } from '@/components/dashboard/recent-activity'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { PageTransition } from '@/components/motion/page-transition'
 import { StaggerItem, StaggerList } from '@/components/motion/stagger-list'
@@ -116,7 +117,10 @@ export default function DashboardPage() {
             />
           ) : null}
 
-          <OrganizationsOverview />
+          <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
+            <OrganizationsOverview />
+            <RecentActivity />
+          </div>
         </>
       )}
     </PageTransition>

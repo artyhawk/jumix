@@ -17,7 +17,7 @@ import { useOrganizationsInfinite } from '@/lib/hooks/use-organizations'
 import { formatKzPhoneDisplay } from '@/lib/phone-format'
 import { Plus, ShieldAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 
 const STATUS_OPTIONS: { value: OrganizationStatus; label: string }[] = [
   { value: 'active', label: 'Активные' },
@@ -49,8 +49,7 @@ export default function OrganizationsPage() {
     ? (params.get('status') as OrganizationStatus)
     : null
   const openId = params.get('open')
-
-  const [createOpen, setCreateOpen] = useState(false)
+  const createOpen = params.get('create') === 'true'
 
   useEffect(() => {
     if (user && user.role !== 'superadmin') router.replace('/')
@@ -125,7 +124,7 @@ export default function OrganizationsPage() {
         action={
           <Button
             variant="primary"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => setParam('create', 'true')}
             className="w-full md:w-auto"
           >
             <Plus className="size-4" strokeWidth={1.5} aria-hidden />
@@ -189,7 +188,12 @@ export default function OrganizationsPage() {
           if (!next) setParam('open', null)
         }}
       />
-      <CreateOrganizationDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateOrganizationDialog
+        open={createOpen}
+        onOpenChange={(next) => {
+          if (!next) setParam('create', null)
+        }}
+      />
     </PageTransition>
   )
 }

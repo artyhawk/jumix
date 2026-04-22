@@ -489,6 +489,111 @@ onOpenCraneProfile={(craneProfileId) => {
 
 ---
 
+## 12b. Dashboard audit-feed + Cmd+K палитра (B3-UI-2d)
+
+Финальная вертикаль superadmin-кабинета: recent-activity timeline на dashboard + declarative command-palette.
+
+### Backend: `audit` module
+
+`GET /api/v1/audit/recent?limit=N` (superadmin-only; default 50, max 100). Возвращает enriched events: actor (left-join `users`), organization (left-join `organizations`), metadata passthrough, ordered `DESC` by `created_at`.
+
+Структура: `audit.policy.ts` (`canViewRecent` — superadmin-only), `audit.service.ts` (Drizzle query), `audit.routes.ts` (Zod query-schema, `.strict()`), `audit.plugin.ts` (`fp` с `dependencies: ['authenticate']`). ZodError маппится на 422 `VALIDATION_ERROR` в error-handler (не 400). Паттерн 1:1 копия `dashboard` module'а.
+
+### Web: `RecentActivity` component
+
+`components/dashboard/recent-activity.tsx` — timeline-feed с states:
+
+- `ActivityRow` — size-8 icon (от action-type) + label + actor · organization · relative-time.
+- `ActivitySkeleton` — 5 shimmer-rows (размер статичный чтобы не прыгало layout).
+- `ActivityEmpty` — `Inbox` icon + «Пока нет событий».
+- `ActivityError` — `AlertCircle` + «Повторить» button → `refetch()`.
+
+Height-cap `max-h-[480px] overflow-auto`. Query — `useRecentAudit(20)` со `staleTime: 30_000` (события накапливаются не быстро, 30-секундный cache снимает нагрузку).
+
+### Audit format registry (`lib/format/audit.ts`)
+
+Централизованная таблица `action → {icon, label}`:
+
+```ts
+const ACTION_ICONS: Record<string, LucideIcon> = {
+  'organization.create': Building2,
+  'crane.approve': CheckCircle2,
+  'license.warning_sent': AlertTriangle,
+  'registration.complete': UserPlus,
+  ...30+ actions
+}
+const ACTION_LABELS: Record<string, string> = {...}
+getActionIcon(action) // fallback: Clock
+formatActionLabel(event) // fallback: action-string as-is
+```
+
+Добавление новой audit-action = одна запись в registry, никаких switch'ей по компонентам.
+
+### Dashboard 2-col layout
+
+`/dashboard` — `grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4`:
+
+- Левая колонка (2fr): `OrganizationsOverview` — top-5 organizations.
+- Правая колонка (1fr): `RecentActivity` — последние 20 audit-events.
+
+На phone — stack по вертикали (1fr = 100%).
+
+### Command palette rewrite
+
+Полная замена прежней hardcoded-палитры на declarative registry.
+
+**`lib/commands/registry.ts`** — массив `CommandEntry`:
+
+```ts
+type CommandEntry = {
+  id: string                    // unique, e.g. 'nav.approvals'
+  label: string                 // UI label (RU)
+  group: 'navigation' | 'actions' | 'system'
+  roles: UserRole[]             // которым доступно
+  href?: string                 // static navigation
+  action?: 'logout' | 'create-organization' | ...  // custom handler
+  icon?: LucideIcon
+  keywords?: string[]           // для fuzzy search ("одоб" → "Заявки")
+  shortcut?: string[]           // e.g. ['⌘', 'B']
+}
+getCommandsForRole(role: UserRole): CommandEntry[]
+```
+
+Invariant: каждый entry имеет `href || action` (проверено тестом). Role-фильтрация — pure-function (тестируема без React).
+
+**`lib/commands/use-commands.ts`** — hook возвращает `{commands, execute}`:
+
+```ts
+execute(cmd):
+  cmd.href       → router.push(cmd.href)
+  cmd.action:
+    'logout'              → logout() + router.push('/login')
+    'create-organization' → router.push('/organizations?create=true')
+```
+
+Паттерн `?create=true` — простое cross-page dialog orchestration (см. ниже) вместо lifted state или Zustand store.
+
+**`components/ui/command-palette.tsx`** — cmdk fuzzy search + framer-motion spring modal:
+
+- Toggle через `useKeyboard('cmd+k')` hook.
+- Groups из `COMMAND_GROUP_ORDER` — headers «Переход» / «Действия» / «Система».
+- Fuzzy value: `value={cmd.label + ' ' + cmd.keywords.join(' ')}` — cmdk матчит по concat-строке, поэтому «одоб» находит «Заявки на рассмотрение» через keyword «одобрение».
+- Motion: spring `{stiffness: 340, damping: 28}` на контент + backdrop fade (0.15s). Overlay `z-40`, content `z-50`.
+- `handleSelect` делает `setOpen(false)` + 50ms `setTimeout(() => execute(cmd))` — modal успевает закрыться до navigation, иначе StaggerList на next page «перепрыгивает».
+- Accessibility: `role="dialog"` на motion.div (с biome-ignore — native `<dialog>` имеет top-layer/focus-trap семантику которую мы не хотим, backdrop/Escape обрабатываем сами).
+
+### Тесты: jsdom + cmdk caveat
+
+cmdk Item's `onSelect` не фаерится надёжно через `fireEvent.click`/`userEvent.click` в jsdom (Primitive.div wrapping + React 19 synthetic events + cmdk's store-driven state). Тесты палитры покрывают UI-surface (render, grouping, role-filter, fuzzy search, keyboard toggle, Escape). Интеграционная часть («select item → execute → router.push») покрыта в `use-commands.test.ts` — execute-функция pure и тестируется напрямую.
+
+### URL-state: `?create=true` cross-page
+
+`/organizations` читает `params.get('create') === 'true'` → open CreateOrganizationDialog. Закрытие — `setParam('create', null)` (см. §12a URL-state pattern).
+
+Профит: команда «Создать организацию» из палитры на `/dashboard` → `router.push('/organizations?create=true')` → страница открывается с уже-открытым dialog. Проще чем global Zustand dialog store или lifted state.
+
+---
+
 ## 13. Связанные документы
 
 - [design-system.md](design-system.md) — цвет, typography, иконки, spacing.

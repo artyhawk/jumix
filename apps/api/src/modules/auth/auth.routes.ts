@@ -9,10 +9,13 @@ import type { FastifyInstance, FastifyPluginAsync } from 'fastify'
  * следующих коммитах отдельного модуля.
  */
 export const registerAuthRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
-  app.get('/auth/me', { preHandler: app.authenticate }, async (request) => ({
-    userId: request.ctx.userId,
-    organizationId: request.ctx.organizationId,
-    role: request.ctx.role,
-    tokenVersion: request.ctx.tokenVersion,
-  }))
+  app.get('/auth/me', { preHandler: app.authenticate }, async (request) => {
+    const { ctx } = request
+    return {
+      userId: ctx.userId,
+      organizationId: ctx.role === 'operator' ? null : ctx.organizationId,
+      role: ctx.role,
+      tokenVersion: ctx.tokenVersion,
+    }
+  })
 }

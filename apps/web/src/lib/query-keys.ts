@@ -12,6 +12,9 @@ export const qk = {
   dashboard: ['dashboard'] as const,
   dashboardStats: ['dashboard', 'stats'] as const,
 
+  audit: ['audit'] as const,
+  auditRecent: (limit: number) => ['audit', 'recent', limit] as const,
+
   organizations: ['organizations'] as const,
   organizationsList: (query: ListOrganizationsQuery) => ['organizations', 'list', query] as const,
   organizationsInfinite: (query: Omit<ListOrganizationsQuery, 'cursor'>) =>
