@@ -1,10 +1,6 @@
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
-/**
- * Logo-компонент. `mark` — знак "J" (collapsed sidebar, favicon). `full` — полный.
- * Используем next/image с explicit width/height — иначе Next шлёт оригинал 5504×1642.
- */
 export function Logo({
   variant = 'full',
   className,
@@ -28,13 +24,22 @@ export function Logo({
   }
 
   return (
-    <Image
-      src="/brand/logo-full.png"
-      alt="Jumix"
-      width={120}
-      height={36}
-      priority={priority}
-      className={cn('object-contain h-9 w-auto', className)}
-    />
+    <span
+      className={cn('inline-flex items-center gap-2 select-none', className)}
+      aria-label="Jumix"
+    >
+      <Image
+        src="/brand/logo-mark.png"
+        alt=""
+        aria-hidden
+        width={28}
+        height={28}
+        priority={priority}
+        className="object-contain shrink-0"
+      />
+      <span className="text-text-primary font-semibold text-lg tracking-tight leading-none">
+        Jumix
+      </span>
+    </span>
   )
 }
