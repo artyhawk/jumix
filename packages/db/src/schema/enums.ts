@@ -36,6 +36,21 @@ export const craneTypeEnum = pgEnum('crane_type', ['tower', 'mobile', 'crawler',
 // deleted_at!=null → скрыт из UI полностью, история сохраняется.
 export const craneStatusEnum = pgEnum('crane_status', ['active', 'maintenance', 'retired'])
 
+// Approval workflow крана (ADR 0002 — holding-approval model). Ортогонально
+// operational `status`. Admin-gated — меняется только через /approve и /reject
+// endpoints суперадмина.
+//   pending   → owner запросил добавление, холдинг ещё не решил; кран в
+//               operational-обороте НЕ участвует (change_status → 409)
+//   approved  → холдинг одобрил; operational работа открыта (lifecycle через
+//               status active/maintenance/retired)
+//   rejected  → холдинг отказал; запись read-only (update/setStatus → 409),
+//               разрешено только soft-delete для cleanup
+export const craneApprovalStatusEnum = pgEnum('crane_approval_status', [
+  'pending',
+  'approved',
+  'rejected',
+])
+
 // Жизненный цикл крановщика (employment status).
 //   active      → работает нормально, смены фиксируются
 //   blocked     → временно заблокирован (дисциплинарно), не может работать,

@@ -49,7 +49,7 @@ SaaS-платформа для компаний Казахстана, сдающ
 | Infrastructure | [infrastructure.md](docs/architecture/infrastructure.md) | docker-compose, healthchecks, backup, monitoring, secrets |
 | CI/CD | [cicd.md](docs/architecture/cicd.md) | Pipelines (PR/main/tag), миграции, rolling deploy |
 | Backlog | [backlog.md](docs/architecture/backlog.md) | Отложенные задачи (post-MVP, блокеры заказчика) |
-| ADRs | [adr/](docs/architecture/adr/) | Architectural decision records |
+| ADRs | [adr/](docs/architecture/adr/) | Architectural decision records (см. [0002 holding-approval model](docs/architecture/adr/0002-holding-approval-model.md) — почему cranes идут через approve/reject холдингом) |
 
 **Правило чтения:** под задачу открывай 1-2 файла максимум. Не грузи всё подряд — контекст-окно не резиновое.
 
@@ -218,6 +218,8 @@ SaaS-платформа для компаний Казахстана, сдающ
 9. **Object storage — только через `app.storage`.** Никогда не импортируй `MinioStorageClient` / `InMemoryStorageClient` из модулей. Ключи строятся через helpers в `apps/api/src/lib/storage/object-key.ts` (tenant-prefix обязателен). Детали — [storage.md](docs/architecture/storage.md).
 
 10. **Self-service endpoints (`/me`, `/me/**`) — subject ТОЛЬКО из `ctx.userId`.** Никогда не принимай `operatorId` / `userId` из URL path, query или body в `/me`-endpoint'ах. Это cross-tenant vulnerability: параметр приглашает к злоупотреблению даже если policy «страхует». Контракт `/me` — просто `ctx.userId`, без parameters. Детали — [authorization.md §4.2a](docs/architecture/authorization.md).
+
+11. **Approval-gated entities (cranes; в будущем — crane_profiles и т.п.) имеют двумерный статус.** `approval_status` (pending/approved/rejected) ортогонален operational `status` и меняется ТОЛЬКО через отдельные endpoints `:id/approve` и `:id/reject`, доступные superadmin'у. `POST /entity` создаёт pending; operational операции (update, setStatus) требуют `approval_status='approved'`. Rejected — read-only (только delete для cleanup). Owner НЕ одобряет свои же заявки (внешний актор обязателен — инвариант holding-approval). Детали — [authorization.md §4.2b](docs/architecture/authorization.md) + ADR [0002](docs/architecture/adr/0002-holding-approval-model.md).
 
 ---
 

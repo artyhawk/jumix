@@ -22,6 +22,8 @@ const yearManufacturedSchema = z.number().int().min(1900).max(CURRENT_YEAR())
 
 const craneTypeSchema = z.enum(['tower', 'mobile', 'crawler', 'overhead'])
 const craneStatusSchema = z.enum(['active', 'maintenance', 'retired'])
+const craneApprovalStatusSchema = z.enum(['pending', 'approved', 'rejected'])
+const rejectionReasonSchema = z.string().trim().min(1).max(500)
 
 export const createCraneSchema = z.object({
   type: craneTypeSchema,
@@ -60,6 +62,13 @@ export type UpdateCraneInput = z.infer<typeof updateCraneSchema>
  * GET /cranes — cursor = last seen id (id DESC). Список по умолчанию
  * исключает soft-deleted (deleted_at IS NOT NULL). Фильтры status/type/siteId —
  * опциональны. siteId=null фильтрует «на складе» (без площадки).
+ *
+ * approvalStatus default (если не задан в query) устанавливает service в
+ * зависимости от роли:
+ *   - owner/superadmin → 'approved' (основной operational список)
+ *   - значение 'all' в query — показать все approval-state'ы (pending +
+ *     approved + rejected, но по-прежнему без soft-deleted)
+ *   - superadmin'у для approval-queue UX — передать 'pending'
  */
 export const listCranesQuerySchema = z.object({
   cursor: z.string().uuid().optional(),
@@ -68,9 +77,29 @@ export const listCranesQuerySchema = z.object({
   status: craneStatusSchema.optional(),
   type: craneTypeSchema.optional(),
   siteId: z.string().uuid().optional(),
+  approvalStatus: z.enum(['pending', 'approved', 'rejected', 'all']).optional(),
 })
 export type ListCranesQuery = z.infer<typeof listCranesQuerySchema>
 
 export const craneIdParamsSchema = z.object({
   id: z.string().uuid(),
 })
+
+/**
+ * POST /cranes/:id/approve — body пустой. Отдельная схема для явного
+ * намерения (в будущем сюда может добавиться commentary / reviewer note).
+ */
+export const approveCraneSchema = z.object({})
+export type ApproveCraneInput = z.infer<typeof approveCraneSchema>
+
+/**
+ * POST /cranes/:id/reject — reason обязателен. Причина отказа попадёт в
+ * cranes.rejection_reason + audit metadata; после rejected кран становится
+ * read-only, поэтому причина фиксируется один раз и навсегда.
+ */
+export const rejectCraneSchema = z.object({
+  reason: rejectionReasonSchema,
+})
+export type RejectCraneInput = z.infer<typeof rejectCraneSchema>
+
+export { craneApprovalStatusSchema }

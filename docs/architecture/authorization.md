@@ -61,6 +61,36 @@ Policies — **чистые функции** над `AuthContext` + минима
 
 **Типичная ошибка:** принимать `operatorId` в `/me`-endpoint «для гибкости». Это открывает cross-tenant vulnerability — хотя policy вернёт false, сам факт наличия параметра в контракте приглашает к злоупотреблениям. Правильно: `/me`-endpoints НЕ имеют path/body параметров для идентификации субъекта, subject берётся только из `ctx.userId`.
 
+## 4.2b Approval workflow pattern (holding-approval)
+
+Для сущностей, которые создаёт `owner`, но допускать к operational обороту должен `superadmin` (холдинг), в модуле появляется **второе измерение статуса** — `approval_status`, ортогональное operational `status`.
+
+**Базовая модель** (reference implementation — cranes, ADR [0002](adr/0002-holding-approval-model.md)):
+
+```
+approval_status: 'pending' | 'approved' | 'rejected'    ← admin-gated
+status:          'active' | 'maintenance' | 'retired'   ← operational
+```
+
+Оси независимые: `approval_status` меняется только через отдельные endpoints (approve/reject), а `status` — через operational action'ы (activate/maintenance/retire). Mutations operational `status` gated: требуется `approval_status='approved'`.
+
+**Правила применимости:**
+
+- `POST /entities` (owner) → entity создаётся как `approval_status='pending'`; audit action `entity.submit`
+- `POST /entities/:id/approve` → **superadmin only**; pending → approved; `approved_by_user_id` + `approved_at`; audit `entity.approve`
+- `POST /entities/:id/reject` → **superadmin only**; body `{reason}` обязателен; pending → rejected; `rejected_by_user_id` + `rejected_at` + `rejection_reason`; audit `entity.reject`
+- `canApprove` / `canReject` — **только `role === 'superadmin'`**. Owner НЕ может одобрять собственные заявки (ключевой инвариант: внешний актор всегда обязателен)
+- Approve/reject не-pending заявки → **409 `ENTITY_NOT_PENDING`** (не меняем approved/rejected — один переход за жизнь)
+- `canUpdate` возвращает `false` для `rejected` (read-only после отказа) — **единственный путь модификации rejected-записи — delete**. Это защита «договорного» характера: отказ зафиксирован, owner не должен иметь возможности «подправить» и передать снова без явного ре-submit'а
+- `canChangeStatus` требует `approval_status === 'approved'`. Pending → **409 `ENTITY_NOT_APPROVED`**, rejected → **409 `ENTITY_REJECTED_READONLY`**
+- `canDelete` разрешён во всех approval-state'ах (cleanup должен работать для всех)
+
+**List-фильтр:** `GET /entities?approvalStatus=pending|approved|rejected|all` (default — `'approved'`). Это значит, что по умолчанию owner'ский operational список не шумит pending/rejected записями — их видно только по явному запросу (approval queue UX). Superadmin с `?approvalStatus=pending` получает глобальную очередь заявок.
+
+**DTO boundary:** `approved_at` / `rejected_at` / `rejection_reason` отдаются клиенту (owner видит, почему отказали). `approved_by_user_id` / `rejected_by_user_id` — **internal audit**, не в публичном DTO (они живут в `audit_log`).
+
+**Индексы:** partial index для hot-path очереди `WHERE approval_status = 'pending' AND deleted_at IS NULL`; существующие operational индексы (например «какие краны на site'е») дополняются условием `approval_status = 'approved'`, чтобы в индексе не сидели pending/rejected записи.
+
 **Layer 3: Repository с обязательным AuthContext**
 
 ```typescript

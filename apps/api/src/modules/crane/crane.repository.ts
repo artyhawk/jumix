@@ -1,13 +1,14 @@
 import type { AuthContext, UserRole } from '@jumix/auth'
 import {
   type Crane,
+  type CraneApprovalStatus,
   type CraneStatus,
   type CraneType,
   type DatabaseClient,
   auditLog,
   cranes,
 } from '@jumix/db'
-import { type SQL, and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm'
+import { type SQL, and, asc, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm'
 
 /**
  * CraneRepository — data access с tenant scope через AuthContext
@@ -17,9 +18,16 @@ import { type SQL, and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm'
  * `superadmin` scope по организации отсутствует; `owner` читает только свою;
  * `operator` — пусто.
  *
- * Mutations (`create`, `updateFields`, `setStatus`, `softDelete`) — в одной
- * транзакции с audit-записью: инвариант «мутация без аудита невозможна»
- * (тот же паттерн, что у Site/Organization).
+ * Mutations (`create`, `updateFields`, `setStatus`, `softDelete`, `approve`,
+ * `reject`) — в одной транзакции с audit-записью: инвариант «мутация без
+ * аудита невозможна» (тот же паттерн, что у Site/Organization/Operator).
+ *
+ * Approval workflow (ADR 0002):
+ *   - `create` устанавливает approval_status='pending', audit action='crane.submit'
+ *   - `approve` / `reject` мутируют только approval_status + timestamp/actor;
+ *     operational `status` не трогается
+ *   - `updateFields` / `setStatus` НЕ могут менять approval_status (whitelist
+ *     обеспечивается тем, что approval_status отсутствует в CraneUpdateFields)
  *
  * `findAnyById` и `findAnyByInventory` — service-internal lookups (post-write
  * re-read или conflict-detection), НЕ скопятся ctx'ом.
@@ -50,6 +58,12 @@ function hydrate(row: CraneRow): Crane {
     yearManufactured: row.yearManufactured,
     tariffsJson: (row.tariffsJson ?? {}) as Record<string, unknown>,
     status: row.status as CraneStatus,
+    approvalStatus: row.approvalStatus as CraneApprovalStatus,
+    approvedByUserId: row.approvedByUserId,
+    approvedAt: row.approvedAt,
+    rejectedByUserId: row.rejectedByUserId,
+    rejectedAt: row.rejectedAt,
+    rejectionReason: row.rejectionReason,
     notes: row.notes,
     deletedAt: row.deletedAt,
     createdAt: row.createdAt,
@@ -81,6 +95,8 @@ export type CraneUpdateFields = {
   tariffsJson?: Record<string, unknown>
   notes?: string | null
 }
+
+export type CraneListApprovalFilter = CraneApprovalStatus | 'all'
 
 export class CraneRepository {
   constructor(
@@ -140,6 +156,7 @@ export class CraneRepository {
     status?: CraneStatus
     type?: CraneType
     siteId?: string
+    approvalStatus: CraneListApprovalFilter
   }): Promise<{ rows: Crane[]; nextCursor: string | null }> {
     if (this.ctx.role === 'operator') return { rows: [], nextCursor: null }
 
@@ -151,6 +168,9 @@ export class CraneRepository {
     if (params.status) conds.push(eq(cranes.status, params.status))
     if (params.type) conds.push(eq(cranes.type, params.type))
     if (params.siteId) conds.push(eq(cranes.siteId, params.siteId))
+    if (params.approvalStatus !== 'all') {
+      conds.push(eq(cranes.approvalStatus, params.approvalStatus))
+    }
     if (params.search) {
       const needle = `%${params.search}%`
       const match = or(ilike(cranes.model, needle), ilike(cranes.inventoryNumber, needle))
@@ -170,6 +190,23 @@ export class CraneRepository {
     return { rows: page, nextCursor }
   }
 
+  /**
+   * Approval queue для superadmin'а — все pending заявки глобально,
+   * отсортированные по created_at ASC (старейшие сначала, FIFO).
+   * Cursor формат отличается от list() — пока не реализован (approval queue
+   * редко вырастает большой, за пределы limit=100 уходят редкие кейсы).
+   * Когда понадобится — добавить created_at-based cursor.
+   */
+  async listPending(params: { limit: number }): Promise<{ rows: Crane[] }> {
+    const rows = await this.database.db
+      .select()
+      .from(cranes)
+      .where(and(eq(cranes.approvalStatus, 'pending'), isNull(cranes.deletedAt)))
+      .orderBy(asc(cranes.createdAt))
+      .limit(params.limit)
+    return { rows: rows.map(hydrate) }
+  }
+
   async create(input: CraneCreateInput, audit: AuditMeta): Promise<Crane> {
     return this.database.db.transaction(async (tx) => {
       const inserted = await tx
@@ -187,6 +224,7 @@ export class CraneRepository {
           yearManufactured: input.yearManufactured,
           tariffsJson: input.tariffsJson,
           notes: input.notes,
+          // approvalStatus опускаем → default 'pending' из схемы.
         })
         .returning()
 
@@ -196,7 +234,7 @@ export class CraneRepository {
       await tx.insert(auditLog).values({
         actorUserId: audit.actorUserId,
         actorRole: audit.actorRole,
-        action: 'crane.create',
+        action: 'crane.submit',
         targetType: 'crane',
         targetId: row.id,
         organizationId: row.organizationId,
@@ -299,6 +337,80 @@ export class CraneRepository {
         actorUserId: audit.actorUserId,
         actorRole: audit.actorRole,
         action: 'crane.delete',
+        targetType: 'crane',
+        targetId: id,
+        organizationId,
+        metadata: audit.metadata,
+        ipAddress: audit.ipAddress,
+      })
+
+      return hydrate(row)
+    })
+  }
+
+  async approve(id: string, organizationId: string, audit: AuditMeta): Promise<Crane | null> {
+    return this.database.db.transaction(async (tx) => {
+      const now = new Date()
+      const rows = await tx
+        .update(cranes)
+        .set({
+          approvalStatus: 'approved',
+          approvedByUserId: audit.actorUserId,
+          approvedAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(eq(cranes.id, id), eq(cranes.approvalStatus, 'pending'), isNull(cranes.deletedAt)),
+        )
+        .returning()
+
+      const row = rows[0]
+      if (!row) return null
+
+      await tx.insert(auditLog).values({
+        actorUserId: audit.actorUserId,
+        actorRole: audit.actorRole,
+        action: 'crane.approve',
+        targetType: 'crane',
+        targetId: id,
+        organizationId,
+        metadata: audit.metadata,
+        ipAddress: audit.ipAddress,
+      })
+
+      return hydrate(row)
+    })
+  }
+
+  async reject(
+    id: string,
+    organizationId: string,
+    reason: string,
+    audit: AuditMeta,
+  ): Promise<Crane | null> {
+    return this.database.db.transaction(async (tx) => {
+      const now = new Date()
+      const rows = await tx
+        .update(cranes)
+        .set({
+          approvalStatus: 'rejected',
+          rejectedByUserId: audit.actorUserId,
+          rejectedAt: now,
+          rejectionReason: reason,
+          updatedAt: now,
+        })
+        .where(
+          and(eq(cranes.id, id), eq(cranes.approvalStatus, 'pending'), isNull(cranes.deletedAt)),
+        )
+        .returning()
+
+      const row = rows[0]
+      if (!row) return null
+
+      await tx.insert(auditLog).values({
+        actorUserId: audit.actorUserId,
+        actorRole: audit.actorRole,
+        action: 'crane.reject',
         targetType: 'crane',
         targetId: id,
         organizationId,

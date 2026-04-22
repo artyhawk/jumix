@@ -101,6 +101,41 @@
 
 Тест должен: создать org A (+ site + crane), org B (+ site), залогинить owner A, дёрнуть `GET /cranes?siteId={orgB_site.id}` → ожидать 200 с пустым items array.
 
+### Cross-org crane transfer (holding-internal move)
+
+Сейчас `cranes.organization_id` — fixed после create: `updateCraneSchema` не содержит поле, repository update-path не позволяет его менять. Кейс «холдинг перебрасывает кран между дочками» сегодня решается через soft-delete в org A + create в org B (новый crane.id, новый history, approval нужно проходить заново).
+
+Пост-MVP — явный flow:
+- `POST /api/v1/cranes/:id/transfer` с `{ targetOrganizationId }`, доступен только superadmin (валидирует, что target — дочка того же холдинга когда появится `holdings` таблица).
+- Сохраняет crane.id; записывает audit `crane.transfer` с `{ fromOrgId, toOrgId }`; переклеивает `site_id` на NULL (site остаётся в исходной org); approval_status скорее всего остаётся `'approved'` (уже одобрен холдингом), но это решение зависит от compliance.
+- История shifts / maintenance остаётся привязанной к старому org (для отчётов), новая активность пишется под target org.
+
+Триггер: запрос от заказчика на cross-subsidiary перераспределение техники.
+
+### Multi-stage approval (holding → compliance → tech)
+
+Текущая ADR [0002](adr/0002-holding-approval-model.md) — single-stage: один `superadmin` approve/reject. Реальный процесс в холдинге может быть двух- или трёх-этапным: сначала compliance-officer проверяет документы, потом technical officer — характеристики крана, и только потом финальный approve от holding owner'а.
+
+Пост-MVP — extension points:
+- Добавить enum `approval_stage` (`compliance_pending`, `tech_pending`, `final_pending`, `approved`, `rejected`) взамен текущего plain `approval_status`.
+- Новые роли superadmin-sub (`compliance_admin`, `tech_admin`) с правом менять свою stage.
+- Каждый этап пишет свой audit + актор + timestamp. Rejection на любом этапе → терминальный rejected (как сейчас).
+
+Альтернативы — workflow-движок (camunda-style) или checklist-модель (массив `approval_checks[]`). Решение зависит от того, захочет ли заказчик кастомизировать число этапов под свой процесс.
+
+Триггер: запрос от заказчика на разделение approval-ответственности внутри холдинга.
+
+### Notifications on approve/reject
+
+Сейчас approve/reject меняет state + пишет audit, но не уведомляет owner'а. Реальный UX: owner добавил кран, ждёт решения — должен получить push/email/SMS «ваш кран одобрен» или «отклонён: причина X».
+
+Пост-MVP:
+- Notification worker job после транзакции approve/reject: `notifications` table + delivery через FCM / Mobizon.
+- Templates: `{craneModel} на объекте {siteName} — одобрен холдингом` / `отклонён: {reason}`.
+- Owner в вебе видит badge «требует внимания» на главной, mobile — push.
+
+Триггер: первый production-кейс, где owner'ы жалуются на отсутствие фидбека по отправленным заявкам. До этого web UI в разделе «мои краны» с ?approvalStatus=rejected достаточно для discovery.
+
 ---
 
 ## Operators (from B2b)

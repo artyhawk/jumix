@@ -4,7 +4,11 @@ import type { FastifyBaseLogger } from 'fastify'
 import { AppError } from '../../lib/errors'
 import { SiteRepository } from '../site/site.repository'
 import { cranePolicy } from './crane.policy'
-import { CraneRepository, type CraneUpdateFields } from './crane.repository'
+import {
+  type CraneListApprovalFilter,
+  CraneRepository,
+  type CraneUpdateFields,
+} from './crane.repository'
 import type { CreateCraneInput, ListCranesQuery, UpdateCraneInput } from './crane.schemas'
 
 /**
@@ -20,6 +24,9 @@ import type { CreateCraneInput, ListCranesQuery, UpdateCraneInput } from './cran
  *   - идемпотентность status/delete: повтор target-состояния → 200/без audit.
  *   - conflict-detection для `inventory_number` (409 INVENTORY_NUMBER_ALREADY_EXISTS),
  *     pre-check + fallback на pg unique_violation от race.
+ *   - approval workflow (ADR 0002): create → pending; approve/reject — только
+ *     superadmin; rejected crane — read-only (update/setStatus → 409); approve
+ *     не-pending → 409 CRANE_NOT_PENDING (не меняем approved/rejected).
  *
  * Singleton, per-call репозитории создаются с ctx из request.
  */
@@ -99,6 +106,15 @@ export class CraneService {
     return true
   }
 
+  /**
+   * Default для approvalStatus query-фильтра: если не задан, owner/superadmin
+   * видят approved — основной operational список. Свои pending/rejected можно
+   * запросить явно через ?approvalStatus=pending|rejected|all.
+   */
+  private resolveApprovalFilter(query: ListCranesQuery): CraneListApprovalFilter {
+    return query.approvalStatus ?? 'approved'
+  }
+
   async list(
     ctx: AuthContext,
     params: ListCranesQuery,
@@ -106,7 +122,15 @@ export class CraneService {
     if (!cranePolicy.canList(ctx)) {
       throw forbidden('FORBIDDEN', 'Operators cannot list cranes')
     }
-    return this.repoFor(ctx).list(params)
+    return this.repoFor(ctx).list({
+      cursor: params.cursor,
+      limit: params.limit,
+      search: params.search,
+      status: params.status,
+      type: params.type,
+      siteId: params.siteId,
+      approvalStatus: this.resolveApprovalFilter(params),
+    })
   }
 
   async getById(ctx: AuthContext, id: string): Promise<Crane> {
@@ -195,6 +219,13 @@ export class CraneService {
     const existing = await repo.findInScope(id)
     if (!existing) throw craneNotFound()
 
+    // policy.canUpdate уже отсекает rejected cranes (read-only после отказа)
+    // — даём явный 409 с объясняющим кодом, чтобы owner видел, почему
+    // его кран больше не редактируется.
+    if (existing.approvalStatus === 'rejected') {
+      throw conflict('CRANE_REJECTED_READONLY', 'Rejected crane is read-only (delete is allowed)')
+    }
+
     if (!cranePolicy.canUpdate(ctx, existing)) {
       throw forbidden('FORBIDDEN', 'Not allowed to update this crane')
     }
@@ -272,6 +303,16 @@ export class CraneService {
     const existing = await repo.findInScope(id)
     if (!existing) throw craneNotFound()
 
+    if (existing.approvalStatus === 'pending') {
+      throw conflict(
+        'CRANE_NOT_APPROVED',
+        'Crane must be approved by holding before operational status changes',
+      )
+    }
+    if (existing.approvalStatus === 'rejected') {
+      throw conflict('CRANE_REJECTED_READONLY', 'Rejected crane is read-only (delete is allowed)')
+    }
+
     if (!cranePolicy.canChangeStatus(ctx, existing)) {
       throw forbidden('FORBIDDEN', 'Not allowed to change status of this crane')
     }
@@ -317,6 +358,7 @@ export class CraneService {
       ipAddress: meta.ipAddress,
       metadata: {
         status: existing.status,
+        approvalStatus: existing.approvalStatus,
         siteId: existing.siteId,
         inventoryNumber: existing.inventoryNumber,
       },
@@ -326,6 +368,88 @@ export class CraneService {
       throw craneNotFound()
     }
     return deleted
+  }
+
+  async approve(ctx: AuthContext, id: string, meta: RequestMeta): Promise<Crane> {
+    if (!cranePolicy.canApprove(ctx)) {
+      throw forbidden('FORBIDDEN', 'Only superadmin can approve cranes')
+    }
+
+    const repo = this.repoFor(ctx)
+    const existing = await repo.findInScope(id)
+    if (!existing) throw craneNotFound()
+
+    if (existing.approvalStatus !== 'pending') {
+      throw conflict(
+        'CRANE_NOT_PENDING',
+        `Crane is already ${existing.approvalStatus}; only pending cranes can be approved`,
+      )
+    }
+
+    const approved = await repo.approve(id, existing.organizationId, {
+      actorUserId: ctx.userId,
+      actorRole: ctx.role,
+      ipAddress: meta.ipAddress,
+      metadata: {
+        previousApprovalStatus: 'pending',
+        model: existing.model,
+        inventoryNumber: existing.inventoryNumber,
+      },
+    })
+    if (!approved) {
+      // Race: кто-то поменял состояние между findInScope и approve. Перечитываем.
+      const re = await repo.findAnyById(id)
+      if (re && re.approvalStatus !== 'pending') {
+        throw conflict(
+          'CRANE_NOT_PENDING',
+          `Crane is already ${re.approvalStatus}; only pending cranes can be approved`,
+        )
+      }
+      this.logger.error({ id }, 'crane approve returned null after pending state verified')
+      throw craneNotFound()
+    }
+    return approved
+  }
+
+  async reject(ctx: AuthContext, id: string, reason: string, meta: RequestMeta): Promise<Crane> {
+    if (!cranePolicy.canReject(ctx)) {
+      throw forbidden('FORBIDDEN', 'Only superadmin can reject cranes')
+    }
+
+    const repo = this.repoFor(ctx)
+    const existing = await repo.findInScope(id)
+    if (!existing) throw craneNotFound()
+
+    if (existing.approvalStatus !== 'pending') {
+      throw conflict(
+        'CRANE_NOT_PENDING',
+        `Crane is already ${existing.approvalStatus}; only pending cranes can be rejected`,
+      )
+    }
+
+    const rejected = await repo.reject(id, existing.organizationId, reason, {
+      actorUserId: ctx.userId,
+      actorRole: ctx.role,
+      ipAddress: meta.ipAddress,
+      metadata: {
+        previousApprovalStatus: 'pending',
+        reason,
+        model: existing.model,
+        inventoryNumber: existing.inventoryNumber,
+      },
+    })
+    if (!rejected) {
+      const re = await repo.findAnyById(id)
+      if (re && re.approvalStatus !== 'pending') {
+        throw conflict(
+          'CRANE_NOT_PENDING',
+          `Crane is already ${re.approvalStatus}; only pending cranes can be rejected`,
+        )
+      }
+      this.logger.error({ id }, 'crane reject returned null after pending state verified')
+      throw craneNotFound()
+    }
+    return rejected
   }
 }
 

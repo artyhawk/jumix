@@ -92,19 +92,27 @@ async function createSite(token: string, name: string): Promise<{ id: string }> 
   return { id: res.json().id }
 }
 
+type CraneOverrides = {
+  type?: 'tower' | 'mobile' | 'crawler' | 'overhead'
+  model?: string
+  inventoryNumber?: string
+  capacityTon?: number
+  boomLengthM?: number
+  yearManufactured?: number
+  siteId?: string
+  tariffsJson?: Record<string, unknown>
+  notes?: string
+}
+
+/**
+ * Создаёт crane (всегда pending после ADR 0002) и НЕ approve'ит его. Для
+ * тестов approval workflow, либо когда тест явно проверяет pending state.
+ * Для operational тестов (list visibility, status transitions) используй
+ * `createApprovedCrane` — helper делает submit+approve в два шага.
+ */
 async function createCrane(
   token: string,
-  overrides: {
-    type?: 'tower' | 'mobile' | 'crawler' | 'overhead'
-    model?: string
-    inventoryNumber?: string
-    capacityTon?: number
-    boomLengthM?: number
-    yearManufactured?: number
-    siteId?: string
-    tariffsJson?: Record<string, unknown>
-    notes?: string
-  } = {},
+  overrides: CraneOverrides = {},
 ): Promise<{ id: string; organizationId: string; siteId: string | null }> {
   const res = await handle.app.inject({
     method: 'POST',
@@ -131,8 +139,30 @@ async function createCrane(
   return { id: json.id, organizationId: json.organizationId, siteId: json.siteId }
 }
 
+/**
+ * Submit + holding approve. Это реальный путь от «owner добавил кран» до
+ * «кран в operational обороте» — большинство существующих тестов B1 неявно
+ * полагались на то, что create сразу делает operational crane. После ADR 0002
+ * нужно явно approve'ить через superadmin'а.
+ */
+async function createApprovedCrane(
+  ownerToken: string,
+  overrides: CraneOverrides = {},
+): Promise<{ id: string; organizationId: string; siteId: string | null }> {
+  const crane = await createCrane(ownerToken, overrides)
+  const approve = await handle.app.inject({
+    method: 'POST',
+    url: `/api/v1/cranes/${crane.id}/approve`,
+    headers: { authorization: `Bearer ${superadminToken}` },
+  })
+  if (approve.statusCode !== 200) {
+    throw new Error(`crane approve failed: ${approve.statusCode} ${approve.body}`)
+  }
+  return crane
+}
+
 describe('POST /api/v1/cranes (create)', () => {
-  it('201: owner creates crane in own org; audit written in same txn', async () => {
+  it('201: owner creates crane in own org as pending; audit crane.submit in same txn', async () => {
     const res = await handle.app.inject({
       method: 'POST',
       url: '/api/v1/cranes',
@@ -159,12 +189,15 @@ describe('POST /api/v1/cranes (create)', () => {
     expect(json.boomLengthM).toBe(50.0)
     expect(json.yearManufactured).toBe(2020)
     expect(json.status).toBe('active')
+    expect(json.approvalStatus).toBe('pending')
+    expect(json.approvedAt).toBeNull()
+    expect(json.rejectedAt).toBeNull()
     expect(json.deletedAt).toBeNull()
 
     const audits = await handle.app.db.db
       .select()
       .from(auditLog)
-      .where(and(eq(auditLog.targetId, json.id), eq(auditLog.action, 'crane.create')))
+      .where(and(eq(auditLog.targetId, json.id), eq(auditLog.action, 'crane.submit')))
     expect(audits).toHaveLength(1)
     expect(audits[0]?.organizationId).toBe(orgAId)
   })
@@ -326,9 +359,9 @@ describe('POST /api/v1/cranes — CRITICAL cross-tenant isolation', () => {
 
 describe('GET /api/v1/cranes (list)', () => {
   it('200: owner sees ONLY own-org cranes (no foreign leak)', async () => {
-    await createCrane(ownerAToken, { model: 'ListTest-A1' })
-    await createCrane(ownerAToken, { model: 'ListTest-A2' })
-    await createCrane(ownerBToken, { model: 'ListTest-B1' })
+    await createApprovedCrane(ownerAToken, { model: 'ListTest-A1' })
+    await createApprovedCrane(ownerAToken, { model: 'ListTest-A2' })
+    await createApprovedCrane(ownerBToken, { model: 'ListTest-B1' })
 
     const res = await handle.app.inject({
       method: 'GET',
@@ -356,6 +389,11 @@ describe('GET /api/v1/cranes (list)', () => {
   })
 
   it('200: cursor pagination returns non-overlapping pages', async () => {
+    // Default list фильтрует по approvalStatus='approved' — нужно иметь
+    // хотя бы 2 approved крана для двух непустых страниц.
+    await createApprovedCrane(ownerAToken, { model: 'Paginate-1' })
+    await createApprovedCrane(ownerAToken, { model: 'Paginate-2' })
+
     const first = await handle.app.inject({
       method: 'GET',
       url: '/api/v1/cranes?limit=1',
@@ -379,7 +417,7 @@ describe('GET /api/v1/cranes (list)', () => {
   })
 
   it('200: search by model token', async () => {
-    await createCrane(ownerAToken, { model: 'UNIQUE-SEARCH-MODEL-TOKEN' })
+    await createApprovedCrane(ownerAToken, { model: 'UNIQUE-SEARCH-MODEL-TOKEN' })
     const res = await handle.app.inject({
       method: 'GET',
       url: '/api/v1/cranes?search=UNIQUE-SEARCH-MODEL',
@@ -392,7 +430,7 @@ describe('GET /api/v1/cranes (list)', () => {
   })
 
   it('200: filter by type', async () => {
-    await createCrane(ownerAToken, { type: 'crawler', model: 'CrawlerType' })
+    await createApprovedCrane(ownerAToken, { type: 'crawler', model: 'CrawlerType' })
     const res = await handle.app.inject({
       method: 'GET',
       url: '/api/v1/cranes?type=crawler&limit=100',
@@ -400,11 +438,12 @@ describe('GET /api/v1/cranes (list)', () => {
     })
     expect(res.statusCode).toBe(200)
     const items = res.json().items as Array<{ type: string }>
+    expect(items.length).toBeGreaterThan(0)
     expect(items.every((i) => i.type === 'crawler')).toBe(true)
   })
 
   it('200: filter by siteId', async () => {
-    await createCrane(ownerAToken, { model: 'OnSite2-1', siteId: orgASite2Id })
+    await createApprovedCrane(ownerAToken, { model: 'OnSite2-1', siteId: orgASite2Id })
     const res = await handle.app.inject({
       method: 'GET',
       url: `/api/v1/cranes?siteId=${orgASite2Id}&limit=100`,
@@ -412,11 +451,12 @@ describe('GET /api/v1/cranes (list)', () => {
     })
     expect(res.statusCode).toBe(200)
     const items = res.json().items as Array<{ siteId: string | null }>
+    expect(items.length).toBeGreaterThan(0)
     expect(items.every((i) => i.siteId === orgASite2Id)).toBe(true)
   })
 
   it('200: list excludes soft-deleted cranes', async () => {
-    const c = await createCrane(ownerAToken, { model: 'ToDelete' })
+    const c = await createApprovedCrane(ownerAToken, { model: 'ToDelete' })
     const delRes = await handle.app.inject({
       method: 'DELETE',
       url: `/api/v1/cranes/${c.id}`,
@@ -627,7 +667,7 @@ describe('PATCH /api/v1/cranes/:id — CRITICAL cross-tenant on siteId', () => {
 
 describe('POST /api/v1/cranes/:id/{activate,maintenance,retire}', () => {
   it('200: active → maintenance → active (round-trip); audit written', async () => {
-    const c = await createCrane(ownerAToken, { model: 'RoundTrip' })
+    const c = await createApprovedCrane(ownerAToken, { model: 'RoundTrip' })
     const toMaintenance = await handle.app.inject({
       method: 'POST',
       url: `/api/v1/cranes/${c.id}/maintenance`,
@@ -646,7 +686,7 @@ describe('POST /api/v1/cranes/:id/{activate,maintenance,retire}', () => {
   })
 
   it('200: active → retired; audit crane.retire', async () => {
-    const c = await createCrane(ownerAToken, { model: 'Retires' })
+    const c = await createApprovedCrane(ownerAToken, { model: 'Retires' })
     const res = await handle.app.inject({
       method: 'POST',
       url: `/api/v1/cranes/${c.id}/retire`,
@@ -663,7 +703,7 @@ describe('POST /api/v1/cranes/:id/{activate,maintenance,retire}', () => {
   })
 
   it('409: retired → active rejected (retired is terminal)', async () => {
-    const c = await createCrane(ownerAToken, { model: 'StuckRetired' })
+    const c = await createApprovedCrane(ownerAToken, { model: 'StuckRetired' })
     await handle.app.inject({
       method: 'POST',
       url: `/api/v1/cranes/${c.id}/retire`,
@@ -679,7 +719,7 @@ describe('POST /api/v1/cranes/:id/{activate,maintenance,retire}', () => {
   })
 
   it('409: retired → maintenance rejected (terminal)', async () => {
-    const c = await createCrane(ownerAToken, { model: 'NoRepair' })
+    const c = await createApprovedCrane(ownerAToken, { model: 'NoRepair' })
     await handle.app.inject({
       method: 'POST',
       url: `/api/v1/cranes/${c.id}/retire`,
@@ -694,7 +734,7 @@ describe('POST /api/v1/cranes/:id/{activate,maintenance,retire}', () => {
   })
 
   it('200: idempotent — double-retire does not duplicate audit', async () => {
-    const c = await createCrane(ownerAToken, { model: 'DoubleRetire' })
+    const c = await createApprovedCrane(ownerAToken, { model: 'DoubleRetire' })
     await handle.app.inject({
       method: 'POST',
       url: `/api/v1/cranes/${c.id}/retire`,
@@ -851,5 +891,412 @@ describe('Data layer guarantees', () => {
       headers: { authorization: `Bearer ${ownerAToken}` },
     })
     expect(res.json().capacityTon).toBe(12.75)
+  })
+})
+
+/**
+ * Holding-approval workflow (ADR 0002). После B2c owner создаёт кран только
+ * как pending; approve/reject делает holding-superadmin. Тесты покрывают:
+ *   - RBAC на approve/reject (только superadmin; owner/operator — 403);
+ *   - идемпотентность / race-protection: approve approved/rejected → 409;
+ *   - operational операции на не-approved кранах — 409 с объясняющим кодом;
+ *   - list-фильтр по approvalStatus (default approved, all, pending, rejected);
+ *   - cross-tenant: superadmin'овские endpoints сохраняют 404 для
+ *     несуществующих id; owner'у approve/reject выдаёт 403 даже по своей org.
+ */
+describe('Approval workflow — POST /api/v1/cranes/:id/approve', () => {
+  it('200: superadmin approves pending crane; audit crane.approve; approvedAt set', async () => {
+    const c = await createCrane(ownerAToken, { model: 'ApproveMe' })
+
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/approve`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    const json = res.json()
+    expect(json.approvalStatus).toBe('approved')
+    expect(json.approvedAt).toEqual(expect.any(String))
+    expect(json.rejectedAt).toBeNull()
+    expect(json.rejectionReason).toBeNull()
+
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, c.id), eq(auditLog.action, 'crane.approve')))
+    expect(audits).toHaveLength(1)
+    expect(audits[0]?.organizationId).toBe(orgAId)
+  })
+
+  it('409: approving already-approved crane → CRANE_NOT_PENDING', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'DoubleApprove' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/approve`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_NOT_PENDING')
+  })
+
+  it('409: approving rejected crane → CRANE_NOT_PENDING', async () => {
+    const c = await createCrane(ownerAToken, { model: 'RejectedThenApprove' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'no docs' },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/approve`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_NOT_PENDING')
+  })
+
+  it('403: owner cannot approve own crane (holding-approval invariant)', async () => {
+    const c = await createCrane(ownerAToken, { model: 'OwnerApprove' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/approve`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(403)
+    expect(res.json().error.code).toBe('FORBIDDEN')
+  })
+
+  it('403: operator cannot approve', async () => {
+    const c = await createCrane(ownerAToken, { model: 'OperatorApprove' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/approve`,
+      headers: { authorization: `Bearer ${operatorAToken}` },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('401: unauthenticated approve rejected', async () => {
+    const c = await createCrane(ownerAToken, { model: 'NoAuthApprove' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/approve`,
+    })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it('404: superadmin approve nonexistent id', async () => {
+    const fakeId = '00000000-0000-0000-0000-000000000000'
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${fakeId}/approve`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error.code).toBe('CRANE_NOT_FOUND')
+  })
+})
+
+describe('Approval workflow — POST /api/v1/cranes/:id/reject', () => {
+  it('200: superadmin rejects pending crane with reason; audit crane.reject; rejectedAt+reason set', async () => {
+    const c = await createCrane(ownerAToken, { model: 'RejectMe' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'Документы не соответствуют' },
+    })
+    expect(res.statusCode).toBe(200)
+    const json = res.json()
+    expect(json.approvalStatus).toBe('rejected')
+    expect(json.rejectedAt).toEqual(expect.any(String))
+    expect(json.rejectionReason).toBe('Документы не соответствуют')
+    expect(json.approvedAt).toBeNull()
+
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, c.id), eq(auditLog.action, 'crane.reject')))
+    expect(audits).toHaveLength(1)
+    expect(audits[0]?.organizationId).toBe(orgAId)
+  })
+
+  it('422: reject without reason rejected by Zod', async () => {
+    const c = await createCrane(ownerAToken, { model: 'RejectNoReason' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: {},
+    })
+    expect(res.statusCode).toBe(422)
+  })
+
+  it('422: reject with empty-string reason rejected by Zod', async () => {
+    const c = await createCrane(ownerAToken, { model: 'RejectEmptyReason' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: '   ' },
+    })
+    expect(res.statusCode).toBe(422)
+  })
+
+  it('409: rejecting approved crane → CRANE_NOT_PENDING', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'RejectApproved' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'too late' },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_NOT_PENDING')
+  })
+
+  it('409: rejecting already-rejected crane → CRANE_NOT_PENDING', async () => {
+    const c = await createCrane(ownerAToken, { model: 'DoubleReject' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'first' },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'second' },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_NOT_PENDING')
+  })
+
+  it('403: owner cannot reject', async () => {
+    const c = await createCrane(ownerAToken, { model: 'OwnerReject' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { reason: 'self-reject' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('401: unauthenticated reject', async () => {
+    const c = await createCrane(ownerAToken, { model: 'NoAuthReject' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      payload: { reason: 'x' },
+    })
+    expect(res.statusCode).toBe(401)
+  })
+})
+
+describe('Approval workflow — operational gating on pending/rejected', () => {
+  it('409: status-transition on pending crane → CRANE_NOT_APPROVED', async () => {
+    const c = await createCrane(ownerAToken, { model: 'PendingMaint' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/maintenance`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_NOT_APPROVED')
+  })
+
+  it('409: status-transition on rejected crane → CRANE_REJECTED_READONLY', async () => {
+    const c = await createCrane(ownerAToken, { model: 'RejectedMaint' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'bad' },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/maintenance`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_REJECTED_READONLY')
+  })
+
+  it('409: update on rejected crane → CRANE_REJECTED_READONLY', async () => {
+    const c = await createCrane(ownerAToken, { model: 'RejectedPatch' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'bad' },
+    })
+    const res = await handle.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/cranes/${c.id}`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { model: 'TryRename' },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_REJECTED_READONLY')
+  })
+
+  it('200: update on pending crane is allowed (fix before approval)', async () => {
+    const c = await createCrane(ownerAToken, { model: 'PendingFixable' })
+    const res = await handle.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/cranes/${c.id}`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { model: 'PendingFixed' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().model).toBe('PendingFixed')
+    expect(res.json().approvalStatus).toBe('pending')
+  })
+
+  it('200: delete on pending crane is allowed', async () => {
+    const c = await createCrane(ownerAToken, { model: 'PendingDelete' })
+    const res = await handle.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/cranes/${c.id}`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().deletedAt).toEqual(expect.any(String))
+  })
+
+  it('200: delete on rejected crane is allowed (cleanup path)', async () => {
+    const c = await createCrane(ownerAToken, { model: 'RejectedDelete' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'drop' },
+    })
+    const res = await handle.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/cranes/${c.id}`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+  })
+})
+
+describe('Approval workflow — list filtering by approvalStatus', () => {
+  it("owner default list excludes pending (approvalStatus='approved' is default)", async () => {
+    const pending = await createCrane(ownerAToken, { model: 'DefaultListPending' })
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/cranes?limit=100',
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const ids = (res.json().items as Array<{ id: string }>).map((i) => i.id)
+    expect(ids).not.toContain(pending.id)
+  })
+
+  it('owner ?approvalStatus=pending shows own pending cranes', async () => {
+    const pending = await createCrane(ownerAToken, { model: 'FilterPending' })
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/cranes?approvalStatus=pending&limit=100',
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    const items = res.json().items as Array<{ id: string; approvalStatus: string }>
+    const found = items.find((i) => i.id === pending.id)
+    expect(found?.approvalStatus).toBe('pending')
+    // и все показанные — pending (режим фильтрации строгий)
+    expect(items.every((i) => i.approvalStatus === 'pending')).toBe(true)
+  })
+
+  it('owner ?approvalStatus=rejected shows own rejected cranes', async () => {
+    const crane = await createCrane(ownerAToken, { model: 'FilterRejected' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${crane.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'for filter test' },
+    })
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/cranes?approvalStatus=rejected&limit=100',
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    const items = res.json().items as Array<{ id: string; approvalStatus: string }>
+    expect(items.some((i) => i.id === crane.id)).toBe(true)
+    expect(items.every((i) => i.approvalStatus === 'rejected')).toBe(true)
+  })
+
+  it('owner ?approvalStatus=all shows pending + approved + rejected (minus soft-deleted)', async () => {
+    const pending = await createCrane(ownerAToken, { model: 'AllPending' })
+    const approved = await createApprovedCrane(ownerAToken, { model: 'AllApproved' })
+    const rejected = await createCrane(ownerAToken, { model: 'AllRejected' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${rejected.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'for all-filter' },
+    })
+
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/cranes?approvalStatus=all&limit=100',
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    const ids = (res.json().items as Array<{ id: string }>).map((i) => i.id)
+    expect(ids).toContain(pending.id)
+    expect(ids).toContain(approved.id)
+    expect(ids).toContain(rejected.id)
+  })
+
+  it('superadmin ?approvalStatus=pending shows pending globally (approval queue)', async () => {
+    const pA = await createCrane(ownerAToken, { model: 'QueueA' })
+    const pB = await createCrane(ownerBToken, { model: 'QueueB' })
+
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/cranes?approvalStatus=pending&limit=100',
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    const items = res.json().items as Array<{ id: string; organizationId: string }>
+    const ids = items.map((i) => i.id)
+    expect(ids).toContain(pA.id)
+    expect(ids).toContain(pB.id)
+    const orgs = new Set(items.map((i) => i.organizationId))
+    expect(orgs.size).toBeGreaterThanOrEqual(2)
+  })
+
+  it('owner cannot see FOREIGN pending via ?approvalStatus=pending (tenant scope)', async () => {
+    const foreign = await createCrane(ownerBToken, { model: 'ForeignPending' })
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/cranes?approvalStatus=pending&limit=100',
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const ids = (res.json().items as Array<{ id: string }>).map((i) => i.id)
+    expect(ids).not.toContain(foreign.id)
+  })
+})
+
+describe('Approval workflow — cross-tenant and hiding', () => {
+  it('404: superadmin approve on soft-deleted crane hidden', async () => {
+    const c = await createCrane(ownerAToken, { model: 'DeletedThenApprove' })
+    await handle.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/cranes/${c.id}`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/approve`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error.code).toBe('CRANE_NOT_FOUND')
   })
 })
