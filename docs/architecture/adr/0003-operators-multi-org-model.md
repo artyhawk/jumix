@@ -170,8 +170,8 @@ deprecate'ится в пользу явного `findMembershipsByUserId` + `X-O
 
 ### Прогресс split'а (B2d-2a → B2d-2b)
 
-**B2d-2a** (текущий коммит) — выносит `crane-profile/` как отдельный модуль и
-поднимает плагин `organization-context`:
+**B2d-2a** (предыдущий коммит) — выносит `crane-profile/` как отдельный модуль
+и поднимает плагин `organization-context`:
 
 - `apps/api/src/modules/crane-profile/` — platform-level CRUD
   (`/api/v1/crane-profiles`) + self-endpoints (`/me`, `/me/avatar/*`,
@@ -181,25 +181,33 @@ deprecate'ится в пользу явного `findMembershipsByUserId` + `X-O
   operator'а в активный `organization_operators` row, прикрепляет
   `request.organizationContext = { organizationOperator, craneProfile }`.
   Error matrix — см. [authorization.md §4.2c](../authorization.md#42c-multi-org-operator-model-adr-0003).
-- Operator-модуль сокращён до admin-hire-surface: POST/GET/PATCH/DELETE
-  `:id` + PATCH `:id/status`. Self-endpoints удалены. POST
-  `/api/v1/operators` всё ещё создаёт обе строки сразу `approved` (compat shim
-  остаётся).
-- `OperatorRepository` урезан: `findByUserId` / `updateSelfFields` /
-  `setAvatarKey` / `clearAvatarKey` удалены (эти responsibility'и ушли в
-  `CraneProfileRepository`).
 
-**B2d-2b** (следующий коммит) — переименование operator-модуля в
-organization-operator + approve/reject pipeline 2:
+**B2d-2b** (текущий коммит) — переименование operator-модуля в
+`organization-operator/` + approve/reject pipeline 2 + удаление compat-shim:
 
-- `operator/` → `organization-operator/`, DTO-поля выравниваются с
-  `organization_operators` (id теперь hireId всегда, craneProfileId отдельно).
-- POST `/api/v1/organization-operators/:id/approve` + `.../:id/reject` —
-  superadmin-only, по паттерну § 4.2b.
-- Admin-create (owner): `POST /api/v1/organization-operators` перестаёт
-  делать сразу approved, переходит на pending; профиль тоже pending если
-  приглашается новый человек (B2d-3 добавит public SMS registration
-  оператором самостоятельно). Compat shim в `createUserAndOperator` уходит.
+- `apps/api/src/modules/operator/` → `apps/api/src/modules/organization-operator/`.
+  Классы: `OrganizationOperatorService` / `OrganizationOperatorRepository` /
+  `organizationOperatorPolicy`. URL-префикс: `/api/v1/organization-operators`.
+- **POST hire принимает ТОЛЬКО `{craneProfileId, hiredAt?}`**. Identity
+  (phone/firstName/lastName/iin/specialization) больше не принимается —
+  профиль должен уже существовать и быть approved (pipeline 1).
+  Compat-shim `createUserAndOperator` удалён полностью.
+- **Approval pipeline 2 активен**: POST создаёт pending
+  organization_operator; superadmin апрувит через
+  `POST /:id/approve` или отклоняет через `POST /:id/reject` с `reason`
+  (superadmin-only, ADR 0002 holding-approval invariant).
+- Rejected hire — read-only (delete разрешён для cleanup). Update/changeStatus
+  pending hire → 409 `ORGANIZATION_OPERATOR_NOT_APPROVED`; rejected → 409
+  `ORGANIZATION_OPERATOR_REJECTED_READONLY`. См. authorization.md §4.2b/§4.2c.
+- **softDelete затрагивает ТОЛЬКО organization_operator**. crane_profile
+  остаётся жить — тот же человек может быть перенанят сюда же (после
+  освобождения UNIQUE-слота) или в другую дочку.
+- **DTO отдаёт nested `craneProfile`** (id, userId, firstName, lastName,
+  patronymic, iin, avatarUrl, approvalStatus) для list + detail —
+  экономит N+1 запрос UI. Detail endpoint дополнительно возвращает
+  `craneProfile.phone` (masked); в списке phone отсутствует.
+- Audit action'ы: `organization_operator.submit` / `.approve` / `.reject` /
+  `.update` / `.activate` / `.block` / `.terminate` / `.delete`.
 
 ## Альтернативы которые рассматривали
 
@@ -252,8 +260,8 @@ identity, per-request org context через header.
 - B2d-1 — breaking change на JWT / AuthContext / API. Mobile app при
   обновлении должен re-login (старые operator JWT имеют org, новые — нет).
   Для B2b-dev это OK (mobile ещё не задеплоен).
-- Compat shim в OperatorRepository — временная сложность. Ликвидируется
-  в B2d-2.
+- ~~Compat shim в OperatorRepository — временная сложность. Ликвидируется
+  в B2d-2.~~ **Ликвидирован в B2d-2b** (этот commit).
 - Per-org запросы operator'а требуют `X-Organization-Id` header. Middleware
   валидации на B2d-2.
 - Возрастает количество миграций backfill'а если данные приедут от заказчика

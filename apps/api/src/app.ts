@@ -8,7 +8,7 @@ import type { Env } from './config/env'
 import authPlugin from './modules/auth/auth.plugin'
 import craneProfilePlugin from './modules/crane-profile/crane-profile.plugin'
 import cranePlugin from './modules/crane/crane.plugin'
-import operatorPlugin from './modules/operator/operator.plugin'
+import organizationOperatorPlugin from './modules/organization-operator/organization-operator.plugin'
 import organizationPlugin from './modules/organization/organization.plugin'
 import sitePlugin from './modules/site/site.plugin'
 import authenticatePlugin from './plugins/authenticate'
@@ -72,7 +72,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(sitePlugin)
   await app.register(cranePlugin)
   await app.register(craneProfilePlugin)
-  await app.register(operatorPlugin)
+  await app.register(organizationOperatorPlugin)
 
   return app
 }

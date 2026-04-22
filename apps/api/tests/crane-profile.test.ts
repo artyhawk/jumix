@@ -83,9 +83,10 @@ function nextPhone(): string {
 }
 
 /**
- * Создаёт operator hire через admin-create POST /api/v1/operators (owner path).
- * Возвращает hire id + profile id (JOIN через users.id → crane_profiles.user_id).
- * Обе строки create'ом помечаются approved (B2d-2a compat-shim).
+ * Создаёт approved crane_profile + approved hire в orgA через полный pipeline
+ * ADR 0003: user → pending profile → profile approve (superadmin) → pending
+ * hire (POST /api/v1/organization-operators owner'ом) → hire approve (superadmin).
+ * Возвращает hire id + profile id + user id.
  */
 async function createApprovedPair(overrides: { firstName?: string } = {}): Promise<{
   operatorId: string
@@ -96,30 +97,58 @@ async function createApprovedPair(overrides: { firstName?: string } = {}): Promi
 }> {
   const iinValue = iin(seq * 1000)
   const phoneValue = nextPhone()
-  const res = await handle.app.inject({
-    method: 'POST',
-    url: '/api/v1/operators',
-    headers: { authorization: `Bearer ${ownerAToken}` },
-    payload: {
-      phone: phoneValue,
+  const user = await createUser(handle.app, {
+    role: 'operator',
+    phone: phoneValue,
+    organizationId: orgAId,
+    name: overrides.firstName ?? 'Ivan',
+  })
+  const cpRows = await handle.app.db.db
+    .insert(craneProfiles)
+    .values({
+      userId: user.id,
       firstName: overrides.firstName ?? 'Иван',
       lastName: 'Петров',
       iin: iinValue,
-    },
-  })
-  if (res.statusCode !== 201) throw new Error(`operator create: ${res.statusCode} ${res.body}`)
-  const json = res.json() as { id: string; userId: string }
-  const cpRows = await handle.app.db.db
-    .select({ id: craneProfiles.id })
-    .from(craneProfiles)
-    .where(eq(craneProfiles.userId, json.userId))
-    .limit(1)
+      approvalStatus: 'pending',
+    })
+    .returning({ id: craneProfiles.id })
   const craneProfileId = cpRows[0]?.id
-  if (!craneProfileId) throw new Error('crane_profile not found after create')
+  if (!craneProfileId) throw new Error('crane_profile insert failed')
+
+  const approveProfile = await handle.app.inject({
+    method: 'POST',
+    url: `/api/v1/crane-profiles/${craneProfileId}/approve`,
+    headers: { authorization: `Bearer ${superadminToken}` },
+  })
+  if (approveProfile.statusCode !== 200) {
+    throw new Error(`profile approve: ${approveProfile.statusCode} ${approveProfile.body}`)
+  }
+
+  const hireRes = await handle.app.inject({
+    method: 'POST',
+    url: '/api/v1/organization-operators',
+    headers: { authorization: `Bearer ${ownerAToken}` },
+    payload: { craneProfileId },
+  })
+  if (hireRes.statusCode !== 201) {
+    throw new Error(`hire create: ${hireRes.statusCode} ${hireRes.body}`)
+  }
+  const hire = hireRes.json() as { id: string }
+
+  const approveHire = await handle.app.inject({
+    method: 'POST',
+    url: `/api/v1/organization-operators/${hire.id}/approve`,
+    headers: { authorization: `Bearer ${superadminToken}` },
+  })
+  if (approveHire.statusCode !== 200) {
+    throw new Error(`hire approve: ${approveHire.statusCode} ${approveHire.body}`)
+  }
+
   return {
-    operatorId: json.id,
+    operatorId: hire.id,
     craneProfileId,
-    userId: json.userId,
+    userId: user.id,
     phone: phoneValue,
     iin: iinValue,
   }
@@ -199,7 +228,7 @@ describe('GET /api/v1/crane-profiles/me', () => {
     const pair = await createApprovedPair()
     await handle.app.inject({
       method: 'PATCH',
-      url: `/api/v1/operators/${pair.operatorId}/status`,
+      url: `/api/v1/organization-operators/${pair.operatorId}/status`,
       headers: { authorization: `Bearer ${ownerAToken}` },
       payload: { status: 'blocked' },
     })
@@ -308,7 +337,7 @@ describe('PATCH /api/v1/crane-profiles/me (self update)', () => {
     const pair = await createApprovedPair()
     await handle.app.inject({
       method: 'PATCH',
-      url: `/api/v1/operators/${pair.operatorId}/status`,
+      url: `/api/v1/organization-operators/${pair.operatorId}/status`,
       headers: { authorization: `Bearer ${ownerAToken}` },
       payload: { status: 'blocked' },
     })

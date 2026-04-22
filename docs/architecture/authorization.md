@@ -91,6 +91,12 @@ status:          'active' | 'maintenance' | 'retired'   ← operational
 
 **Индексы:** partial index для hot-path очереди `WHERE approval_status = 'pending' AND deleted_at IS NULL`; существующие operational индексы (например «какие краны на site'е») дополняются условием `approval_status = 'approved'`, чтобы в индексе не сидели pending/rejected записи.
 
+**Reference implementations:**
+
+- `apps/api/src/modules/crane/` (ADR 0002) — прямое применение паттерна для кранов.
+- `apps/api/src/modules/crane-profile/` (ADR 0003 pipeline 1) — платформенный approval identity.
+- `apps/api/src/modules/organization-operator/` (ADR 0003 pipeline 2) — per-org hire approval. Коды ошибок: `ORGANIZATION_OPERATOR_NOT_PENDING` / `ORGANIZATION_OPERATOR_NOT_APPROVED` / `ORGANIZATION_OPERATOR_REJECTED_READONLY` (специализация `ENTITY_*` из таблицы выше).
+
 ## 4.2c Multi-org operator model (ADR 0003)
 
 Один человек-крановщик может работать в нескольких дочках холдинга. Для этого identity + membership разделены на две таблицы — **holding-approval в two-pipeline форме** (ADR [0003](adr/0003-operators-multi-org-model.md)):
@@ -107,9 +113,9 @@ status:          'active' | 'maintenance' | 'retired'   ← operational
 - Per-org операции operator'а (выбор конкретной дочки, смен, баланса) идут через `X-Organization-Id` header. Plugin `organization-context` (B2d-2a) декорирует `app.requireOrganizationContext`: preHandler резолвит header в `organization_operators.id` для crane_profile текущего `ctx.userId` и проверяет `approval_status='approved' AND status<>'terminated' AND deleted_at IS NULL AND crane_profiles.deleted_at IS NULL`. Error matrix: без header'а → 400 `ORGANIZATION_HEADER_REQUIRED`; header не UUID → 400 `ORGANIZATION_HEADER_INVALID`; role≠operator → 403 `ORGANIZATION_CONTEXT_OPERATOR_ONLY`; нет активного найма → 403 `ORGANIZATION_MEMBERSHIP_NOT_FOUND`. На успехе вешает `request.organizationContext = { organizationOperator, craneProfile }`.
 - `sameOrganization(ctx, orgId)` для operator'а теперь **всегда `false`** (нет «той же» org без выбора). `tenantListScope` для operator → `{ type: 'by_crane_profile', userId }`.
 
-**Compat-shim (B2d-1 + B2d-2a):** `OperatorRepository` отдаёт legacy `Operator` shape (единая плоская запись) INNER-JOIN'ом между `organization_operators` и `crane_profiles`. Id в hydrated-форме — это `organization_operators.id` (preserved из `operators.id` через миграцию 0007 → audit-log continuity). POST `/api/v1/operators` (admin-create, B2d-2a) создаёт обе строки сразу `approved`. Реальный approval-workflow поверх профилей и найма — B2d-3.
+**B2d-2a splits:** self-endpoints (`/me`, `/me/avatar/*`) + platform admin (list/get/update/delete/approve/reject crane-profile) переехали в отдельный модуль `apps/api/src/modules/crane-profile/` с маршрутами `/api/v1/crane-profiles/*` (pipeline 1).
 
-**B2d-2a splits:** self-endpoints (`/me`, `/me/avatar/*`) + platform admin (list/get/update/delete/approve/reject crane-profile) переехали в отдельный модуль `apps/api/src/modules/crane-profile/` с маршрутами `/api/v1/crane-profiles/*`. Operator-модуль (`/api/v1/operators/*`) сокращён до hire-admin-surface (POST/GET/PATCH/DELETE /:id + /:id/status). B2d-2b переименует operator-модуль в organization-operator и добавит approve/reject hire.
+**B2d-2b complete (текущий коммит):** operator-модуль переименован в `organization-operator/`, маршруты — `/api/v1/organization-operators/*`. Admin-surface: POST/GET/PATCH/DELETE `/:id` + PATCH `/:id/status` + **POST `/:id/approve` + POST `/:id/reject`** (pipeline 2, superadmin-only). POST hire принимает только `{craneProfileId, hiredAt?}` — identity должна уже существовать и быть approved на уровне платформы; создаётся pending `organization_operator`. `softDelete` затрагивает только hire-запись (identity на crane_profile сохраняется — тот же человек может быть перенанят в эту же или другую дочку). Compat-shim `createUserAndOperator` удалён, hydrated shape теперь `{ hire: OrganizationOperator, profile: CraneProfile }`, DTO отдаёт `craneProfile` nested'ом (id, userId, firstName, lastName, patronymic, iin, avatarUrl, approvalStatus) для list + detail; phone (masked) — только в detail endpoint.
 
 **Layer 3: Repository с обязательным AuthContext**
 

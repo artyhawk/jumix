@@ -140,26 +140,11 @@
 
 ## Operators (from B2b)
 
-### B2d-2: `X-Organization-Id` header for operator per-org actions
+### B2d-2a / B2d-2b — РЕШЕНО (см. ADR 0003 «Прогресс split'а»)
 
-B2d-1 раздробил операторов на `crane_profiles` + `organization_operators` и убрал `organizationId` из operator JWT. Per-org операции operator'а (смены в конкретной дочке, баланс, документы) требуют явного выбора дочки — по header'у `X-Organization-Id: <org_uuid>`.
+~~`X-Organization-Id` header + real approval workflow для hire~~
 
-Нужен в B2d-2:
-- Middleware resolve'ит header → `organization_operators.id` с проверкой `approval_status='approved' AND status<>'terminated' AND deleted_at IS NULL`. Miss → 400 `ORGANIZATION_CONTEXT_REQUIRED` или 403 `NOT_HIRED_IN_ORGANIZATION`.
-- Добавить `request.operatorOrgCtx?: { organizationOperatorId, organizationId }` поверх `AuthContext`.
-- `findByUserId` в OperatorRepository перестаёт быть «первый живой hire» и начинает выбирать по header'у.
-- Endpoints `/me/shifts`, `/me/balance`, `/me/documents` (B3+) принимают header обязательно; `/me` (профиль) — по-прежнему без header'а (identity live на `crane_profiles`).
-
-Триггер: начало B2d-2 (сразу после B2d-1).
-
-### B2d-3: crane_profile approval workflow + hire-request
-
-B2d-1 создаёт обе approval-строки `approved` через compat-shim. Real approval-flow (ADR 0003):
-- `POST /crane-profiles` (owner) → создаёт pending `crane_profiles`. Holdingsuperadmin approve'ит через `/crane-profiles/:id/approve`.
-- `POST /organizations/:id/operators/hire` с `{ craneProfileId }` → создаёт pending `organization_operators`. Superadmin approve'ит через `/organizations/:id/operators/:hireId/approve`.
-- Existing `/operators` endpoint либо редиректит на новый flow, либо удаляется в B2d-3 вместе с compat-shim'ом.
-
-Триггер: B2d-3 — реальный approval UX для холдинга.
+B2d-2a отгрузил plugin `organization-context` (header → `request.organizationContext` с approval/status-гейтом). B2d-2b переименовал `operator/` → `organization-operator/`, убрал compat-shim `createUserAndOperator` и развернул pipeline 2: POST hire принимает только `{craneProfileId, hiredAt?}` и создаёт **pending** hire; `POST /:id/approve` / `POST /:id/reject` (superadmin-only) завершают pайплайн. `canChangeStatus` требует `approval_status='approved'` (ENTITY_NOT_APPROVED / ENTITY_REJECTED_READONLY специализированы как `ORGANIZATION_OPERATOR_*`). Оба approval-pipeline'а (profile + hire) работают по § 4.2b. Вопрос закрыт.
 
 ### Operator transfer between organizations — РЕШЕНО B2d-1
 

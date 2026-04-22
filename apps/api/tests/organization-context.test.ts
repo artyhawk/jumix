@@ -118,9 +118,10 @@ function iin(seed: number): string {
  * в указанной организации. Статус hire задаётся параметрами. Возвращает
  * bearer token + ключевые id, нужные для assertions.
  *
- * Создаём НАПРЯМУЮ в БД (без POST /api/v1/operators), потому что нам нужен
- * контроль над approval_status / status / deleted_at hire-строки — admin-create
- * в B2d-2a всегда делает approved/active.
+ * Создаём НАПРЯМУЮ в БД (без POST /api/v1/organization-operators), потому что
+ * нам нужен контроль над approval_status / status / deleted_at hire-строки:
+ * API hire-эндпоинт всегда создаёт pending, а profile-approve живёт отдельным
+ * workflow'ом (ADR 0003 pipeline 2).
  */
 async function createOperatorWithHire(opts: {
   organizationId: string
