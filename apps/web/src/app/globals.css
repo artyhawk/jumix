@@ -1,0 +1,262 @@
+@import "tailwindcss";
+
+/* Переменные дизайн-системы — single source of truth. См. docs/architecture/design-system.md §8. */
+@theme inline {
+  /* === Surfaces (multi-layer dark palette) === */
+  --color-layer-0: #0a0a0b;
+  --color-layer-1: #111113;
+  --color-layer-2: #18181b;
+  --color-layer-3: #1f1f23;
+  --color-layer-4: #27272a;
+
+  /* === Borders === */
+  --color-border-subtle: #27272a;
+  --color-border-default: #2e2e33;
+  --color-border-strong: #3f3f46;
+
+  /* === Text === */
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #a1a1aa;
+  --color-text-tertiary: #71717a;
+  --color-text-disabled: #52525b;
+
+  /* === Brand orange — правило 2-5% экрана (design-system §8.2) === */
+  --color-brand-50: #fef1e6;
+  --color-brand-100: #fddbbe;
+  --color-brand-200: #fcba83;
+  --color-brand-300: #fa9947;
+  --color-brand-400: #fa8b2e;
+  --color-brand-500: #f97b10; /* base — CTA, active sidebar, focus */
+  --color-brand-600: #e06a06; /* pressed */
+  --color-brand-700: #bd5905;
+  --color-brand-800: #954604;
+  --color-brand-900: #723603;
+
+  /* === Semantic === */
+  --color-success: #10b981;
+  --color-warning: #eab308; /* yellow — НЕ orange чтобы не путалось с brand */
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+  --color-neutral: #71717a;
+
+  /* === Fonts — подхватываются из next/font var'ов (см. layout.tsx) === */
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-mono-jetbrains), ui-monospace, "SFMono-Regular", "Menlo", monospace;
+
+  /* === Radius === */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
+
+/* === Base (layer 1) === */
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    background: var(--color-layer-0);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01", "ss03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border-subtle);
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-brand-500) 35%, transparent);
+    color: var(--color-text-primary);
+  }
+
+  /* Scrollbar (dark) */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-default);
+    border-radius: 10px;
+    border: 2px solid var(--color-layer-0);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-strong);
+  }
+
+  /* Убираем authofill жёлтый фон в Chrome */
+  input:-webkit-autofill {
+    -webkit-text-fill-color: var(--color-text-primary);
+    -webkit-box-shadow: 0 0 0 1000px var(--color-layer-1) inset;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+}
+
+/* === Utilities (layer 3) === */
+@layer utilities {
+  .tabular {
+    font-feature-settings: "tnum" 1;
+  }
+
+  .font-mono-numbers {
+    font-family: var(--font-mono);
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Фоновый сабтл grid для auth-pages */
+  .bg-grid-subtle {
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  /* Skeleton shimmer — 1.8s loop */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(249, 123, 16, 0.06) 50%,
+      transparent 100%
+    );
+    animation: shimmer 1.8s infinite;
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Radix data-state анимации (избегаем tailwindcss-animate — v4 компат проблемы) */
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes zoom-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes zoom-out {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-out-right {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-out-left {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-100%);
+    }
+  }
+
+  [data-state="open"].anim-fade-zoom {
+    animation: zoom-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  [data-state="closed"].anim-fade-zoom {
+    animation: zoom-out 120ms ease-in;
+  }
+  [data-state="open"].anim-fade {
+    animation: fade-in 180ms ease-out;
+  }
+  [data-state="closed"].anim-fade {
+    animation: fade-out 140ms ease-in;
+  }
+  [data-state="open"].anim-slide-right {
+    animation: slide-in-right 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  [data-state="closed"].anim-slide-right {
+    animation: slide-out-right 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  [data-state="open"].anim-slide-left {
+    animation: slide-in-left 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  [data-state="closed"].anim-slide-left {
+    animation: slide-out-left 220ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  /* shake — для auth error states */
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20%,
+    60% {
+      transform: translateX(-4px);
+    }
+    40%,
+    80% {
+      transform: translateX(4px);
+    }
+  }
+  .animate-shake {
+    animation: shake 380ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "common": {
+    "loading": "Загрузка…",
+    "error": "Ошибка",
+    "retry": "Повторить",
+    "cancel": "Отмена",
+    "back": "Назад",
+    "next": "Далее",
+    "save": "Сохранить",
+    "signOut": "Выйти"
+  },
+  "auth": {
+    "login": {
+      "title": "Войти в Jumix",
+      "subtitle": "Введите номер телефона для входа",
+      "phoneLabel": "Номер телефона",
+      "phonePlaceholder": "+7 700 000 00 00",
+      "continue": "Получить код",
+      "or": "или",
+      "usePassword": "Войти по паролю",
+      "useSms": "Войти по SMS-коду",
+      "passwordLabel": "Пароль",
+      "passwordPlaceholder": "Введите пароль",
+      "loginButton": "Войти",
+      "invalidPhone": "Введите корректный номер телефона Казахстана",
+      "invalidCredentials": "Неверный номер или пароль",
+      "rateLimited": "Слишком много попыток. Попробуйте позже.",
+      "accountLocked": "Аккаунт временно заблокирован. Попробуйте через 15 минут.",
+      "genericError": "Не удалось войти. Попробуйте позже.",
+      "footerTerms": "Соглашение",
+      "footerPrivacy": "Конфиденциальность"
+    },
+    "verify": {
+      "title": "Введите код",
+      "subtitle": "Мы отправили 6-значный код на",
+      "codeLabel": "SMS-код",
+      "resendIn": "Повторить код через",
+      "resend": "Отправить ещё раз",
+      "changePhone": "Изменить номер",
+      "invalidCode": "Неверный код",
+      "expiredCode": "Код истёк. Запросите новый.",
+      "maxAttempts": "Превышено число попыток. Запросите новый код.",
+      "requestNew": "Запросить новый код",
+      "userNotRegistered": "Этот номер не зарегистрирован",
+      "genericError": "Не удалось подтвердить код"
+    },
+    "welcome": {
+      "title": "Добро пожаловать, {name}!",
+      "subtitle": "Кабинет {role} будет доступен в следующем релизе.",
+      "superadminNote": "Ваша роль: администратор платформы.",
+      "ownerNote": "Ваша роль: владелец организации.",
+      "operatorNote": "Ваша роль: крановщик."
+    }
+  },
+  "nav": {
+    "sections": {
+      "operations": "Операции",
+      "people": "Люди",
+      "finance": "Финансы",
+      "management": "Управление"
+    },
+    "dashboard": "Обзор",
+    "approvals": "Заявки",
+    "organizations": "Организации",
+    "cranes": "Краны",
+    "craneProfiles": "Крановщики",
+    "operators": "Сотрудники",
+    "myCranes": "Мои краны",
+    "myOperators": "Мои сотрудники",
+    "hireRequests": "Заявки на найм",
+    "sites": "Объекты",
+    "myProfile": "Мой профиль",
+    "license": "Удостоверение",
+    "memberships": "Организации"
+  },
+  "roles": {
+    "superadmin": "Администратор",
+    "owner": "Владелец",
+    "operator": "Крановщик"
+  },
+  "language": {
+    "ru": "Русский",
+    "kz": "Қазақша"
+  }
+}

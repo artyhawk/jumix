@@ -1,0 +1,13 @@
+{
+  "common": {},
+  "auth": {
+    "login": {},
+    "verify": {},
+    "welcome": {}
+  },
+  "nav": {
+    "sections": {}
+  },
+  "roles": {},
+  "language": {}
+}

@@ -351,6 +351,84 @@ MVP: один документ (license). Когда появится второ
 
 ---
 
+## Web (from B3-UI-1)
+
+### Auth-token storage: localStorage → HttpOnly cookies
+
+MVP хранит `{accessToken, refreshToken, accessTokenExpiresAt, refreshTokenExpiresAt, user}` в localStorage через `zustand/persist` (key `jumix-auth`). Это приемлемо для staging + контролируемого пилота, но уязвимо к XSS: любая inject-уязвимость на домене даёт атакующему полный refresh-token.
+
+Миграция — связана с backlog `Auth / Web cookie mode`: как только backend добавит cookie-path для `/auth/*` (CLAUDE.md §5.2), клиент:
+
+- Удаляет `accessToken`/`refreshToken` из persisted state; `fetch` делается с `credentials: 'include'`.
+- Auth store хранит только `user` + derived `isAuthenticated` (проверяется через `GET /auth/me` при старте).
+- Refresh-single-flight остаётся, но без явной передачи токена — сервер ставит новые Set-Cookie.
+
+Триггер: готовность backend cookie-flow.
+
+### Light theme
+
+Сейчас принудительно `className="dark"` в `<html>`. Дизайн-система описывает только dark-палитру. Light-вариант потребует: (а) расширить `@theme inline` в `globals.css` (+ второй набор токенов), (б) ThemeProvider с persisted preference, (в) manual QA всех скринов.
+
+Триггер: реальный запрос от заказчика ИЛИ accessibility-требование.
+
+### KZ locale (полноценный)
+
+`src/messages/kz.json` — placeholder (копия ru). Для полного KZ потребуется: (а) перевод всех strings (native reviewer), (б) locale switcher в topbar + persist, (в) переключение `Intl.*`-форматирования дат/чисел, (г) Accept-Language-based defaulting для unauthenticated-users.
+
+Зависит от backlog `Registration / SMS templates i18n` и `Operators / Preferred language` — единое решение про язык пользователя.
+
+Триггер: Этап 3/4 ИЛИ запрос от заказчика.
+
+### Real-time notifications (WebSocket / SSE)
+
+MVP — polling через React Query `refetchOnWindowFocus`. Для live-карты смен (Этап 2) и push-событий (Этап 4) потребуется двусторонний канал:
+
+- SSE (проще, one-way) — достаточно для большинства «update nudge» кейсов.
+- WebSocket (full-duplex) — если появится чат / real-time collaboration.
+- Fallback на long-polling для клиентов за строгими proxy.
+
+Триггер: Этап 2 — live-карта смен.
+
+### Visual regression tests
+
+Сейчас тесты — unit only (Vitest + Testing Library). Compound UI-регрессии (поломался flex в sidebar, сдвинулся header) проверяются manual smoke. Для долгого lifetime проекта нужен visual snapshot tool:
+
+- **Chromatic** (на базе Storybook) — платный, но де-факто standard.
+- **Playwright + pixelmatch** — бесплатный, требует самостоятельной infrastructure.
+- **Percy / Applitools** — коммерческие альтернативы.
+
+Триггер: > 3 accidental визуальных regression'а за месяц ИЛИ onboarding второго разработчика в UI.
+
+### E2E tests (Playwright)
+
+Unit покрывает компоненты, но не flow (login → verify → dashboard). E2E нужны на happy path: SMS login, password login, forbidden redirect на `/login`, Cmd+K, переключение sidebar ↔ drawer на resize.
+
+Триггер: первая регрессия на auth-flow ИЛИ Этап 2 (shifts UX — больше interactive flow).
+
+### Accessibility audit
+
+WCAG 2.1 AA — цель, но не проверено автоматически. Текущий стек частично покрывает (Radix primitives follow WAI-ARIA), но общая страница не прогонялась через axe/Lighthouse/manual screen-reader.
+
+Post-MVP:
+- `@axe-core/react` в dev-режиме (логи в консоль на каждый render).
+- Lighthouse CI gate на PR'ах.
+- Manual VoiceOver pass по всем screen'ам перед каждым major release.
+
+Триггер: accessibility-требование от заказчика ИЛИ public launch.
+
+### Advanced mobile: offline-режим, install prompt, native share
+
+Веб на мобиле сейчас — just responsive. Для guest-level мобильного UX (суперадмин / owner с телефона) можно улучшить:
+
+- **Service worker** для offline shell + кешированных GET'ов.
+- **PWA install prompt** (`beforeinstallprompt`) с нативной кнопкой «Добавить на домашний экран».
+- **Native share / clipboard integration** — через Web Share API для marketplace-ссылок.
+- **Background sync** — queued mutations когда сеть падает.
+
+Существенное усложнение, не MVP. Триггер: реальные запросы от admin-пользователей на «работу в поле с плохой связью».
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:

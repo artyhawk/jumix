@@ -65,3 +65,6 @@ __pycache__/
 docs/contract/*.docx
 docs/contract/*.pdf
 *.bundle
+
+# Local Claude Code settings + scheduled tasks (per-developer state)
+.claude/
