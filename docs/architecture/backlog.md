@@ -529,6 +529,34 @@ Post-MVP options:
 
 ---
 
+## Web — owner cranes (from B3-UI-3b)
+
+### Server-side crane type filter
+
+`/my-cranes` сейчас делает client-side `all.filter((c) => c.type === type)` после загрузки страницы — на больших парках (200+ кранов) приведёт к фрагментированной пагинации (страница из 20 может схлопнуться в 3 после фильтра). Перенести `type` в `GET /api/v1/cranes` query (тот же паттерн что approval/status). Триггер: jumping pagination на demo'шке заказчика.
+
+### CranesLayer — picker для группы
+
+При нескольких кранах на одном site (group >1) клик по маркеру открывает первый из списка. Корректный UX — picker (popover со списком моделей или mini-list, выбор → drawer на конкретный crane). Backlog до тех пор пока realistic-нагрузка не покажет «у нас по 3-5 кранов на объекте». Альтернатива — вместо одного маркера с badge'ем рисовать N маркеров со спиральным offset (cluster-style); сложнее, но не теряет clickable per-crane.
+
+### CraneDrawer — bulk actions
+
+Сейчас `assign-to-site` / `setStatus` делают per-crane мутации. Backlog: select-multiple на `/my-cranes` (checkbox column в DataTable) + batch endpoints `POST /api/v1/cranes/bulk/{assign,activate,maintenance,retire}` body `{ids[], siteId?}`. Триггер: жалоба заказчика на ручную работу при сезонной перевозке кранов.
+
+### Owner stats — расширение метрик
+
+`OwnerDashboardStats` сейчас содержит `{active:{sites,cranes,memberships}, pending:{cranes,hires}}`. Естественные дополнения по мере появления модулей: `pending.licenseExpiring` (B2d-4 + B3-UI-3c), `monthlyHours` (после shifts/Этап 2), `expensesThisMonth` (после payroll). Каждое расширение — backward-compatible add-only поле (existing UI ignored).
+
+### Owner approve-self — anti-pattern doc
+
+`crane.policy.canApprove` блокирует owner'а одобрять свои же заявки (rule #11 + ADR 0002). Это инвариант холдинговой модели — внешний актор обязателен. Если заказчик попросит «можно я сам себе одобрю краны, для скорости» — отказ + ссылка на ADR 0002. Если заказчик настаивает (один-человек-холдинг кейс) — нужен явный feature flag `org.allow_self_approval = true` через миграцию + аудит-event с особой меткой; **по умолчанию выключено**, ручной enable суперадминистратором.
+
+### CranesLayer — heatmap для retired
+
+При накоплении исторических данных (1+ год эксплуатации) полезно видеть «карту тепла» retired/maintenance кранов — где исторически выходили из строя, что коррелирует с типом грунта/площадки/застройщика. Слой опционально включается через filter chip «История» в `/my-cranes`. Не для MVP — нужны annual-cohort'ы.
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:

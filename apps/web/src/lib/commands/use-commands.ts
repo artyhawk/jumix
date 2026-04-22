@@ -40,6 +40,10 @@ export function useCommands() {
         router.push('/sites?create=true')
         return
       }
+      if (cmd.action === 'create-crane') {
+        router.push('/my-cranes?create=true')
+        return
+      }
     },
     [router, logout],
   )

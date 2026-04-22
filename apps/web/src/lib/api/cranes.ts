@@ -1,5 +1,5 @@
 import { apiFetch } from './client'
-import type { ApprovalFilter, Crane, CraneOperationalStatus, Paginated } from './types'
+import type { ApprovalFilter, Crane, CraneOperationalStatus, CraneType, Paginated } from './types'
 
 export interface ListCranesQuery {
   cursor?: string
@@ -8,6 +8,26 @@ export interface ListCranesQuery {
   approvalStatus?: ApprovalFilter
   status?: CraneOperationalStatus | 'all'
   organizationId?: string
+}
+
+export interface CreateCraneInput {
+  type: CraneType
+  model: string
+  inventoryNumber?: string
+  capacityTon: number
+  boomLengthM?: number
+  yearManufactured?: number
+  notes?: string
+}
+
+export interface UpdateCraneInput {
+  type?: CraneType
+  model?: string
+  inventoryNumber?: string | null
+  capacityTon?: number
+  boomLengthM?: number | null
+  yearManufactured?: number | null
+  notes?: string | null
 }
 
 export function listCranes(query: ListCranesQuery = {}) {
@@ -28,6 +48,14 @@ export function getCrane(id: string) {
   return apiFetch<Crane>(`/api/v1/cranes/${id}`, { method: 'GET' })
 }
 
+export function createCrane(input: CreateCraneInput) {
+  return apiFetch<Crane>('/api/v1/cranes', { method: 'POST', body: input })
+}
+
+export function updateCrane(id: string, patch: UpdateCraneInput) {
+  return apiFetch<Crane>(`/api/v1/cranes/${id}`, { method: 'PATCH', body: patch })
+}
+
 export function approveCrane(id: string) {
   return apiFetch<Crane>(`/api/v1/cranes/${id}/approve`, { method: 'POST' })
 }
@@ -37,4 +65,31 @@ export function rejectCrane(id: string, reason: string) {
     method: 'POST',
     body: { reason },
   })
+}
+
+export function assignCraneToSite(id: string, siteId: string) {
+  return apiFetch<Crane>(`/api/v1/cranes/${id}/assign-site`, {
+    method: 'POST',
+    body: { siteId },
+  })
+}
+
+export function unassignCraneFromSite(id: string) {
+  return apiFetch<Crane>(`/api/v1/cranes/${id}/unassign-site`, { method: 'POST' })
+}
+
+export function activateCrane(id: string) {
+  return apiFetch<Crane>(`/api/v1/cranes/${id}/activate`, { method: 'POST' })
+}
+
+export function setCraneMaintenance(id: string) {
+  return apiFetch<Crane>(`/api/v1/cranes/${id}/maintenance`, { method: 'POST' })
+}
+
+export function retireCrane(id: string) {
+  return apiFetch<Crane>(`/api/v1/cranes/${id}/retire`, { method: 'POST' })
+}
+
+export function resubmitCrane(id: string) {
+  return apiFetch<Crane>(`/api/v1/cranes/${id}/resubmit`, { method: 'POST' })
 }

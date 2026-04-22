@@ -414,6 +414,129 @@ export class CraneService {
     return approved
   }
 
+  /**
+   * Assign approved crane к site. Cross-table tenant validation: и crane, и
+   * site должны принадлежать одной org (checked via resolveSiteForOrg +
+   * policy.canAssignToSite). Идемпотентность: siteId уже равен target →
+   * вернуть existing без audit-записи.
+   */
+  async assignToSite(
+    ctx: AuthContext,
+    id: string,
+    siteId: string,
+    meta: RequestMeta,
+  ): Promise<Crane> {
+    const repo = this.repoFor(ctx)
+    const existing = await repo.findInScope(id)
+    if (!existing) throw craneNotFound()
+
+    if (!cranePolicy.canAssignToSite(ctx, existing)) {
+      if (existing.approvalStatus !== 'approved') {
+        throw conflict(
+          'CRANE_NOT_APPROVED',
+          'Crane must be approved by holding before site assignment',
+        )
+      }
+      throw forbidden('FORBIDDEN', 'Not allowed to assign this crane to a site')
+    }
+
+    const ok = await this.resolveSiteForOrg(ctx, siteId, existing.organizationId)
+    if (!ok) throw siteNotFound()
+
+    if (existing.siteId === siteId) {
+      return existing
+    }
+
+    const updated = await repo.assignSite(id, existing.organizationId, siteId, {
+      actorUserId: ctx.userId,
+      actorRole: ctx.role,
+      ipAddress: meta.ipAddress,
+      metadata: { from: existing.siteId, to: siteId },
+    })
+    if (!updated) {
+      this.logger.error({ id }, 'crane assignSite returned null after successful findInScope')
+      throw craneNotFound()
+    }
+    return updated
+  }
+
+  /** Снять crane с site (siteId → null). Идемпотентно: already-null → return existing. */
+  async unassignFromSite(ctx: AuthContext, id: string, meta: RequestMeta): Promise<Crane> {
+    const repo = this.repoFor(ctx)
+    const existing = await repo.findInScope(id)
+    if (!existing) throw craneNotFound()
+
+    if (!cranePolicy.canAssignToSite(ctx, existing)) {
+      if (existing.approvalStatus !== 'approved') {
+        throw conflict(
+          'CRANE_NOT_APPROVED',
+          'Crane must be approved by holding before site assignment',
+        )
+      }
+      throw forbidden('FORBIDDEN', 'Not allowed to change site assignment of this crane')
+    }
+
+    if (existing.siteId === null) {
+      return existing
+    }
+
+    const updated = await repo.assignSite(id, existing.organizationId, null, {
+      actorUserId: ctx.userId,
+      actorRole: ctx.role,
+      ipAddress: meta.ipAddress,
+      metadata: { from: existing.siteId, to: null },
+    })
+    if (!updated) {
+      this.logger.error({ id }, 'crane unassign returned null after successful findInScope')
+      throw craneNotFound()
+    }
+    return updated
+  }
+
+  /**
+   * Resubmit rejected crane → pending. Владелец пересылает свой же
+   * отклонённый кран на повторное рассмотрение (инвентарный номер и id
+   * сохраняются, rejected-metadata чистится).
+   */
+  async resubmit(ctx: AuthContext, id: string, meta: RequestMeta): Promise<Crane> {
+    const repo = this.repoFor(ctx)
+    const existing = await repo.findInScope(id)
+    if (!existing) throw craneNotFound()
+
+    if (!cranePolicy.canResubmit(ctx, existing)) {
+      if (existing.approvalStatus !== 'rejected') {
+        throw conflict(
+          'CRANE_NOT_REJECTED',
+          `Crane is ${existing.approvalStatus}; only rejected cranes can be resubmitted`,
+        )
+      }
+      throw forbidden('FORBIDDEN', 'Not allowed to resubmit this crane')
+    }
+
+    const updated = await repo.resubmit(id, existing.organizationId, {
+      actorUserId: ctx.userId,
+      actorRole: ctx.role,
+      ipAddress: meta.ipAddress,
+      metadata: {
+        previousRejectionReason: existing.rejectionReason,
+        model: existing.model,
+        inventoryNumber: existing.inventoryNumber,
+      },
+    })
+    if (!updated) {
+      const re = await repo.findAnyById(id)
+      if (re && re.approvalStatus !== 'rejected') {
+        throw conflict(
+          'CRANE_NOT_REJECTED',
+          `Crane is ${re.approvalStatus}; only rejected cranes can be resubmitted`,
+        )
+      }
+      this.logger.error({ id }, 'crane resubmit returned null after rejected state verified')
+      throw craneNotFound()
+    }
+    return updated
+  }
+
   async reject(ctx: AuthContext, id: string, reason: string, meta: RequestMeta): Promise<Crane> {
     if (!cranePolicy.canReject(ctx)) {
       throw forbidden('FORBIDDEN', 'Only superadmin can reject cranes')

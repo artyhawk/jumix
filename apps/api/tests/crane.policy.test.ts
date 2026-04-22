@@ -184,3 +184,40 @@ describe('cranePolicy.canReject', () => {
     expect(cranePolicy.canReject(operatorA)).toBe(false)
   })
 })
+
+describe('cranePolicy.canAssignToSite (approval-gated, B3-UI-3b)', () => {
+  it('superadmin/owner can assign approved crane', () => {
+    expect(cranePolicy.canAssignToSite(superadmin, approvedInOrgA)).toBe(true)
+    expect(cranePolicy.canAssignToSite(ownerA, approvedInOrgA)).toBe(true)
+  })
+  it('owner cannot assign foreign-org approved crane', () => {
+    expect(cranePolicy.canAssignToSite(ownerA, approvedInOrgB)).toBe(false)
+  })
+  it('cannot assign pending or rejected crane (gate closed)', () => {
+    expect(cranePolicy.canAssignToSite(ownerA, pendingInOrgA)).toBe(false)
+    expect(cranePolicy.canAssignToSite(ownerA, rejectedInOrgA)).toBe(false)
+    expect(cranePolicy.canAssignToSite(superadmin, pendingInOrgA)).toBe(false)
+  })
+  it('operator cannot assign', () => {
+    expect(cranePolicy.canAssignToSite(operatorA, approvedInOrgA)).toBe(false)
+  })
+})
+
+describe('cranePolicy.canResubmit (rejected-only, B3-UI-3b)', () => {
+  it('owner can resubmit own-org rejected crane', () => {
+    expect(cranePolicy.canResubmit(ownerA, rejectedInOrgA)).toBe(true)
+  })
+  it('superadmin can resubmit (cleanup)', () => {
+    expect(cranePolicy.canResubmit(superadmin, rejectedInOrgA)).toBe(true)
+  })
+  it('owner cannot resubmit foreign-org crane', () => {
+    expect(cranePolicy.canResubmit(ownerB, rejectedInOrgA)).toBe(false)
+  })
+  it('cannot resubmit pending or approved crane', () => {
+    expect(cranePolicy.canResubmit(ownerA, pendingInOrgA)).toBe(false)
+    expect(cranePolicy.canResubmit(ownerA, approvedInOrgA)).toBe(false)
+  })
+  it('operator cannot resubmit', () => {
+    expect(cranePolicy.canResubmit(operatorA, rejectedInOrgA)).toBe(false)
+  })
+})

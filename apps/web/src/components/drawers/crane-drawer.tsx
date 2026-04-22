@@ -3,6 +3,7 @@
 import { RejectDialog } from '@/components/approvals/reject-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import {
   DrawerBody,
   DrawerContent,
@@ -12,12 +13,29 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAuth } from '@/hooks/use-auth'
 import { isAppError } from '@/lib/api/errors'
-import type { ApprovalStatus, Crane, CraneOperationalStatus, CraneType } from '@/lib/api/types'
+import type {
+  ApprovalStatus,
+  Crane,
+  CraneOperationalStatus,
+  CraneType,
+  Site,
+} from '@/lib/api/types'
 import { formatRelativeTime } from '@/lib/format/time'
-import { useApproveCrane, useCrane } from '@/lib/hooks/use-cranes'
+import {
+  useActivateCrane,
+  useApproveCrane,
+  useAssignCraneToSite,
+  useCrane,
+  useResubmitCrane,
+  useRetireCrane,
+  useSetCraneMaintenance,
+  useUnassignCraneFromSite,
+} from '@/lib/hooks/use-cranes'
+import { useSites } from '@/lib/hooks/use-sites'
 import { IconCrane } from '@tabler/icons-react'
-import { ShieldAlert } from 'lucide-react'
+import { Hammer, Power, RotateCcw, Send, ShieldAlert, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { DetailRow } from './detail-row'
@@ -57,21 +75,43 @@ const OP_STATUS_LABEL: Record<CraneOperationalStatus, string> = {
 }
 
 export function CraneDrawer({ id, onOpenChange }: Props) {
+  const { user } = useAuth()
   const [rejectOpen, setRejectOpen] = useState(false)
+  const [confirmRetire, setConfirmRetire] = useState(false)
+
   const query = useCrane(id)
   const approve = useApproveCrane()
-  const crane = query.data
+  const activate = useActivateCrane()
+  const setMaintenance = useSetCraneMaintenance()
+  const retire = useRetireCrane()
+  const resubmit = useResubmitCrane()
 
-  const handleApprove = async () => {
-    if (!crane) return
+  const crane = query.data
+  const isOwner =
+    user?.role === 'owner' && Boolean(crane) && user.organizationId === crane?.organizationId
+  const isSuperadmin = user?.role === 'superadmin'
+  const canManage = isOwner || isSuperadmin
+
+  const run = async (fn: () => Promise<unknown>, ok: string, fail: string) => {
     try {
-      await approve.mutateAsync(crane.id)
-      toast.success('Кран одобрен')
+      await fn()
+      toast.success(ok)
+      setConfirmRetire(false)
     } catch (err) {
       const message = isAppError(err) ? err.message : 'Попробуйте ещё раз'
-      toast.error('Не удалось одобрить', { description: message })
+      toast.error(fail, { description: message })
     }
   }
+
+  const handleApprove = () =>
+    crane && run(() => approve.mutateAsync(crane.id), 'Кран одобрен', 'Не удалось одобрить')
+
+  const isMutating =
+    approve.isPending ||
+    activate.isPending ||
+    setMaintenance.isPending ||
+    retire.isPending ||
+    resubmit.isPending
 
   return (
     <>
@@ -86,15 +126,16 @@ export function CraneDrawer({ id, onOpenChange }: Props) {
             ) : query.isError ? (
               <CraneDrawerError />
             ) : crane ? (
-              <CraneDrawerBody crane={crane} />
+              <CraneDrawerBody crane={crane} canManage={canManage} />
             ) : null}
           </DrawerBody>
-          {crane?.approvalStatus === 'pending' ? (
+
+          {crane && crane.approvalStatus === 'pending' && isSuperadmin ? (
             <DrawerFooter className="flex-col-reverse md:flex-row">
               <Button
                 variant="ghost"
                 onClick={() => setRejectOpen(true)}
-                disabled={approve.isPending}
+                disabled={isMutating}
                 className="w-full md:w-auto"
               >
                 Отклонить
@@ -107,6 +148,118 @@ export function CraneDrawer({ id, onOpenChange }: Props) {
               >
                 Одобрить
               </Button>
+            </DrawerFooter>
+          ) : crane && crane.approvalStatus === 'rejected' && (isOwner || isSuperadmin) ? (
+            <DrawerFooter>
+              <Button
+                variant="primary"
+                onClick={() =>
+                  run(
+                    () => resubmit.mutateAsync(crane.id),
+                    'Заявка отправлена повторно',
+                    'Не удалось отправить',
+                  )
+                }
+                loading={resubmit.isPending}
+                className="w-full md:w-auto"
+              >
+                <Send className="size-4" strokeWidth={1.5} aria-hidden />
+                Отправить повторно
+              </Button>
+            </DrawerFooter>
+          ) : crane && crane.approvalStatus === 'approved' && canManage ? (
+            <DrawerFooter className="flex-col-reverse md:flex-row">
+              {confirmRetire ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setConfirmRetire(false)}
+                    disabled={isMutating}
+                    className="w-full md:w-auto"
+                  >
+                    Отмена
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() =>
+                      run(() => retire.mutateAsync(crane.id), 'Кран списан', 'Не удалось списать')
+                    }
+                    loading={retire.isPending}
+                    className="w-full md:w-auto"
+                  >
+                    Списать
+                  </Button>
+                </>
+              ) : crane.status === 'active' ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setConfirmRetire(true)}
+                    disabled={isMutating}
+                    className="w-full md:w-auto"
+                  >
+                    <Trash2 className="size-4" strokeWidth={1.5} aria-hidden />
+                    Списать
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() =>
+                      run(
+                        () => setMaintenance.mutateAsync(crane.id),
+                        'Кран отправлен на ремонт',
+                        'Не удалось обновить',
+                      )
+                    }
+                    loading={setMaintenance.isPending}
+                    className="w-full md:w-auto"
+                  >
+                    <Hammer className="size-4" strokeWidth={1.5} aria-hidden />
+                    На ремонт
+                  </Button>
+                </>
+              ) : crane.status === 'maintenance' ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setConfirmRetire(true)}
+                    disabled={isMutating}
+                    className="w-full md:w-auto"
+                  >
+                    <Trash2 className="size-4" strokeWidth={1.5} aria-hidden />
+                    Списать
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() =>
+                      run(
+                        () => activate.mutateAsync(crane.id),
+                        'Кран снова в работе',
+                        'Не удалось активировать',
+                      )
+                    }
+                    loading={activate.isPending}
+                    className="w-full md:w-auto"
+                  >
+                    <Power className="size-4" strokeWidth={1.5} aria-hidden />В работу
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="primary"
+                  onClick={() =>
+                    run(
+                      () => activate.mutateAsync(crane.id),
+                      'Кран восстановлен',
+                      'Не удалось активировать',
+                    )
+                  }
+                  loading={activate.isPending}
+                  className="w-full md:w-auto"
+                >
+                  <RotateCcw className="size-4" strokeWidth={1.5} aria-hidden />
+                  Восстановить
+                </Button>
+              )}
             </DrawerFooter>
           ) : null}
         </DrawerContent>
@@ -125,7 +278,7 @@ export function CraneDrawer({ id, onOpenChange }: Props) {
   )
 }
 
-function CraneDrawerBody({ crane }: { crane: Crane }) {
+function CraneDrawerBody({ crane, canManage }: { crane: Crane; canManage: boolean }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3">
@@ -169,6 +322,52 @@ function CraneDrawerBody({ crane }: { crane: Crane }) {
         {crane.notes ? <DetailRow label="Заметки">{crane.notes}</DetailRow> : null}
         <DetailRow label="Создан">{formatRelativeTime(crane.createdAt)}</DetailRow>
       </dl>
+
+      {crane.approvalStatus === 'approved' && crane.status !== 'retired' && canManage ? (
+        <AssignmentInline crane={crane} />
+      ) : null}
+    </div>
+  )
+}
+
+function AssignmentInline({ crane }: { crane: Crane }) {
+  const sitesQuery = useSites({ status: 'active', limit: 100 })
+  const assign = useAssignCraneToSite()
+  const unassign = useUnassignCraneFromSite()
+
+  const sites: Site[] = sitesQuery.data?.items ?? []
+  const options: ComboboxOption<string>[] = sites.map((s) => ({ value: s.id, label: s.name }))
+  const isPending = assign.isPending || unassign.isPending
+
+  const onChange = async (next: string | null) => {
+    if (next === crane.siteId) return
+    try {
+      if (next === null) {
+        await unassign.mutateAsync(crane.id)
+        toast.success('Кран снят с площадки')
+      } else {
+        await assign.mutateAsync({ id: crane.id, siteId: next })
+        toast.success('Кран привязан к площадке')
+      }
+    } catch (err) {
+      const message = isAppError(err) ? err.message : 'Попробуйте ещё раз'
+      toast.error('Не удалось обновить привязку', { description: message })
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-border-subtle pt-4">
+      <div className="text-xs font-medium uppercase tracking-wide text-text-tertiary">Площадка</div>
+      <Combobox
+        ariaLabel="Площадка крана"
+        value={crane.siteId}
+        onChange={onChange}
+        options={options}
+        placeholder="Не привязан"
+        emptyText={sitesQuery.isPending ? 'Загрузка…' : 'Нет активных объектов'}
+        loading={sitesQuery.isPending}
+        disabled={isPending}
+      />
     </div>
   )
 }

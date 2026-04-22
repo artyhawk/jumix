@@ -385,6 +385,83 @@ export class CraneRepository {
     })
   }
 
+  /**
+   * Assign approved crane к site (siteId set / clear). Отдельный метод вместо
+   * updateFields — отдельный audit action (`crane.assign_to_site` /
+   * `crane.unassign_from_site`) и более явная семантика для UI.
+   */
+  async assignSite(
+    id: string,
+    organizationId: string,
+    siteId: string | null,
+    audit: AuditMeta,
+  ): Promise<Crane | null> {
+    return this.database.db.transaction(async (tx) => {
+      const rows = await tx
+        .update(cranes)
+        .set({ siteId, updatedAt: new Date() })
+        .where(and(eq(cranes.id, id), isNull(cranes.deletedAt)))
+        .returning()
+
+      const row = rows[0]
+      if (!row) return null
+
+      const action = siteId ? 'crane.assign_to_site' : 'crane.unassign_from_site'
+
+      await tx.insert(auditLog).values({
+        actorUserId: audit.actorUserId,
+        actorRole: audit.actorRole,
+        action,
+        targetType: 'crane',
+        targetId: id,
+        organizationId,
+        metadata: audit.metadata,
+        ipAddress: audit.ipAddress,
+      })
+
+      return hydrate(row)
+    })
+  }
+
+  /**
+   * Resubmit rejected crane → pending. Сбрасываем rejected-state (timestamp/
+   * actor/reason → null), preserved id/inventoryNumber. Audit `crane.resubmit`.
+   */
+  async resubmit(id: string, organizationId: string, audit: AuditMeta): Promise<Crane | null> {
+    return this.database.db.transaction(async (tx) => {
+      const now = new Date()
+      const rows = await tx
+        .update(cranes)
+        .set({
+          approvalStatus: 'pending',
+          rejectedByUserId: null,
+          rejectedAt: null,
+          rejectionReason: null,
+          updatedAt: now,
+        })
+        .where(
+          and(eq(cranes.id, id), eq(cranes.approvalStatus, 'rejected'), isNull(cranes.deletedAt)),
+        )
+        .returning()
+
+      const row = rows[0]
+      if (!row) return null
+
+      await tx.insert(auditLog).values({
+        actorUserId: audit.actorUserId,
+        actorRole: audit.actorRole,
+        action: 'crane.resubmit',
+        targetType: 'crane',
+        targetId: id,
+        organizationId,
+        metadata: audit.metadata,
+        ipAddress: audit.ipAddress,
+      })
+
+      return hydrate(row)
+    })
+  }
+
   async reject(
     id: string,
     organizationId: string,

@@ -1300,3 +1300,262 @@ describe('Approval workflow — cross-tenant and hiding', () => {
     expect(res.json().error.code).toBe('CRANE_NOT_FOUND')
   })
 })
+
+/**
+ * B3-UI-3b: assign-site / unassign-site explicit endpoints + audit actions.
+ * Critical: cross-org tenant guard, approved-only gate, idempotency.
+ */
+describe('POST /api/v1/cranes/:id/assign-site', () => {
+  it('200: owner assigns approved crane к own site; audit crane.assign_to_site', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'AssignA' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { siteId: orgASiteId },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().siteId).toBe(orgASiteId)
+
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, c.id), eq(auditLog.action, 'crane.assign_to_site')))
+    expect(audits).toHaveLength(1)
+  })
+
+  it('200: idempotent re-assign к same site — no-op, no audit', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'AssignIdem' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { siteId: orgASiteId },
+    })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { siteId: orgASiteId },
+    })
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, c.id), eq(auditLog.action, 'crane.assign_to_site')))
+    expect(audits).toHaveLength(1)
+  })
+
+  it('200: re-assign к second site (orgASite2Id) updates siteId and writes audit', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'ReAssign' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { siteId: orgASiteId },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { siteId: orgASite2Id },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().siteId).toBe(orgASite2Id)
+  })
+
+  it('404: owner assigns own crane к FOREIGN site (cross-org guard)', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'CrossOrg' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { siteId: orgBSiteId },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error.code).toBe('SITE_NOT_FOUND')
+  })
+
+  it('409: cannot assign pending crane (CRANE_NOT_APPROVED)', async () => {
+    const c = await createCrane(ownerAToken, { model: 'PendingAssign' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { siteId: orgASiteId },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_NOT_APPROVED')
+  })
+
+  it('404: owner assigns FOREIGN crane (tenant scope)', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'ForeignCrane' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerBToken}` },
+      payload: { siteId: orgBSiteId },
+    })
+    expect(res.statusCode).toBe(404)
+    expect(res.json().error.code).toBe('CRANE_NOT_FOUND')
+  })
+
+  it('403: operator cannot assign', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'OperatorAssign' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${operatorAToken}` },
+      payload: { siteId: orgASiteId },
+    })
+    // operator findInScope returns null → 404 (cranes module hides existence)
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('422: missing siteId in body', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'NoBody' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: {},
+    })
+    expect(res.statusCode).toBe(422)
+  })
+})
+
+describe('POST /api/v1/cranes/:id/unassign-site', () => {
+  it('200: owner unassigns own crane; audit crane.unassign_from_site', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'Unassign' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/assign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { siteId: orgASiteId },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/unassign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().siteId).toBeNull()
+
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, c.id), eq(auditLog.action, 'crane.unassign_from_site')))
+    expect(audits).toHaveLength(1)
+  })
+
+  it('200: idempotent unassign on already-null siteId — no audit', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'UnassignIdem' })
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/unassign-site`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, c.id), eq(auditLog.action, 'crane.unassign_from_site')))
+    expect(audits).toHaveLength(0)
+  })
+})
+
+describe('POST /api/v1/cranes/:id/resubmit', () => {
+  async function makeRejected(model: string): Promise<{ id: string }> {
+    const c = await createCrane(ownerAToken, { model })
+    const r = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/reject`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+      payload: { reason: 'because' },
+    })
+    if (r.statusCode !== 200) throw new Error(`reject failed: ${r.statusCode}`)
+    return c
+  }
+
+  it('200: owner resubmits rejected → pending; rejected fields cleared; audit crane.resubmit', async () => {
+    const c = await makeRejected('Resub1')
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/resubmit`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    const json = res.json()
+    expect(json.approvalStatus).toBe('pending')
+    expect(json.rejectedAt).toBeNull()
+    expect(json.rejectionReason).toBeNull()
+
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, c.id), eq(auditLog.action, 'crane.resubmit')))
+    expect(audits).toHaveLength(1)
+  })
+
+  it('200: resubmitted crane re-appears in superadmin pending queue', async () => {
+    const c = await makeRejected('ResubQueue')
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/resubmit`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/cranes?approvalStatus=pending&limit=100',
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    const ids = (res.json().items as Array<{ id: string }>).map((i) => i.id)
+    expect(ids).toContain(c.id)
+  })
+
+  it('200: superadmin can re-approve resubmitted', async () => {
+    const c = await makeRejected('ResubApprove')
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/resubmit`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/approve`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().approvalStatus).toBe('approved')
+  })
+
+  it('409: cannot resubmit approved crane (CRANE_NOT_REJECTED)', async () => {
+    const c = await createApprovedCrane(ownerAToken, { model: 'ResubApproved' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/resubmit`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_NOT_REJECTED')
+  })
+
+  it('409: cannot resubmit pending crane', async () => {
+    const c = await createCrane(ownerAToken, { model: 'ResubPending' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/resubmit`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('CRANE_NOT_REJECTED')
+  })
+
+  it('404: owner of org B cannot resubmit org A crane', async () => {
+    const c = await makeRejected('ResubForeign')
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/cranes/${c.id}/resubmit`,
+      headers: { authorization: `Bearer ${ownerBToken}` },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+})

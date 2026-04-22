@@ -73,4 +73,33 @@ export const cranePolicy = {
    */
   canApprove: (ctx: AuthContext): boolean => ctx.role === 'superadmin',
   canReject: (ctx: AuthContext): boolean => ctx.role === 'superadmin',
+
+  /**
+   * Assign approved crane к site внутри той же organization. Доступно owner'у
+   * своей org; superadmin может для cleanup'а в любой org. Pending/rejected —
+   * gate закрыт (operational операция требует approved).
+   */
+  canAssignToSite: (
+    ctx: AuthContext,
+    crane: Pick<Crane, 'organizationId' | 'approvalStatus'>,
+  ): boolean => {
+    if (crane.approvalStatus !== 'approved') return false
+    if (ctx.role === 'superadmin') return true
+    if (ctx.role === 'owner') return ctx.organizationId === crane.organizationId
+    return false
+  },
+
+  /**
+   * Resubmit rejected crane → pending. Доступно owner'у своей org; superadmin
+   * может для cleanup'а. Approved/pending — без смысла (gate закрыт).
+   */
+  canResubmit: (
+    ctx: AuthContext,
+    crane: Pick<Crane, 'organizationId' | 'approvalStatus'>,
+  ): boolean => {
+    if (crane.approvalStatus !== 'rejected') return false
+    if (ctx.role === 'superadmin') return true
+    if (ctx.role === 'owner') return ctx.organizationId === crane.organizationId
+    return false
+  },
 }

@@ -105,4 +105,13 @@ export const rejectCraneSchema = z.object({
 })
 export type RejectCraneInput = z.infer<typeof rejectCraneSchema>
 
+/**
+ * POST /cranes/:id/assign-site — body {siteId}. Site должен принадлежать той
+ * же org что и crane (cross-table validate в service).
+ */
+export const assignCraneSiteSchema = z.object({
+  siteId: z.string().uuid(),
+})
+export type AssignCraneSiteInput = z.infer<typeof assignCraneSiteSchema>
+
 export { craneApprovalStatusSchema }

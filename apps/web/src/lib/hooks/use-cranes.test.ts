@@ -3,20 +3,61 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Crane, Paginated } from '../api/types'
 import { qk } from '../query-keys'
-import { useApproveCrane, useCranes, useCranesInfinite, useRejectCrane } from './use-cranes'
+import {
+  useActivateCrane,
+  useApproveCrane,
+  useAssignCraneToSite,
+  useCranes,
+  useCranesInfinite,
+  useCreateCrane,
+  useRejectCrane,
+  useResubmitCrane,
+  useRetireCrane,
+  useSetCraneMaintenance,
+  useUnassignCraneFromSite,
+  useUpdateCrane,
+} from './use-cranes'
 
 vi.mock('../api/cranes', () => ({
   listCranes: vi.fn(),
   getCrane: vi.fn(),
   approveCrane: vi.fn(),
   rejectCrane: vi.fn(),
+  createCrane: vi.fn(),
+  updateCrane: vi.fn(),
+  assignCraneToSite: vi.fn(),
+  unassignCraneFromSite: vi.fn(),
+  activateCrane: vi.fn(),
+  setCraneMaintenance: vi.fn(),
+  retireCrane: vi.fn(),
+  resubmitCrane: vi.fn(),
 }))
 
-import { approveCrane, listCranes, rejectCrane } from '../api/cranes'
+import {
+  activateCrane,
+  approveCrane,
+  assignCraneToSite,
+  createCrane,
+  listCranes,
+  rejectCrane,
+  resubmitCrane,
+  retireCrane,
+  setCraneMaintenance,
+  unassignCraneFromSite,
+  updateCrane,
+} from '../api/cranes'
 
 const list = vi.mocked(listCranes)
 const approve = vi.mocked(approveCrane)
 const reject = vi.mocked(rejectCrane)
+const create = vi.mocked(createCrane)
+const update = vi.mocked(updateCrane)
+const assign = vi.mocked(assignCraneToSite)
+const unassign = vi.mocked(unassignCraneFromSite)
+const activate = vi.mocked(activateCrane)
+const maintenance = vi.mocked(setCraneMaintenance)
+const retire = vi.mocked(retireCrane)
+const resubmit = vi.mocked(resubmitCrane)
 
 function makeCrane(id: string, status: Crane['approvalStatus'] = 'pending'): Crane {
   return {
@@ -42,6 +83,14 @@ beforeEach(() => {
   list.mockReset()
   approve.mockReset()
   reject.mockReset()
+  create.mockReset()
+  update.mockReset()
+  assign.mockReset()
+  unassign.mockReset()
+  activate.mockReset()
+  maintenance.mockReset()
+  retire.mockReset()
+  resubmit.mockReset()
 })
 
 describe('useCranes', () => {
@@ -150,5 +199,170 @@ describe('useRejectCrane', () => {
 
     const invalidatedKeys = spy.mock.calls.map((c) => c[0]?.queryKey)
     expect(invalidatedKeys).toEqual(expect.arrayContaining([qk.cranes, qk.dashboard]))
+  })
+})
+
+describe('useCreateCrane', () => {
+  it('sends create payload', async () => {
+    create.mockResolvedValueOnce(makeCrane('c-1'))
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useCreateCrane(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ type: 'tower', model: 'КБ-405', capacityTon: 6 })
+    })
+
+    expect(create).toHaveBeenCalledWith({ type: 'tower', model: 'КБ-405', capacityTon: 6 })
+  })
+
+  it('invalidates cranes + dashboard', async () => {
+    const { client, Wrapper } = createQueryWrapper()
+    const spy = vi.spyOn(client, 'invalidateQueries')
+    create.mockResolvedValueOnce(makeCrane('c-1'))
+    const { result } = renderHook(() => useCreateCrane(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ type: 'tower', model: 'x', capacityTon: 1 })
+    })
+
+    const keys = spy.mock.calls.map((c) => c[0]?.queryKey)
+    expect(keys).toEqual(expect.arrayContaining([qk.cranes, qk.dashboard]))
+  })
+})
+
+describe('useUpdateCrane', () => {
+  it('sends patch payload', async () => {
+    update.mockResolvedValueOnce(makeCrane('c-1'))
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useUpdateCrane(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: 'c-1', patch: { model: 'new-model' } })
+    })
+
+    expect(update).toHaveBeenCalledWith('c-1', { model: 'new-model' })
+  })
+
+  it('invalidates list + detail', async () => {
+    const { client, Wrapper } = createQueryWrapper()
+    const spy = vi.spyOn(client, 'invalidateQueries')
+    update.mockResolvedValueOnce(makeCrane('c-1'))
+    const { result } = renderHook(() => useUpdateCrane(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: 'c-1', patch: { model: 'x' } })
+    })
+
+    const keys = spy.mock.calls.map((c) => c[0]?.queryKey)
+    expect(keys).toEqual(expect.arrayContaining([qk.cranes, qk.craneDetail('c-1')]))
+  })
+})
+
+describe('useAssignCraneToSite', () => {
+  it('sends id + siteId', async () => {
+    assign.mockResolvedValueOnce(makeCrane('c-1'))
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useAssignCraneToSite(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: 'c-1', siteId: 's-42' })
+    })
+
+    expect(assign).toHaveBeenCalledWith('c-1', 's-42')
+  })
+
+  it('invalidates list + detail', async () => {
+    const { client, Wrapper } = createQueryWrapper()
+    const spy = vi.spyOn(client, 'invalidateQueries')
+    assign.mockResolvedValueOnce(makeCrane('c-1'))
+    const { result } = renderHook(() => useAssignCraneToSite(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: 'c-1', siteId: 's-1' })
+    })
+
+    const keys = spy.mock.calls.map((c) => c[0]?.queryKey)
+    expect(keys).toEqual(expect.arrayContaining([qk.cranes, qk.craneDetail('c-1')]))
+  })
+})
+
+describe('useUnassignCraneFromSite', () => {
+  it('sends id', async () => {
+    unassign.mockResolvedValueOnce(makeCrane('c-1'))
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useUnassignCraneFromSite(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync('c-1')
+    })
+
+    expect(unassign).toHaveBeenCalledWith('c-1')
+  })
+})
+
+describe('useActivateCrane / useSetCraneMaintenance / useRetireCrane', () => {
+  it('activate sends id + invalidates dashboard', async () => {
+    activate.mockResolvedValueOnce(makeCrane('c-1'))
+    const { client, Wrapper } = createQueryWrapper()
+    const spy = vi.spyOn(client, 'invalidateQueries')
+    const { result } = renderHook(() => useActivateCrane(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync('c-1')
+    })
+
+    expect(activate).toHaveBeenCalledWith('c-1')
+    const keys = spy.mock.calls.map((c) => c[0]?.queryKey)
+    expect(keys).toEqual(expect.arrayContaining([qk.cranes, qk.dashboard]))
+  })
+
+  it('maintenance sends id', async () => {
+    maintenance.mockResolvedValueOnce(makeCrane('c-1'))
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useSetCraneMaintenance(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync('c-1')
+    })
+    expect(maintenance).toHaveBeenCalledWith('c-1')
+  })
+
+  it('retire sends id', async () => {
+    retire.mockResolvedValueOnce(makeCrane('c-1'))
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useRetireCrane(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync('c-1')
+    })
+    expect(retire).toHaveBeenCalledWith('c-1')
+  })
+})
+
+describe('useResubmitCrane', () => {
+  it('sends id', async () => {
+    resubmit.mockResolvedValueOnce(makeCrane('c-1'))
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useResubmitCrane(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync('c-1')
+    })
+
+    expect(resubmit).toHaveBeenCalledWith('c-1')
+  })
+
+  it('invalidates cranes + detail + dashboard', async () => {
+    const { client, Wrapper } = createQueryWrapper()
+    const spy = vi.spyOn(client, 'invalidateQueries')
+    resubmit.mockResolvedValueOnce(makeCrane('c-1'))
+    const { result } = renderHook(() => useResubmitCrane(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync('c-1')
+    })
+
+    const keys = spy.mock.calls.map((c) => c[0]?.queryKey)
+    expect(keys).toEqual(expect.arrayContaining([qk.cranes, qk.craneDetail('c-1'), qk.dashboard]))
   })
 })

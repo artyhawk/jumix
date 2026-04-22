@@ -670,6 +670,139 @@ vi.mock('@/components/map/map-picker', () => ({ MapPicker: ({onChange}) => <butt
 
 ---
 
+## 12d. Owner cranes + cross-role approval workflow (B3-UI-3b)
+
+Вторая вертикаль owner-кабинета: парк кранов с E2E approval-потоком — owner создаёт pending-заявку, superadmin одобряет на `/approvals?tab=cranes`, после одобрения owner может назначать на свои объекты.
+
+### Backend mutations (ADR 0002 holding-approval)
+
+`crane.policy.ts` (см. authorization.md §4.2b):
+
+- `canApprove` / `canReject` — **только superadmin**. Owner НЕ одобряет свои же заявки (ключевой инвариант холдинга — внешний актор обязателен).
+- `canAssignToSite` / `canChangeStatus` / `canResubmit` — gate `approval_status='approved'` (для resubmit — `'rejected'`); pending/wrong-state → 404 как scope-violation.
+- `canDelete` — все approval-state'ы (для cleanup'а rejected); `canUpdate` — все кроме rejected (read-only).
+
+Service-методы (`crane.service.ts`):
+
+- `assignToSite(ctx, id, siteId)` → валидация same-org + `site.status='active'` → audit `crane.assign_to_site`.
+- `unassignFromSite(ctx, id)` → audit `crane.unassign_from_site`.
+- `resubmit(ctx, id)` → rejected → pending, обнуляет `rejectionReason` → audit `crane.resubmit`.
+- `changeStatus(ctx, id, 'active'|'maintenance'|'retired')` — operational transitions через существующий метод (без изменений).
+
+Routes (`crane.routes.ts`):
+
+```
+POST   /:id/assign-site         body {siteId}; approved + same-org site
+POST   /:id/unassign-site       siteId → null
+POST   /:id/activate            status → active (требует approved)
+POST   /:id/maintenance         status → maintenance (требует approved)
+POST   /:id/retire              status → retired (требует approved)
+POST   /:id/resubmit            rejected → pending (owner own / superadmin)
+```
+
+### Dashboard owner-stats endpoint
+
+`GET /api/v1/dashboard/owner-stats` (owner-only, `dashboardPolicy.canViewOwnerStats`) — отдельный от superadmin'ского `/dashboard/stats`. Сервис `dashboardService.getOwnerStats(ctx)` scoped по `ctx.organizationId` (owner всегда имеет primary org, см. CLAUDE.md rule #13). DTO:
+
+```ts
+type OwnerDashboardStats = {
+  active:  { sites: number; cranes: number; memberships: number }
+  pending: { cranes: number; hires: number }
+}
+```
+
+### Web surface
+
+- **`CreateCraneDialog`** (`components/cranes/create-crane-dialog.tsx`) — одношаговый react-hook-form + zod.
+  - Required: `model` (≤200), `capacityTon` (>0, до 999 999.99, comma-decimal `5,5 → 5.5`).
+  - Optional: `inventoryNumber` (≤100), `boomLengthM` (>0, до 9 999.99, comma-decimal), `yearManufactured` (1900..currentYear), `notes` (≤2000).
+  - `Controller`-wrapped `<select>` для type (4 варианта tower/mobile/crawler/overhead).
+  - Submit success → toast `Заявка отправлена на одобрение / Платформа рассмотрит в течение 1–2 дней`, `reset()` + `onOpenChange(false)`.
+  - Backend error → `toast.error('Не удалось создать', { description: isAppError(err) ? err.message : 'Попробуйте ещё раз' })`.
+
+- **`CraneDrawer`** (`components/drawers/crane-drawer.tsx`) — role-aware footer:
+  - `superadmin && pending` → Approve/Reject (через shared `RejectDialog`).
+  - `(owner|superadmin) && rejected` → «Отправить повторно» (Send icon).
+  - `canManage && approved` → status-specific footer:
+    - `active` → «Списать» (ghost) + «На ремонт» (primary, Hammer icon)
+    - `maintenance` → «Списать» (ghost) + «В работу» (primary, Power icon)
+    - `retired` → «Восстановить» (primary, RotateCcw icon)
+  - **Inline retire confirmation** — `confirmRetire` state flip (НЕ native `confirm()` как у sites): первый клик «Списать» → footer перерисовывается в «Отмена / Списать»; второй клик подтверждает; «Отмена» откатывает state. Pattern масштабируется на любые destructive-actions.
+  - `canManage = (isOwner && user.organizationId === crane.organizationId) || isSuperadmin`.
+
+- **`AssignmentInline`** (внутри `CraneDrawer` body) — `Combobox` (только для approved + status≠retired):
+  - Source: `useSites({ status: 'active', limit: 100 })` — серверная фильтрация по статусу + scope (backend сам ограничит owner'а его org'ом).
+  - `onChange(next)` → если `next === null` → `unassign.mutateAsync(crane.id)`, иначе `assign.mutateAsync({id, siteId: next})`.
+  - Toasts: «Кран привязан к площадке» / «Кран снят с площадки» / «Не удалось обновить привязку».
+
+### `/my-cranes` page
+
+`app/(app)/my-cranes/page.tsx` — owner-only (non-owner → `router.replace('/')` в useEffect, render guard `if (!user || user.role !== 'owner') return null`).
+
+- **FilterBar** — `SearchInput` (debounced 300ms, search by model/inventoryNumber) + `FilterChip`'ы Approval / Type / Status.
+- **URL-state** — `?search/?approval/?type/?status/?open/?create` через `router.replace` (не push).
+- **Backend scoping** — backend сам scopes список по `ctx.organizationId` для role=owner; **`organizationId` в query НЕ передаём** (попытка передачи была бы no-op + потенциальная атака на cross-org enumeration).
+- **Client-side filter по type** — server не фильтрует по `crane.type` на MVP (см. backlog: serverside type filter); делаем `all.filter()` на загруженной странице. Search/approval/status/cursor-pagination — server-side.
+- **Empty state** — context-aware: «Ничего не найдено по фильтрам» если есть фильтры, иначе «У вас пока нет кранов» + CTA «Добавить первый кран» → `setParam('create', 'true')`.
+- **Drawer + Dialog** — `CraneDrawer` (open via `?open`) + `CreateCraneDialog` (open via `?create=true`).
+
+### Map: CranesLayer
+
+`components/map/cranes-layer.tsx` — рендерит cranes **сгруппированными по siteId**:
+
+- Группировка: `Map<siteId, Crane[]>`; cranes без `siteId` («на складе») и cranes с unknown site **не отображаются**.
+- Один маркер на site с count-badge'ем при `length > 1`.
+- Маркер — квадрат (`rounded-[3px] bg-brand-400`), визуально отличается от круглых site-маркеров.
+- Element offset `translate(8px, -8px)` — anchor на правый-верх site-маркера, не перекрывает его.
+- Click → `onCraneClick(list[0])` (открываем первый из группы; на MVP без picker'а для группы — backlog).
+- Пересоздаёт markers при изменении `cranes` или `sites` (full diff cleanup).
+
+### Integration в OwnerDashboard
+
+`OwnerSitesMap` теперь рендерит **два слоя поверх `BaseMap`**:
+
+```tsx
+<BaseMap initialCenter={initialCenter} onReady={setMap} />
+<SitesLayer  map={map} sites={sites}  onSiteClick={s => router.push(`/sites?open=${s.id}`)} />
+<CranesLayer map={map} sites={sites} cranes={cranes} onCraneClick={c => router.push(`/my-cranes?open=${c.id}`)} />
+```
+
+`useCranes({ approvalStatus: 'approved', status: 'active', limit: 100 })` — только approved+working краны попадают на карту.
+
+`OwnerDashboard` stats: «Краны в работе» продвинут из `StatCardPlaceholder` в реальный `StatCard` (href=/my-cranes, value=`stats.active.cranes`). Source данных полностью заменён: hero plural-subtitle, «Активные объекты» и «Краны в работе» теперь читают `useOwnerDashboardStats()` вместо старого `useSites({status:'active'}).items.length`. Placeholder'ов осталось 2 (Операторы на смене + Расходы за месяц — будут заполнены в B3-UI-3c/B3-финансы).
+
+### Commands + nav + audit
+
+- `lib/commands/registry.ts` — owner получает `nav.my-cranes` (IconCrane, `/my-cranes`) + `action.create-crane` (Plus, action).
+- `lib/commands/use-commands.ts` — branch `'create-crane' → router.push('/my-cranes?create=true')` (повтор cross-page URL-state pattern из §12b).
+- `components/layout/nav-config.ts` — owner sidebar: `nav.myCranes.href` переключён с `/` (stub) на `/my-cranes`.
+- `lib/format/audit.ts` — добавлены три новые actions: `crane.assign_to_site` (Link2, «Кран привязан к объекту»), `crane.unassign_from_site` (Link2Off, «Кран снят с объекта»), `crane.resubmit` (Send, «Заявка отправлена повторно»). Добавление новой audit-action — одна запись в registry.
+
+### Hooks pattern
+
+`lib/hooks/use-cranes.ts`:
+
+- `useApproveCrane()` — **optimistic update** через `setQueriesData` flip `approvalStatus → 'approved'`, `onError` rollback из snapshot, `onSettled` invalidate `qk.cranes` + `qk.dashboard`. Pattern переиспользован из B3-UI-2d (см. §12b).
+- Остальные мутации (`useAssignCraneToSite/useUnassignCraneFromSite/useActivateCrane/useSetCraneMaintenance/useRetireCrane/useResubmitCrane`) — простой invalidate `qk.cranes` + `qk.craneDetail(id)` + (для status-changes) `qk.dashboard`.
+- `useOwnerDashboardStats(enabled = true)` — отдельный hook для `getOwnerDashboardStats`, queryKey `qk.dashboardOwnerStats`, staleTime 15s.
+
+### Testing caveats
+
+- **CranesLayer** — `vi.mock('maplibre-gl', () => ({default: {Marker: markerCtor}, Marker: markerCtor}))`. `markerCtor` — `vi.fn(() => ({setLngLat, remove}))` где `setLngLat` возвращает `{addTo}`. Тесты ассертят `markerCtor.mock.calls[0][0].element` для проверки DOM-структуры (count-badge как `span`, click handler).
+- **CraneDrawer multi-role tests** — pattern mutable `mockUser`:
+  ```ts
+  const mockUser = { value: { id, role, organizationId, name } }
+  vi.mock('@/hooks/use-auth', () => ({ useAuth: () => ({ user: mockUser.value, ... }) }))
+  function asOwner(orgId = 'o-1') { mockUser.value = { ..., role: 'owner', organizationId: orgId } }
+  function asSuperadmin() { mockUser.value = { ..., role: 'superadmin', organizationId: null } }
+  beforeEach(() => { asSuperadmin() })
+  ```
+  Каждый тест-кейс сам вызывает `asOwner(...)` если нужна owner-перспектива. Альтернатива (отдельные suite'ы на роль) — overkill для одного компонента.
+- **Owner-dashboard tests** — продолжаем моккать `BaseMap/SitesLayer/CranesLayer` как no-op (WebGL в jsdom не работает; см. §12c testing caveats).
+- **`getOwnerDashboardStats` mock** — все тесты `OwnerDashboard` мокают и `listSites`, и `getOwnerDashboardStats`; забыть второе → flaky на cards «Активные объекты» / «Краны в работе».
+
+---
+
 ## 13. Связанные документы
 
 - [design-system.md](design-system.md) — цвет, typography, иконки, spacing.

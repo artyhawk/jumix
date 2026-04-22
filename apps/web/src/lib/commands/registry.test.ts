@@ -33,11 +33,13 @@ describe('getCommandsForRole', () => {
     expect(commands.some((c) => c.id === 'system.logout')).toBe(true)
   })
 
-  it('owner sees navigation (dashboard + sites) + actions + system', () => {
+  it('owner sees navigation (dashboard + sites + my-cranes) + actions + system', () => {
     const commands = getCommandsForRole('owner')
     expect(commands.some((c) => c.id === 'nav.owner-dashboard')).toBe(true)
     expect(commands.some((c) => c.id === 'nav.sites')).toBe(true)
+    expect(commands.some((c) => c.id === 'nav.my-cranes')).toBe(true)
     expect(commands.some((c) => c.id === 'action.create-site')).toBe(true)
+    expect(commands.some((c) => c.id === 'action.create-crane')).toBe(true)
     expect(commands.some((c) => c.id === 'system.logout')).toBe(true)
     // owner НЕ видит superadmin-only команд
     expect(commands.some((c) => c.id === 'action.create-organization')).toBe(false)

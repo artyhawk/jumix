@@ -12,6 +12,7 @@ import type { ListSitesQuery } from './api/sites'
 export const qk = {
   dashboard: ['dashboard'] as const,
   dashboardStats: ['dashboard', 'stats'] as const,
+  dashboardOwnerStats: ['dashboard', 'owner-stats'] as const,
 
   audit: ['audit'] as const,
   auditRecent: (limit: number) => ['audit', 'recent', limit] as const,

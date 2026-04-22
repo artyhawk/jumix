@@ -8,7 +8,7 @@ import { StaggerItem, StaggerList } from '@/components/motion/stagger-list'
 import { useAuth } from '@/hooks/use-auth'
 import { formatRuLongDate } from '@/lib/format/date'
 import { pluralRu } from '@/lib/format/plural'
-import { useSites } from '@/lib/hooks/use-sites'
+import { useOwnerDashboardStats } from '@/lib/hooks/use-dashboard'
 import { IconCrane } from '@tabler/icons-react'
 import { HardHat, type IdCard, MapPin, Wallet } from 'lucide-react'
 import { useMemo } from 'react'
@@ -18,16 +18,17 @@ const SITES_FORMS = ['объект', 'объекта', 'объектов'] as co
 /**
  * Owner-кабинет landing page. Hero + 4 stats grid + 2-col (map + recent list).
  *
- * MVP: живой stat — активные объекты (из `/sites?status=active`). Остальные
- * карточки (краны в работе, операторы на смене, расходы) — placeholder'ы
- * `—`: даты реализации в B3-UI-3b/c и этапе 3 финансов.
+ * MVP: живые stats — активные объекты + краны в работе из
+ * `/dashboard/owner-stats`. Карточки «Операторы на смене» и «Расходы» —
+ * placeholder'ы `—`, реализуются в этапе 3.
  */
 export function OwnerDashboard() {
   const { user } = useAuth()
-  const sitesQuery = useSites({ status: 'active', limit: 100 })
+  const stats = useOwnerDashboardStats()
 
   const formattedDate = useMemo(() => formatRuLongDate(), [])
-  const activeSitesCount = sitesQuery.data?.items.length ?? 0
+  const activeSitesCount = stats.data?.active.sites ?? 0
+  const activeCranesCount = stats.data?.active.cranes ?? 0
   const sitesLabel = `${activeSitesCount} ${pluralRu(activeSitesCount, SITES_FORMS)} активно`
 
   return (
@@ -47,14 +48,17 @@ export function OwnerDashboard() {
             icon={MapPin}
             label="Активные объекты"
             value={activeSitesCount}
-            loading={sitesQuery.isLoading}
+            loading={stats.isLoading}
             href="/sites"
           />
         </StaggerItem>
         <StaggerItem>
-          <StatCardPlaceholder
-            icon={IconCrane as unknown as typeof IdCard}
+          <StatCard
+            icon={IconCrane as unknown as typeof MapPin}
             label="Краны в работе"
+            value={activeCranesCount}
+            loading={stats.isLoading}
+            href="/my-cranes"
           />
         </StaggerItem>
         <StaggerItem>

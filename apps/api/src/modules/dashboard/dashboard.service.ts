@@ -5,6 +5,7 @@ import {
   cranes,
   organizationOperators,
   organizations,
+  sites,
 } from '@jumix/db'
 import { and, count, eq, gte, isNull, ne } from 'drizzle-orm'
 import { AppError } from '../../lib/errors'
@@ -32,6 +33,30 @@ export type DashboardStats = {
   }
   thisWeek: {
     newRegistrations: number
+  }
+}
+
+/**
+ * Owner-scoped stats: счётчики только для собственной организации. Отдельный
+ * shape от platform-wide DashboardStats — discriminated по endpoint, не по
+ * полю в response. Web типизирует напрямую (отдельный hook
+ * useOwnerDashboardStats).
+ *
+ *   active.sites          — сайты status='active' (без archived/completed/soft-deleted)
+ *   active.cranes         — approved + не-retired (operational fleet)
+ *   active.memberships    — approved + active hires (нанятые крановщики)
+ *   pending.cranes        — pending заявки на собственные cranes (для footer-action)
+ *   pending.hires         — pending заявки на найм
+ */
+export type OwnerDashboardStats = {
+  active: {
+    sites: number
+    cranes: number
+    memberships: number
+  }
+  pending: {
+    cranes: number
+    hires: number
   }
 }
 
@@ -124,6 +149,82 @@ export class DashboardService {
       },
       thisWeek: {
         newRegistrations: firstCount(newRegistrationsThisWeek),
+      },
+    }
+  }
+
+  /**
+   * Owner-scoped стат для собственной организации. Endpoint /dashboard/owner-stats.
+   * Owner без active organization (теоретически невозможно, но invariant'но
+   * защищаем) — 403; superadmin → 403 (он использует /stats); operator → 403.
+   */
+  async getOwnerStats(ctx: AuthContext): Promise<OwnerDashboardStats> {
+    if (!dashboardPolicy.canViewOwnerStats(ctx) || ctx.role !== 'owner') {
+      throw forbidden('FORBIDDEN', 'Only owner can view owner dashboard stats')
+    }
+
+    const orgId = ctx.organizationId
+    const db = this.database.db
+
+    const [activeSites, activeCranes, activeMemberships, pendingCranes, pendingHires] =
+      await Promise.all([
+        db
+          .select({ value: count() })
+          .from(sites)
+          .where(and(eq(sites.organizationId, orgId), eq(sites.status, 'active'))),
+        db
+          .select({ value: count() })
+          .from(cranes)
+          .where(
+            and(
+              eq(cranes.organizationId, orgId),
+              eq(cranes.approvalStatus, 'approved'),
+              ne(cranes.status, 'retired'),
+              isNull(cranes.deletedAt),
+            ),
+          ),
+        db
+          .select({ value: count() })
+          .from(organizationOperators)
+          .where(
+            and(
+              eq(organizationOperators.organizationId, orgId),
+              eq(organizationOperators.approvalStatus, 'approved'),
+              eq(organizationOperators.status, 'active'),
+              isNull(organizationOperators.deletedAt),
+            ),
+          ),
+        db
+          .select({ value: count() })
+          .from(cranes)
+          .where(
+            and(
+              eq(cranes.organizationId, orgId),
+              eq(cranes.approvalStatus, 'pending'),
+              isNull(cranes.deletedAt),
+            ),
+          ),
+        db
+          .select({ value: count() })
+          .from(organizationOperators)
+          .where(
+            and(
+              eq(organizationOperators.organizationId, orgId),
+              eq(organizationOperators.approvalStatus, 'pending'),
+              isNull(organizationOperators.deletedAt),
+            ),
+          ),
+      ])
+
+    return {
+      active: {
+        sites: firstCount(activeSites),
+        cranes: firstCount(activeCranes),
+        memberships: firstCount(activeMemberships),
+      },
+      pending: {
+        cranes: firstCount(pendingCranes),
+        hires: firstCount(pendingHires),
       },
     }
   }

@@ -5,7 +5,10 @@ import {
   Clock,
   Edit,
   FileText,
+  Link2,
+  Link2Off,
   Plus,
+  Send,
   Shield,
   Trash2,
   UserMinus,
@@ -54,6 +57,9 @@ const ACTION_ICONS: Record<string, ActionIcon> = {
   'crane.activate': { icon: Shield, accent: 'neutral' },
   'crane.maintenance': { icon: Shield, accent: 'warning' },
   'crane.retire': { icon: Shield, accent: 'warning' },
+  'crane.assign_to_site': { icon: Link2, accent: 'neutral' },
+  'crane.unassign_from_site': { icon: Link2Off, accent: 'neutral' },
+  'crane.resubmit': { icon: Send, accent: 'neutral' },
   'crane.delete': { icon: Trash2, accent: 'warning' },
 
   // Organization
@@ -111,6 +117,9 @@ const ACTION_LABELS: Record<string, string> = {
   'crane.activate': 'Активировал кран',
   'crane.maintenance': 'Отправил кран в обслуживание',
   'crane.retire': 'Списал кран',
+  'crane.assign_to_site': 'Назначил кран на объект',
+  'crane.unassign_from_site': 'Снял кран с объекта',
+  'crane.resubmit': 'Отправил кран на повторное одобрение',
   'crane.delete': 'Удалил кран',
 
   'organization.create': 'Создал организацию',

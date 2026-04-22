@@ -5,6 +5,14 @@ import DashboardPage from './page'
 
 vi.mock('@/lib/api/dashboard', () => ({
   getDashboardStats: vi.fn(),
+  getOwnerDashboardStats: vi.fn().mockResolvedValue({
+    active: { sites: 0, cranes: 0, memberships: 0 },
+    pending: { cranes: 0, hires: 0 },
+  }),
+}))
+vi.mock('@/lib/api/cranes', () => ({
+  listCranes: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+  getCrane: vi.fn(),
 }))
 vi.mock('@/lib/api/audit', () => ({
   listRecentAudit: vi.fn().mockResolvedValue({ events: [] }),
@@ -27,6 +35,9 @@ vi.mock('@/components/map/base-map', () => ({
 }))
 vi.mock('@/components/map/sites-layer', () => ({
   SitesLayer: () => null,
+}))
+vi.mock('@/components/map/cranes-layer', () => ({
+  CranesLayer: () => null,
 }))
 
 const replace = vi.fn()

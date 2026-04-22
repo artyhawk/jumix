@@ -19,6 +19,7 @@ let handle: TestAppHandle
 let superadminToken: string
 let ownerToken: string
 let operatorToken: string
+let ownerOrgId: string
 
 beforeAll(async () => {
   handle = await buildTestApp()
@@ -35,6 +36,7 @@ beforeAll(async () => {
     name: 'Dashboard Org',
     bin: '650000000001',
   })
+  ownerOrgId = orgActive.id
   const owner = await createUser(handle.app, {
     role: 'owner',
     phone: '+77150000002',
@@ -344,3 +346,128 @@ async function getStats(): Promise<{
   expect(res.statusCode).toBe(200)
   return res.json()
 }
+
+/**
+ * B3-UI-3b: owner-scoped stats endpoint. Authz mirror'ит /stats (mutual 403'ы),
+ * counters сужены до собственной org.
+ */
+describe('GET /api/v1/dashboard/owner-stats — authorization', () => {
+  it('401: no token', async () => {
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/owner-stats',
+    })
+    expect(res.statusCode).toBe(401)
+  })
+
+  it('403: superadmin uses /stats not /owner-stats', async () => {
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/owner-stats',
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(403)
+    expect(res.json().error.code).toBe('FORBIDDEN')
+  })
+
+  it('403: operator cannot read owner stats', async () => {
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/owner-stats',
+      headers: { authorization: `Bearer ${operatorToken}` },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('200: owner gets typed owner-stats shape', async () => {
+    const res = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/owner-stats',
+      headers: { authorization: `Bearer ${ownerToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({
+      active: {
+        sites: expect.any(Number),
+        cranes: expect.any(Number),
+        memberships: expect.any(Number),
+      },
+      pending: {
+        cranes: expect.any(Number),
+        hires: expect.any(Number),
+      },
+    })
+  })
+})
+
+describe('GET /api/v1/dashboard/owner-stats — counters scoped to own org', () => {
+  it('counters reflect owner own-org fixtures and ignore other orgs', async () => {
+    // baseline для owner'а
+    const baselineRes = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/owner-stats',
+      headers: { authorization: `Bearer ${ownerToken}` },
+    })
+    const baseline = baselineRes.json() as {
+      active: { sites: number; cranes: number; memberships: number }
+      pending: { cranes: number; hires: number }
+    }
+
+    // foreign org - не должна попасть в owner counters
+    const foreignOrg = await createOrganization(handle.app, {
+      name: 'Foreign Org',
+      bin: '650000000099',
+    })
+
+    // +1 own active crane (approved + active)
+    await handle.app.db.db.insert(cranes).values({
+      organizationId: ownerOrgId,
+      type: 'tower',
+      model: 'OwnActive',
+      capacityTon: '5.00',
+      approvalStatus: 'approved',
+      status: 'active',
+    })
+
+    // +1 own pending crane
+    await handle.app.db.db.insert(cranes).values({
+      organizationId: ownerOrgId,
+      type: 'tower',
+      model: 'OwnPending',
+      capacityTon: '5.00',
+      approvalStatus: 'pending',
+      status: 'active',
+    })
+
+    // +1 foreign approved+active crane — НЕ должен попасть в owner.active.cranes
+    await handle.app.db.db.insert(cranes).values({
+      organizationId: foreignOrg.id,
+      type: 'tower',
+      model: 'ForeignActive',
+      capacityTon: '5.00',
+      approvalStatus: 'approved',
+      status: 'active',
+    })
+
+    // +1 own retired crane — НЕ должен попасть в active (ne retired)
+    await handle.app.db.db.insert(cranes).values({
+      organizationId: ownerOrgId,
+      type: 'tower',
+      model: 'OwnRetired',
+      capacityTon: '5.00',
+      approvalStatus: 'approved',
+      status: 'retired',
+    })
+
+    const after = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/owner-stats',
+      headers: { authorization: `Bearer ${ownerToken}` },
+    })
+    expect(after.statusCode).toBe(200)
+    const stats = after.json() as typeof baseline
+
+    expect(stats.active.cranes).toBe(baseline.active.cranes + 1)
+    expect(stats.pending.cranes).toBe(baseline.pending.cranes + 1)
+  })
+})

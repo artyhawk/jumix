@@ -1,16 +1,18 @@
 import { createQueryWrapper } from '@/test-utils/query-wrapper'
 import { renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DashboardStats } from '../api/types'
-import { useDashboardStats } from './use-dashboard'
+import type { DashboardStats, OwnerDashboardStats } from '../api/types'
+import { useDashboardStats, useOwnerDashboardStats } from './use-dashboard'
 
 vi.mock('../api/dashboard', () => ({
   getDashboardStats: vi.fn(),
+  getOwnerDashboardStats: vi.fn(),
 }))
 
-import { getDashboardStats } from '../api/dashboard'
+import { getDashboardStats, getOwnerDashboardStats } from '../api/dashboard'
 
 const get = vi.mocked(getDashboardStats)
+const getOwner = vi.mocked(getOwnerDashboardStats)
 
 const sampleStats: DashboardStats = {
   pending: { craneProfiles: 3, organizationOperators: 2, cranes: 1 },
@@ -18,8 +20,14 @@ const sampleStats: DashboardStats = {
   thisWeek: { newRegistrations: 5 },
 }
 
+const sampleOwnerStats: OwnerDashboardStats = {
+  active: { sites: 4, cranes: 7, memberships: 12 },
+  pending: { cranes: 2, hires: 1 },
+}
+
 beforeEach(() => {
   get.mockReset()
+  getOwner.mockReset()
 })
 
 describe('useDashboardStats', () => {
@@ -46,5 +54,24 @@ describe('useDashboardStats', () => {
     const { result } = renderHook(() => useDashboardStats(), { wrapper: Wrapper })
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(result.current.error).toBeInstanceOf(Error)
+  })
+})
+
+describe('useOwnerDashboardStats', () => {
+  it('fetches owner-scoped stats', async () => {
+    getOwner.mockResolvedValueOnce(sampleOwnerStats)
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useOwnerDashboardStats(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(getOwner).toHaveBeenCalled()
+    expect(result.current.data?.active.cranes).toBe(7)
+    expect(result.current.data?.pending.cranes).toBe(2)
+  })
+
+  it('respects enabled=false', () => {
+    getOwner.mockResolvedValueOnce(sampleOwnerStats)
+    const { Wrapper } = createQueryWrapper()
+    renderHook(() => useOwnerDashboardStats(false), { wrapper: Wrapper })
+    expect(getOwner).not.toHaveBeenCalled()
   })
 })

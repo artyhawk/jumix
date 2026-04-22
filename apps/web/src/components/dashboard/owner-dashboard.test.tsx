@@ -1,4 +1,4 @@
-import type { Site } from '@/lib/api/types'
+import type { OwnerDashboardStats, Site } from '@/lib/api/types'
 import { createQueryWrapper } from '@/test-utils/query-wrapper'
 import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,14 +13,23 @@ vi.mock('@/lib/api/sites', () => ({
   archiveSite: vi.fn(),
   activateSite: vi.fn(),
 }))
+vi.mock('@/lib/api/cranes', () => ({
+  listCranes: vi.fn(async () => ({ items: [], nextCursor: null })),
+  getCrane: vi.fn(),
+}))
+vi.mock('@/lib/api/dashboard', () => ({
+  getDashboardStats: vi.fn(),
+  getOwnerDashboardStats: vi.fn(),
+}))
 
-// BaseMap + SitesLayer требуют WebGL; подменяем на no-op, потому что
-// owner-dashboard тест проверяет layout + stats + recent list, а не карту.
 vi.mock('@/components/map/base-map', () => ({
   BaseMap: () => <div data-testid="base-map" />,
 }))
 vi.mock('@/components/map/sites-layer', () => ({
   SitesLayer: () => null,
+}))
+vi.mock('@/components/map/cranes-layer', () => ({
+  CranesLayer: () => null,
 }))
 
 const push = vi.fn()
@@ -43,8 +52,10 @@ vi.mock('@/hooks/use-auth', () => ({
   useAuth: () => authUser,
 }))
 
+import { getOwnerDashboardStats } from '@/lib/api/dashboard'
 import { listSites } from '@/lib/api/sites'
 const list = vi.mocked(listSites)
+const getOwnerStats = vi.mocked(getOwnerDashboardStats)
 
 function makeSite(overrides: Partial<Site> = {}): Site {
   return {
@@ -63,6 +74,14 @@ function makeSite(overrides: Partial<Site> = {}): Site {
   }
 }
 
+function makeStats(overrides: Partial<OwnerDashboardStats> = {}): OwnerDashboardStats {
+  return {
+    active: { sites: 0, cranes: 0, memberships: 0 },
+    pending: { cranes: 0, hires: 0 },
+    ...overrides,
+  }
+}
+
 function renderDash() {
   const { Wrapper } = createQueryWrapper()
   return render(
@@ -74,57 +93,58 @@ function renderDash() {
 
 beforeEach(() => {
   list.mockReset()
+  getOwnerStats.mockReset()
   push.mockReset()
   authUser.user = { id: 'u-1', role: 'owner', organizationId: 'org-1', name: 'Ербол' }
+  list.mockResolvedValue({ items: [], nextCursor: null })
+  getOwnerStats.mockResolvedValue(makeStats())
 })
 
 describe('OwnerDashboard', () => {
   it('renders personalised hero with user name', async () => {
-    list.mockResolvedValue({ items: [], nextCursor: null })
     renderDash()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Здравствуйте, Ербол')
   })
 
   it('hero fallback when user has no name', async () => {
     authUser.user = { id: 'u-1', role: 'owner', organizationId: 'org-1', name: '' }
-    list.mockResolvedValue({ items: [], nextCursor: null })
     renderDash()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Обзор организации')
   })
 
   it('subtitle reflects active sites count with plural form', async () => {
-    list.mockResolvedValue({
-      items: [makeSite({ id: 's1' }), makeSite({ id: 's2' })],
-      nextCursor: null,
-    })
+    getOwnerStats.mockResolvedValue(makeStats({ active: { sites: 2, cranes: 0, memberships: 0 } }))
     renderDash()
     await waitFor(() => {
       expect(screen.getByText(/2 объекта активно/)).toBeInTheDocument()
     })
   })
 
-  it('Активные объекты stat card shows real count', async () => {
-    list.mockResolvedValue({
-      items: [makeSite({ id: 's1' }), makeSite({ id: 's2' }), makeSite({ id: 's3' })],
-      nextCursor: null,
-    })
+  it('Активные объекты stat card links to /sites', async () => {
+    getOwnerStats.mockResolvedValue(makeStats({ active: { sites: 3, cranes: 0, memberships: 0 } }))
     renderDash()
     await waitFor(() => {
       const card = screen.getByRole('link', { name: /Активные объекты/ })
-      expect(card).toBeInTheDocument()
+      expect(card).toHaveAttribute('href', '/sites')
     })
   })
 
-  it('renders three placeholder cards for upcoming metrics', async () => {
-    list.mockResolvedValue({ items: [], nextCursor: null })
+  it('Краны в работе stat card links to /my-cranes', async () => {
+    getOwnerStats.mockResolvedValue(makeStats({ active: { sites: 0, cranes: 7, memberships: 0 } }))
     renderDash()
     await waitFor(() => {
-      expect(screen.getByText('Краны в работе')).toBeInTheDocument()
+      const card = screen.getByRole('link', { name: /Краны в работе/ })
+      expect(card).toHaveAttribute('href', '/my-cranes')
+    })
+  })
+
+  it('renders two placeholder cards for upcoming metrics', async () => {
+    renderDash()
+    await waitFor(() => {
       expect(screen.getByText('Операторы на смене')).toBeInTheDocument()
       expect(screen.getByText('Расходы за месяц')).toBeInTheDocument()
     })
-    // Placeholder content displays "Скоро"
-    expect(screen.getAllByText('Скоро').length).toBeGreaterThanOrEqual(3)
+    expect(screen.getAllByText('Скоро').length).toBe(2)
   })
 
   it('renders OwnerSitesMap + RecentSitesList in 2-col grid', async () => {
@@ -138,7 +158,6 @@ describe('OwnerDashboard', () => {
   })
 
   it('empty state in recent list shows create-first link', async () => {
-    list.mockResolvedValue({ items: [], nextCursor: null })
     renderDash()
     await waitFor(() => {
       expect(screen.getAllByText(/Создать первый объект/).length).toBeGreaterThan(0)

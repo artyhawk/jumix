@@ -2,6 +2,7 @@ import type { Crane } from '@jumix/db'
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify'
 import {
   approveCraneSchema,
+  assignCraneSiteSchema,
   craneIdParamsSchema,
   createCraneSchema,
   listCranesQuerySchema,
@@ -22,6 +23,9 @@ import {
  *   POST   /api/v1/cranes/:id/activate     status → active (требует approved)
  *   POST   /api/v1/cranes/:id/maintenance  status → maintenance (требует approved)
  *   POST   /api/v1/cranes/:id/retire       status → retired (требует approved)
+ *   POST   /api/v1/cranes/:id/assign-site body {siteId}; approved + same-org site
+ *   POST   /api/v1/cranes/:id/unassign-site siteId → null
+ *   POST   /api/v1/cranes/:id/resubmit     rejected → pending (owner own / superadmin)
  *   POST   /api/v1/cranes/:id/approve      superadmin only; pending → approved
  *   POST   /api/v1/cranes/:id/reject       superadmin only; body {reason}; pending → rejected
  *
@@ -92,6 +96,31 @@ export const registerCraneRoutes: FastifyPluginAsync = async (app: FastifyInstan
       scoped.post('/:id/retire', async (request) => {
         const { id } = craneIdParamsSchema.parse(request.params)
         const crane = await app.craneService.changeStatus(request.ctx, id, 'retired', {
+          ipAddress: request.ip,
+        })
+        return toPublicDTO(crane)
+      })
+
+      scoped.post('/:id/assign-site', async (request) => {
+        const { id } = craneIdParamsSchema.parse(request.params)
+        const body = assignCraneSiteSchema.parse(request.body)
+        const crane = await app.craneService.assignToSite(request.ctx, id, body.siteId, {
+          ipAddress: request.ip,
+        })
+        return toPublicDTO(crane)
+      })
+
+      scoped.post('/:id/unassign-site', async (request) => {
+        const { id } = craneIdParamsSchema.parse(request.params)
+        const crane = await app.craneService.unassignFromSite(request.ctx, id, {
+          ipAddress: request.ip,
+        })
+        return toPublicDTO(crane)
+      })
+
+      scoped.post('/:id/resubmit', async (request) => {
+        const { id } = craneIdParamsSchema.parse(request.params)
+        const crane = await app.craneService.resubmit(request.ctx, id, {
           ipAddress: request.ip,
         })
         return toPublicDTO(crane)

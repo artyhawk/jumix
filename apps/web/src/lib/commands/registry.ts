@@ -36,7 +36,7 @@ export interface CommandEntry {
   action?: CommandAction
 }
 
-export type CommandAction = 'logout' | 'create-organization' | 'create-site'
+export type CommandAction = 'logout' | 'create-organization' | 'create-site' | 'create-crane'
 
 export const COMMAND_REGISTRY: CommandEntry[] = [
   // ---- Navigation — superadmin ----
@@ -114,6 +114,15 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
     roles: ['owner'],
     href: '/sites',
   },
+  {
+    id: 'nav.my-cranes',
+    label: 'Мои краны',
+    keywords: ['cranes', 'kran', 'краны', 'парк', 'оборудование'],
+    icon: IconCrane,
+    group: 'navigation',
+    roles: ['owner'],
+    href: '/my-cranes',
+  },
 
   // ---- Actions — superadmin ----
   {
@@ -135,6 +144,15 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
     group: 'actions',
     roles: ['owner'],
     action: 'create-site',
+  },
+  {
+    id: 'action.create-crane',
+    label: 'Добавить кран',
+    keywords: ['new', 'add', 'novyi', 'создать', 'кран', 'оборудование'],
+    icon: Plus,
+    group: 'actions',
+    roles: ['owner'],
+    action: 'create-crane',
   },
 
   // ---- System (all roles) ----

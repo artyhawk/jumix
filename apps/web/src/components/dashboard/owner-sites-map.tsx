@@ -1,11 +1,13 @@
 'use client'
 
 import { BaseMap } from '@/components/map/base-map'
+import { CranesLayer } from '@/components/map/cranes-layer'
 import { DEFAULT_CENTER } from '@/components/map/map-style'
 import { SitesLayer } from '@/components/map/sites-layer'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { Site } from '@/lib/api/types'
+import type { Crane, Site } from '@/lib/api/types'
+import { useCranes } from '@/lib/hooks/use-cranes'
 import { useSites } from '@/lib/hooks/use-sites'
 import { ArrowRight, MapPin } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
@@ -14,16 +16,19 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
 /**
- * Left dashboard pane для owner'а — карта активных объектов организации.
- * Геозоны + маркеры; клик по маркеру → `/sites?open=<id>`. Центрируется на
- * первом site'е если есть, иначе дефолт (Астана).
+ * Left dashboard pane для owner'а — карта активных объектов организации +
+ * назначенные на них approved-краны (layer поверх). Клик по site → `/sites?open=<id>`;
+ * клик по cranes-маркеру → `/my-cranes?open=<id>`. Центрируется на первом
+ * site'е если есть, иначе дефолт (Астана).
  */
 export function OwnerSitesMap() {
   const router = useRouter()
-  const query = useSites({ status: 'active', limit: 50 })
+  const sitesQuery = useSites({ status: 'active', limit: 50 })
+  const cranesQuery = useCranes({ approvalStatus: 'approved', status: 'active', limit: 100 })
   const [map, setMap] = useState<MapLibreMap | null>(null)
 
-  const sites = query.data?.items ?? []
+  const sites = sitesQuery.data?.items ?? []
+  const cranes = cranesQuery.data?.items ?? []
 
   const initialCenter = useMemo<[number, number]>(() => {
     const first = sites[0]
@@ -33,6 +38,10 @@ export function OwnerSitesMap() {
 
   const handleSiteClick = (site: Site) => {
     router.push(`/sites?open=${site.id}`)
+  }
+
+  const handleCraneClick = (crane: Crane) => {
+    router.push(`/my-cranes?open=${crane.id}`)
   }
 
   return (
@@ -54,9 +63,9 @@ export function OwnerSitesMap() {
       </header>
 
       <div className="relative h-[420px]">
-        {query.isLoading ? (
+        {sitesQuery.isLoading ? (
           <Skeleton className="absolute inset-0 rounded-none" />
-        ) : query.isError ? (
+        ) : sitesQuery.isError ? (
           <div className="flex h-full items-center justify-center text-sm text-text-tertiary">
             Не удалось загрузить объекты
           </div>
@@ -77,6 +86,7 @@ export function OwnerSitesMap() {
           <>
             <BaseMap initialCenter={initialCenter} onReady={setMap} className="absolute inset-0" />
             <SitesLayer map={map} sites={sites} onSiteClick={handleSiteClick} />
+            <CranesLayer map={map} sites={sites} cranes={cranes} onCraneClick={handleCraneClick} />
           </>
         )}
       </div>

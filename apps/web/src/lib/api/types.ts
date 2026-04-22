@@ -58,6 +58,23 @@ export interface DashboardStats {
   }
 }
 
+/**
+ * Owner-scoped dashboard stats. Отдельный endpoint /dashboard/owner-stats —
+ * counters суженные до собственной org. Active = «живые» fleet/teams; pending
+ * = approval queues для footer-CTA («есть N заявок ждущих холдинга»).
+ */
+export interface OwnerDashboardStats {
+  active: {
+    sites: number
+    cranes: number
+    memberships: number
+  }
+  pending: {
+    cranes: number
+    hires: number
+  }
+}
+
 // ---------- Audit ----------
 
 export type AuditActorRole = UserRole | 'system'
