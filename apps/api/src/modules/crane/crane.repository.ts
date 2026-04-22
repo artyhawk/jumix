@@ -156,6 +156,7 @@ export class CraneRepository {
     status?: CraneStatus
     type?: CraneType
     siteId?: string
+    organizationId?: string
     approvalStatus: CraneListApprovalFilter
   }): Promise<{ rows: Crane[]; nextCursor: string | null }> {
     if (this.ctx.role === 'operator') return { rows: [], nextCursor: null }
@@ -163,6 +164,8 @@ export class CraneRepository {
     const conds: SQL[] = [isNull(cranes.deletedAt)]
     if (this.ctx.role === 'owner') {
       conds.push(eq(cranes.organizationId, this.ctx.organizationId))
+    } else if (params.organizationId) {
+      conds.push(eq(cranes.organizationId, params.organizationId))
     }
     if (params.cursor) conds.push(lt(cranes.id, params.cursor))
     if (params.status) conds.push(eq(cranes.status, params.status))

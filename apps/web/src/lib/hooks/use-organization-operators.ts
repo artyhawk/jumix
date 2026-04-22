@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type ListOrganizationOperatorsQuery,
   approveOrganizationOperator,
@@ -15,6 +15,18 @@ export function useOrganizationOperators(query: ListOrganizationOperatorsQuery =
   return useQuery({
     queryKey: qk.organizationOperatorsList(query),
     queryFn: () => listOrganizationOperators(query),
+  })
+}
+
+export function useOrganizationOperatorsInfinite(
+  query: Omit<ListOrganizationOperatorsQuery, 'cursor'> = {},
+) {
+  return useInfiniteQuery({
+    queryKey: qk.organizationOperatorsInfinite(query),
+    queryFn: ({ pageParam }) =>
+      listOrganizationOperators({ ...query, cursor: pageParam as string | undefined }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
   })
 }
 
@@ -43,7 +55,7 @@ export function useApproveOrganizationOperator() {
       qc.setQueriesData<Paginated<OrganizationOperator>>(
         { queryKey: qk.organizationOperators },
         (old) => {
-          if (!old) return old
+          if (!old || !Array.isArray((old as Paginated<OrganizationOperator>).items)) return old
           return {
             ...old,
             items: old.items.map((item) =>

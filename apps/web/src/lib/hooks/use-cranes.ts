@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type ListCranesQuery,
   approveCrane,
@@ -15,6 +15,15 @@ export function useCranes(query: ListCranesQuery = {}) {
   return useQuery({
     queryKey: qk.cranesList(query),
     queryFn: () => listCranes(query),
+  })
+}
+
+export function useCranesInfinite(query: Omit<ListCranesQuery, 'cursor'> = {}) {
+  return useInfiniteQuery({
+    queryKey: qk.cranesInfinite(query),
+    queryFn: ({ pageParam }) => listCranes({ ...query, cursor: pageParam as string | undefined }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
   })
 }
 
@@ -37,7 +46,7 @@ export function useApproveCrane() {
       await qc.cancelQueries({ queryKey: qk.cranes })
       const snapshot = qc.getQueriesData<Paginated<Crane>>({ queryKey: qk.cranes })
       qc.setQueriesData<Paginated<Crane>>({ queryKey: qk.cranes }, (old) => {
-        if (!old) return old
+        if (!old || !Array.isArray((old as Paginated<Crane>).items)) return old
         return {
           ...old,
           items: old.items.map((item) =>

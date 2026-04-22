@@ -379,13 +379,113 @@ Production build (`pnpm --filter @jumix/web build`) — Turbopack. Деплой 
 
 ## 12. Что НЕ вошло в B3-UI-1 (идёт в следующих вертикалях)
 
-- CRUD-страницы (organizations, sites, cranes, operators) — B3-UI-2+.
+- ~~CRUD-страницы (organizations, sites, cranes, operators)~~ — реализованы в B3-UI-2c (см. §12a).
 - Live-карта смен — Этап 2.
 - Payroll UI — Этап 3.
 - Marketplace + рейтинги — Этап 4.
 - Notifications center + realtime — Этап 4.
 
 Все страницы под `(app)/` будут добавляться инкрементально на существующий shell.
+
+---
+
+## 12a. Глобальные list-страницы (B3-UI-2c)
+
+Четыре глобальных списка для superadmin:
+
+- `/organizations` — реестр организаций (Create dialog + Suspend/Activate actions).
+- `/crane-profiles` — global identity крановщиков (approve/reject pipeline 1).
+- `/cranes` — реестр башенных кранов (approve/reject pipeline 2).
+- `/organization-operators` — M:N наймы (approve/reject pipeline hire + drill-through в crane-profile).
+
+### Примитивы (`components/ui/`)
+
+| Компонент | Роль |
+|---|---|
+| `DataTable` | Unified desktop-table / mobile-cards, orange hover-bar (2-5% правило), cursor-based infinite scroll через `hasMore + onLoadMore`. IntersectionObserver-триггер — в backlog (сейчас — ручная кнопка «Загрузить ещё»). |
+| `FilterBar` | Горизонтальный контейнер для search + chips + dropdowns. Overflow-x на phone. |
+| `FilterChip<T>` | Dropdown с single-select. Активный чип подсвечивается `bg-brand-500/12 text-brand-400` (единственное место брендового оранжевого в фильтрах). |
+| `SearchInput` | Debounced 300ms через `onDebouncedChange`. Clear-кнопка. 44px touch target. |
+| `Combobox<T>` | Async-mode через `onSearchChange` callback (тогда `shouldFilter={!onSearchChange}` — cmdk не фильтрует локально, доверяем server-side поиску). |
+| `LicenseStatusBadge` | Computed на boundary из `licenseStatus` (missing/valid/expiring_30d/expiring_7d/expired). |
+
+### URL-state synchronization
+
+Единый helper в каждой page:
+
+```ts
+const setParam = (key: string, value: string | null) => {
+  const next = new URLSearchParams(params.toString())
+  if (value === null || value === '') next.delete(key)
+  else next.set(key, value)
+  const qs = next.toString()
+  router.replace(qs ? `/page?${qs}` : '/page', { scroll: false })
+}
+```
+
+Все фильтры + `?open=<id>` проходят через этот helper. `scroll: false` обязателен — иначе каждая смена фильтра прыгает в top.
+
+### Drawer orchestration
+
+Клик по строке → `setParam('open', row.id)`. Дровер читает `?open=<id>` и открывается с `id`. Закрытие — `setParam('open', null)`. Принцип: detail-view — **часть URL**, а не component state. Это даёт back/forward navigation + shareable links бесплатно.
+
+### Cross-drawer navigation
+
+На `/organization-operators` hire-дровер имеет кнопку «Открыть профиль» → навигация из одного дровера в другой:
+
+```ts
+onOpenCraneProfile={(craneProfileId) => {
+  const next = new URLSearchParams(params.toString())
+  next.delete('open')
+  next.set('openProfile', craneProfileId)
+  router.replace(`/organization-operators?${next.toString()}`, { scroll: false })
+}}
+```
+
+Одна транзакция URL: `?open=<hireId>` → `?openProfile=<craneProfileId>`. Hire-дровер закрывается, crane-profile-дровер открывается.
+
+### Detail drawers (`components/drawers/`)
+
+- `CraneProfileDrawer` — approve/reject (pipeline 1 — platform identity).
+- `CraneDrawer` — approve/reject (pipeline 2 — org holding).
+- `OrganizationDrawer` — suspend/activate (нет approval pipeline).
+- `OrganizationOperatorDrawer` — approve/reject hire + drill-through на crane-profile.
+
+Общие паттерны:
+- Optimistic mutation (snapshot → `setQueryData` → `onError` rollback → `onSettled` invalidate).
+- `RejectDialog` (shared) с обязательным `reason` (trim > 0, max 500 chars, char-counter).
+- Loading — skeleton (не spinner).
+- Mobile: full-screen drawer (Radix Dialog с `h-full w-full rounded-none` на phone).
+
+### Filter patterns: server-side vs client-side
+
+- **Server-side** — через API-параметры (`search`, `approvalStatus`, `status`, `organizationId`). Отправляются в hook, отдаются бэком.
+- **Client-side** — `useMemo` поверх уже-загруженной страницы. Используется для `licenseStatus` (computed на boundary, бэк не фильтрует) и `crane.type` (ожидает бэк-поддержки). В backlog — server-side варианты для обоих.
+
+Ограничение client-side фильтра: работает только по уже-загруженным rows. Infinite load может догрузить следующую страницу где matching rows отсутствуют — UX приемлем для MVP (< 100 rows на tenant).
+
+### CreateOrganizationDialog
+
+- `react-hook-form` + `zodResolver` + `@jumix/shared` validators (`isValidKzBin`, `isValidKzPhone`).
+- Phone input через `Controller`: onChange пропускает value через `applyPhoneMask`, submit нормализует через `toE164`.
+- Optimistic invalidate — `organizations` + `dashboardStats` после success.
+
+**Тест phone input — `fireEvent.change` вместо `userEvent.type`.** Причина: controlled Input + applyPhoneMask reformatting + char-by-char typing приводит к accumulation bug (каждый reformatted value re-masked на каждый keystroke). `fireEvent.change` прокидывает финальный value одним вызовом — маска применяется один раз.
+
+### Dashboard integration
+
+`OrganizationsOverview` (`components/dashboard/`) — секция на `/dashboard`:
+- `useOrganizations({ limit: 5 })` — последние 5 организаций.
+- Row-link → `/organizations?open=<id>` (один клик → другая страница + открытый дровер).
+- «Все →» → `/organizations`.
+
+### Test conventions
+
+- API-moks: `vi.mock('@/lib/api/organizations', () => ({...}))` + `vi.mocked(listOrganizations)` для типизации.
+- `createQueryWrapper()` helper — **НЕ** выставляет `gcTime: 0` (ломает rollback assertions после invalidate).
+- Mock `next/navigation` — `useRouter() + useSearchParams() + usePathname()` через `searchParams.get.mockImplementation((k) => k === 'open' ? 'id-1' : null)`.
+- Mock `sonner` — `{ toast: { success: vi.fn(), error: vi.fn() } }` (обязательно, иначе RejectDialog упадёт).
+- Reject dialog test: `userEvent.type(textarea, 'причина')` + click «Отклонить» → ждать `reject` mock call с `{ id, reason }`.
 
 ---
 

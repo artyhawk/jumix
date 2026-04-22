@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Crane, Paginated } from '../api/types'
 import { qk } from '../query-keys'
-import { useApproveCrane, useCranes, useRejectCrane } from './use-cranes'
+import { useApproveCrane, useCranes, useCranesInfinite, useRejectCrane } from './use-cranes'
 
 vi.mock('../api/cranes', () => ({
   listCranes: vi.fn(),
@@ -53,6 +53,26 @@ describe('useCranes', () => {
     })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(list).toHaveBeenCalledWith({ approvalStatus: 'pending' })
+  })
+})
+
+describe('useCranesInfinite', () => {
+  it('paginates via cursor', async () => {
+    list.mockImplementation(async ({ cursor }: { cursor?: string } = {}) => {
+      if (!cursor) return { items: [makeCrane('c1')], nextCursor: 'cur-1' }
+      return { items: [makeCrane('c2')], nextCursor: null }
+    })
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useCranesInfinite({ search: 'tower' }), {
+      wrapper: Wrapper,
+    })
+    await waitFor(() => expect(result.current.hasNextPage).toBe(true))
+    await act(async () => {
+      await result.current.fetchNextPage()
+    })
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(2))
+    expect(list).toHaveBeenLastCalledWith({ search: 'tower', cursor: 'cur-1' })
+    expect(result.current.hasNextPage).toBe(false)
   })
 })
 

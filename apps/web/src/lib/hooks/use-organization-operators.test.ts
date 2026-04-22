@@ -6,6 +6,7 @@ import { qk } from '../query-keys'
 import {
   useApproveOrganizationOperator,
   useOrganizationOperators,
+  useOrganizationOperatorsInfinite,
   useRejectOrganizationOperator,
 } from './use-organization-operators'
 
@@ -69,6 +70,26 @@ describe('useOrganizationOperators', () => {
     })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(list).toHaveBeenCalledWith({ approvalStatus: 'pending' })
+  })
+})
+
+describe('useOrganizationOperatorsInfinite', () => {
+  it('paginates via cursor', async () => {
+    list.mockImplementation(async ({ cursor }: { cursor?: string } = {}) => {
+      if (!cursor) return { items: [makeHire('h1')], nextCursor: 'cur-1' }
+      return { items: [makeHire('h2')], nextCursor: null }
+    })
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(
+      () => useOrganizationOperatorsInfinite({ organizationId: 'org-1' }),
+      { wrapper: Wrapper },
+    )
+    await waitFor(() => expect(result.current.hasNextPage).toBe(true))
+    await act(async () => {
+      await result.current.fetchNextPage()
+    })
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(2))
+    expect(list).toHaveBeenLastCalledWith({ organizationId: 'org-1', cursor: 'cur-1' })
   })
 })
 

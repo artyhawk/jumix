@@ -1,12 +1,14 @@
 import { apiFetch } from './client'
-import type { ApprovalFilter, OrganizationOperator, Paginated } from './types'
+import type { ApprovalFilter, OperatorHireStatus, OrganizationOperator, Paginated } from './types'
 
 export interface ListOrganizationOperatorsQuery {
   cursor?: string
   limit?: number
   search?: string
   approvalStatus?: ApprovalFilter
+  status?: OperatorHireStatus | 'all'
   organizationId?: string
+  craneProfileId?: string
 }
 
 export function listOrganizationOperators(query: ListOrganizationOperatorsQuery = {}) {
@@ -17,7 +19,9 @@ export function listOrganizationOperators(query: ListOrganizationOperatorsQuery 
   if (query.approvalStatus && query.approvalStatus !== 'all') {
     params.set('approvalStatus', query.approvalStatus)
   }
+  if (query.status && query.status !== 'all') params.set('status', query.status)
   if (query.organizationId) params.set('organizationId', query.organizationId)
+  if (query.craneProfileId) params.set('craneProfileId', query.craneProfileId)
   const qs = params.toString()
   return apiFetch<Paginated<OrganizationOperator>>(
     `/api/v1/organization-operators${qs ? `?${qs}` : ''}`,

@@ -14,18 +14,26 @@ export const qk = {
 
   organizations: ['organizations'] as const,
   organizationsList: (query: ListOrganizationsQuery) => ['organizations', 'list', query] as const,
+  organizationsInfinite: (query: Omit<ListOrganizationsQuery, 'cursor'>) =>
+    ['organizations', 'infinite', query] as const,
   organizationDetail: (id: string) => ['organizations', 'detail', id] as const,
 
   craneProfiles: ['crane-profiles'] as const,
   craneProfilesList: (query: ListCraneProfilesQuery) => ['crane-profiles', 'list', query] as const,
+  craneProfilesInfinite: (query: Omit<ListCraneProfilesQuery, 'cursor'>) =>
+    ['crane-profiles', 'infinite', query] as const,
   craneProfileDetail: (id: string) => ['crane-profiles', 'detail', id] as const,
 
   cranes: ['cranes'] as const,
   cranesList: (query: ListCranesQuery) => ['cranes', 'list', query] as const,
+  cranesInfinite: (query: Omit<ListCranesQuery, 'cursor'>) =>
+    ['cranes', 'infinite', query] as const,
   craneDetail: (id: string) => ['cranes', 'detail', id] as const,
 
   organizationOperators: ['organization-operators'] as const,
   organizationOperatorsList: (query: ListOrganizationOperatorsQuery) =>
     ['organization-operators', 'list', query] as const,
+  organizationOperatorsInfinite: (query: Omit<ListOrganizationOperatorsQuery, 'cursor'>) =>
+    ['organization-operators', 'infinite', query] as const,
   organizationOperatorDetail: (id: string) => ['organization-operators', 'detail', id] as const,
 }

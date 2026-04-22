@@ -1,5 +1,6 @@
 'use client'
 
+import { OrganizationsOverview } from '@/components/dashboard/organizations-overview'
 import { PendingAttentionCallout } from '@/components/dashboard/pending-attention-callout'
 import { StatCard } from '@/components/dashboard/stat-card'
 import { PageTransition } from '@/components/motion/page-transition'
@@ -114,6 +115,8 @@ export default function DashboardPage() {
               cranes={stats.data.pending.cranes}
             />
           ) : null}
+
+          <OrganizationsOverview />
         </>
       )}
     </PageTransition>

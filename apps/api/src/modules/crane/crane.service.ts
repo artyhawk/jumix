@@ -129,6 +129,9 @@ export class CraneService {
       status: params.status,
       type: params.type,
       siteId: params.siteId,
+      // organizationId фильтр-опция применяется только для superadmin ctx;
+      // для owner ctx репозиторий всегда scope'ит по ctx.organizationId.
+      organizationId: ctx.role === 'superadmin' ? params.organizationId : undefined,
       approvalStatus: this.resolveApprovalFilter(params),
     })
   }

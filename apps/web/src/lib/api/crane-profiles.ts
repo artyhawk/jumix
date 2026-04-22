@@ -1,11 +1,16 @@
 import { apiFetch } from './client'
-import type { ApprovalFilter, CraneProfile, Paginated } from './types'
+import type { ApprovalFilter, CraneProfile, LicenseStatus, Paginated } from './types'
+
+export type LicenseStatusFilter = LicenseStatus | 'all'
 
 export interface ListCraneProfilesQuery {
   cursor?: string
   limit?: number
   search?: string
   approvalStatus?: ApprovalFilter
+  // licenseStatus фильтруется клиентом на загруженной странице — backend
+  // computed на boundary, сервер-side фильтр — в backlog (см. web-architecture).
+  licenseStatus?: LicenseStatusFilter
 }
 
 export function listCraneProfiles(query: ListCraneProfilesQuery = {}) {

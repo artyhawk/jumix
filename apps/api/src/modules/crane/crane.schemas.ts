@@ -77,6 +77,9 @@ export const listCranesQuerySchema = z.object({
   status: craneStatusSchema.optional(),
   type: craneTypeSchema.optional(),
   siteId: z.string().uuid().optional(),
+  // Filter by owning organization — для superadmin-а (owner ctx уже scoped
+  // репозиторием, фильтр у owner'а игнорируется).
+  organizationId: z.string().uuid().optional(),
   approvalStatus: z.enum(['pending', 'approved', 'rejected', 'all']).optional(),
 })
 export type ListCranesQuery = z.infer<typeof listCranesQuerySchema>

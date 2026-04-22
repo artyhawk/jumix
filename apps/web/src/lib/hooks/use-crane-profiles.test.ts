@@ -7,6 +7,7 @@ import {
   useApproveCraneProfile,
   useCraneProfile,
   useCraneProfiles,
+  useCraneProfilesInfinite,
   useRejectCraneProfile,
 } from './use-crane-profiles'
 
@@ -142,6 +143,36 @@ describe('useApproveCraneProfile', () => {
 
     const invalidatedKeys = spy.mock.calls.map((c) => c[0]?.queryKey)
     expect(invalidatedKeys).toEqual(expect.arrayContaining([qk.craneProfiles, qk.dashboard]))
+  })
+})
+
+describe('useCraneProfilesInfinite', () => {
+  it('fetches first page without cursor', async () => {
+    list.mockResolvedValueOnce({ items: [makeProfile('p1')], nextCursor: 'c1' })
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useCraneProfilesInfinite({ approvalStatus: 'all' }), {
+      wrapper: Wrapper,
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(list).toHaveBeenCalledWith({ approvalStatus: 'all', cursor: undefined })
+    expect(result.current.data?.pages[0]?.items).toHaveLength(1)
+    expect(result.current.hasNextPage).toBe(true)
+  })
+
+  it('fetches next page with cursor', async () => {
+    list.mockImplementation(async ({ cursor }: { cursor?: string } = {}) => {
+      if (!cursor) return { items: [makeProfile('p1')], nextCursor: 'c1' }
+      return { items: [makeProfile('p2')], nextCursor: null }
+    })
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useCraneProfilesInfinite(), { wrapper: Wrapper })
+    await waitFor(() => expect(result.current.hasNextPage).toBe(true))
+    await act(async () => {
+      await result.current.fetchNextPage()
+    })
+    await waitFor(() => expect(result.current.data?.pages).toHaveLength(2))
+    expect(list).toHaveBeenLastCalledWith({ cursor: 'c1' })
+    expect(result.current.hasNextPage).toBe(false)
   })
 })
 

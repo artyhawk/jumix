@@ -429,6 +429,48 @@ Post-MVP:
 
 ---
 
+## Web — list pages (from B3-UI-2c)
+
+### IntersectionObserver trigger для infinite load
+
+Сейчас `DataTable` рендерит кнопку «Загрузить ещё» когда `hasMore`. Это consciously минималистично — предсказуемо, не ест bandwidth случайно. Post-MVP — IntersectionObserver на sentinel-row, который автоматически тянет next page когда приближается к bottom. Требует debounce против prefetch-storm'а и fallback для старых браузеров.
+
+Триггер: UX-фидбек заказчика «хочу scroll-to-load» ИЛИ >200 rows типичный case.
+
+### Server-side license filter
+
+`crane_profiles` list-page сейчас фильтрует по `licenseStatus` client-side (`useMemo` поверх страницы). `licenseStatus` computed на boundary из `license_expires_at` и `license_key` — SQL-фильтр возможен, но требует duplicate'а логики `computeLicenseStatus` (5 состояний с датами now + 7d + 30d).
+
+Post-MVP: API-param `?licenseStatus=expired|expiring_critical|...` → repository переводит в SQL-WHERE с тем же пороговыми датами что и `computeLicenseStatus`. Нужна общая функция (shared между backend SQL и frontend computed).
+
+Триггер: типичная организация имеет > 50 крановщиков И фильтр по лицензии становится primary use-case.
+
+### Server-side crane type filter
+
+Аналогично license — `cranes` page фильтрует `type` client-side. Backend API уже принимает `search`, `approvalStatus`, `status`, но НЕ `type`. Добавить `?type=tower|crawler|...` и использовать вместо `useMemo`.
+
+Простой change (enum-поле, прямой WHERE). Триггер: rule of three — когда появится третий client-side фильтр с похожим паттерном, унифицировать все три.
+
+### Virtualized rows
+
+`DataTable` рендерит все строки напрямую. При 500+ строк (большая org с десятками крановщиков × десятками кранов) — scroll jank и memory pressure. Post-MVP — TanStack Virtual или react-window.
+
+Триггер: реальный case с >500 rows на одной странице ИЛИ жалоба на лаги.
+
+### Bulk actions (select multiple + batch approve/reject)
+
+Сейчас approve/reject — по одной entity через drawer. При onboarding'е нового тенанта superadmin может одобрять десятки crane_profiles + hires подряд. Bulk UI: checkbox в DataTable + sticky action bar «Одобрить выбранные (N)».
+
+Триггер: реальный pain-point при onboarding'е крупного клиента ИЛИ заказчик запросит.
+
+### URL-state via nuqs вместо ручного setParam
+
+Ручной `setParam` helper дублируется на каждой page (идентичная реализация). Когда появится 6+ pages с этим паттерном — мигрировать на `nuqs` (typed URL-state helpers для App Router). MVP — оставляем inline, потому что 4 page × 10 строк < overhead библиотеки.
+
+Триггер: 6+ pages ИЛИ первая регрессия из-за рассинхрона реализаций.
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:

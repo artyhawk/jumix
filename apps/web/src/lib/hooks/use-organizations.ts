@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type ListOrganizationsQuery,
   activateOrganization,
@@ -16,6 +16,16 @@ export function useOrganizations(query: ListOrganizationsQuery = {}) {
   return useQuery({
     queryKey: qk.organizationsList(query),
     queryFn: () => listOrganizations(query),
+  })
+}
+
+export function useOrganizationsInfinite(query: Omit<ListOrganizationsQuery, 'cursor'> = {}) {
+  return useInfiniteQuery({
+    queryKey: qk.organizationsInfinite(query),
+    queryFn: ({ pageParam }) =>
+      listOrganizations({ ...query, cursor: pageParam as string | undefined }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
   })
 }
 
