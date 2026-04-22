@@ -103,6 +103,100 @@
 
 ---
 
+## Operators (from B2b)
+
+### Operator transfer between organizations
+
+Сейчас `operators.organization_id` — fixed после create: изменить нельзя ни через admin-update (поле отсутствует в `updateOperatorAdminSchema`), ни через repository. Кейс «крановщик увольняется из org A и устраивается в org B» сегодня решается через soft-delete в A + create заново в B (новый `operators.id`, новый history).
+
+Пост-MVP — явный flow transfer:
+- API `POST /api/v1/operators/:id/transfer` с `{ targetOrganizationId, effectiveDate }`, доступен только superadmin (между orgs своей платформы).
+- Сохраняет historical audit: `transferred_from_org_id`, дата.
+- Операционные данные (shifts, documents) остаются в org A (история), новые — в org B.
+
+Триггер: реальный запрос от заказчика на cross-org movement (до этого acceptable workaround — через soft-delete + recreate).
+
+### Rehire workflow (`rehired_at` column)
+
+Сейчас `terminated_at` — historical record: при `terminated→active` дата увольнения сохраняется (см. commit 3 rationale). Это корректно для law-compliance (чтобы доказать что было увольнение), но теряется дата *возвращения* — если один и тот же оператор уволен в марте и возвращён в июне, мы не знаем дату возврата без парсинга `audit_log`.
+
+Добавить `operators.rehired_at date null` и писать туда `sql`(now() at time zone 'utc')::date` при переходе `terminated→active`. Потребует миграции + расширение `changeStatus` в service. Нужно для отчётов «стаж в компании с учётом перерывов».
+
+Триггер: финансовый отчёт с учётом «непрерывного стажа» (Этап 3) ИЛИ HR-запрос от заказчика.
+
+### SMS re-verification on phone change
+
+Сейчас `operators.phone` (точнее `users.phone`, связанный через FK) — immutable после create. Admin НЕ может менять phone через `PATCH /:id` (поле не в whitelist), operator НЕ может через `/me` (whitelist только ФИО). Это consciously restrictive — любая смена phone сейчас = soft-delete + create заново.
+
+Post-MVP flow:
+1. `POST /api/v1/operators/me/phone/change-request` — operator вводит новый phone.
+2. SMS OTP на новый номер (через Mobizon).
+3. `POST /api/v1/operators/me/phone/confirm` с кодом → `users.phone` атомарно обновляется, старые refresh-tokens revoke'аются (принудительный re-login на всех устройствах).
+4. Audit с обоими номерами (старый + новый), уведомление admin'у org.
+
+Триггер: реальный user-request (крановщик сменил SIM-карту). До этого acceptable workaround — admin делает soft-delete и создаёт заново.
+
+### Orphan avatar cron
+
+Сейчас presigned PUT создаёт объект в MinIO по `operators/<orgId>/<operatorId>/avatar/<uuid>.<ext>`, но confirm может не произойти (пользователь закрыл вкладку, сеть упала). Объект остаётся в bucket'е — никогда не пересечётся с DB, никогда не удалится.
+
+Пост-MVP cron:
+- Раз в сутки listObjects с префиксом `operators/*/avatar/`, для каждого key сверять с `operators.avatar_key` в БД.
+- Если key НЕ матчится и `LastModified > 24h назад` — удалить (grace period на in-flight uploads).
+- Альтернатива: MinIO lifecycle rule с tag `pending-confirm` который снимается в confirm handler.
+
+Триггер: первые признаки bucket bloat ИЛИ жалоба на storage billing.
+
+### Availability endpoints (shifts integration, Этап 2)
+
+`operators.availability` (`free | busy | on_shift | null`) сейчас read-only — имеет CHECK что `NULL ⇔ status≠active`, но НЕТ endpoint'а для изменения. Это сознательно: availability меняется не admin-fiat, а как функция shifts state (когда shift started → `busy`/`on_shift`, когда ended → `free`).
+
+На Этапе 2 shifts-модуль будет писать availability транзакционно вместе с shift events. Endpoint для ручного override (`PATCH /:id/availability`) — open question: скорее нужен (admin override когда data diverges) но с ограничениями (только superadmin? только для `free↔busy` не `on_shift`?). Решим когда появится shifts state machine.
+
+### Bulk operations (CSV import)
+
+Сейчас operators создаются по одному через `POST /operators`. Реальный onboarding org часто = 10-50 крановщиков сразу — manual form-filling неприемлем.
+
+Post-MVP: `POST /api/v1/operators/bulk` с CSV upload → validation pre-flight (все phone уникальны, все IIN валидны, нет конфликтов) → атомарный insert всех либо ни одного. Report о результате — JSON с success/errors по строкам.
+
+Триггер: onboarding крупного клиента с >10 операторов.
+
+### `operators.specialization` structured schema
+
+Сейчас `specialization` — свободный JSONB (`z.record(z.unknown())`). Ожидаемая структура (гипотеза, ожидает подтверждения):
+- `craneTypes: CraneType[]` — какие типы кранов оператор умеет водить (match с `cranes.type_enum`).
+- `licenseClasses: string[]` — классы удостоверения (по приказу Минтруда РК).
+- `yearsOfExperience: number`
+- `certifications: { name, issuedAt, expiresAt, issuer }[]`
+
+Когда заказчик подтвердит структуру → заменить `z.record` на строгую схему + JSONB CHECK в БД. Связка с crane assignment (оператор может работать только на кране из своей specialization.craneTypes) — Этап 2.
+
+### Preferred language (i18n per-user)
+
+`users` не имеет `preferred_language` колонки. Сейчас язык определяется на клиенте (web persist в localStorage, mobile — в Expo SecureStore). Это ломается при: (а) первом логине на новом устройстве, (б) email/SMS от системы — сейчас шлём default RU.
+
+Post-MVP: `users.preferred_language: 'ru' | 'kz'` (default 'ru'), `/me`-endpoint для self-update, применение в notification templates.
+
+Триггер: появление SMS-notifications (Этап 2) ИЛИ email-шаблонов.
+
+### Operator roles within organization
+
+Сейчас внутри org все operators равны — нет concept'а «senior operator», «team lead», «trainee». Tariffs могут различаться (через `cranes.tariffs_json` или per-assignment), но role — нет.
+
+Если заказчик захочет: добавить `operators.internal_role: string | null` (free-form tag, не enum — в каждой org свой набор). Не влияет на RBAC, только на UX (фильтры, отчёты, display).
+
+Триггер: запрос от заказчика.
+
+### Public operator profile QR code
+
+Marketplace (Этап 4) — operators, согласившиеся быть видимыми на platform-wide бирже. Для физического обмена контактами на стройке (мастер участка фотографирует QR → видит profile crane-operator'а) нужен shareable link.
+
+Post-MVP: `GET /public/operators/:token` где `token` — short-lived JWT или UUID из БД с TTL, генерируется operator'ом через `POST /me/public-link`. DTO — ограниченный (без phone, без IIN), только ФИО + avatar + specialization + rating.
+
+Триггер: запрос от заказчика для marketplace UX.
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:

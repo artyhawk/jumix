@@ -47,6 +47,20 @@ export const operatorPolicy = {
 }
 ```
 
+Policies — **чистые функции** над `AuthContext` + минимальным `Pick<Entity, ...>`. Никаких БД-запросов, никаких сайд-эффектов; это делает их легко unit-тестируемыми матрицей «роль × область».
+
+## 4.2a Self-scope predicates (`canReadSelf` / `canUpdateSelf`)
+
+Для self-service endpoints (`/me`, `/me/avatar/*`) policy выделяет отдельные предикаты. Их контракт отличается от admin-предикатов:
+
+- **Subject identification — ТОЛЬКО `ctx.userId`.** Никогда — `request.params.id`, `request.body.userId` и т.п. Это не стилистическое правило, а защита от cross-tenant CSRF-подобных атак: оператор не должен иметь возможности указать «чей» профиль он редактирует даже через ошибку программиста (см. CLAUDE.md §6 rule #10).
+- **`canReadSelf` работает для ВСЕХ статусов** (`active` / `blocked` / `terminated`). Обоснование — ПДЛ РК и ст. 23 Закона «О персональных данных»: субъект имеет право на доступ к своим ПДН вне зависимости от блокировки/увольнения. Скрывать собственные данные от субъекта — нельзя.
+- **`canUpdateSelf` требует `status='active'`.** Заблокированный или уволенный оператор не может «обновить своё ФИО» — его учётная запись заморожена. Единственный путь разморозки — admin меняет статус.
+- **`deleted_at IS NOT NULL` = полная заморозка.** Soft-deleted записи не доступны даже через `canReadSelf` (repository уровень отсекает их независимо от policy).
+- **Owner/superadmin не могут использовать `canReadSelf` / `canUpdateSelf`.** Для них есть admin-предикаты с проверкой `organizationId`. Это гарантирует что handler-у `/me` нельзя «подсунуть» admin-токен.
+
+**Типичная ошибка:** принимать `operatorId` в `/me`-endpoint «для гибкости». Это открывает cross-tenant vulnerability — хотя policy вернёт false, сам факт наличия параметра в контракте приглашает к злоупотреблениям. Правильно: `/me`-endpoints НЕ имеют path/body параметров для идентификации субъекта, subject берётся только из `ctx.userId`.
+
 **Layer 3: Repository с обязательным AuthContext**
 
 ```typescript

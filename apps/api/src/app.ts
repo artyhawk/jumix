@@ -7,6 +7,7 @@ import { type FastifyInstance, fastify } from 'fastify'
 import type { Env } from './config/env'
 import authPlugin from './modules/auth/auth.plugin'
 import cranePlugin from './modules/crane/crane.plugin'
+import operatorPlugin from './modules/operator/operator.plugin'
 import organizationPlugin from './modules/organization/organization.plugin'
 import sitePlugin from './modules/site/site.plugin'
 import authenticatePlugin from './plugins/authenticate'
@@ -67,6 +68,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(organizationPlugin)
   await app.register(sitePlugin)
   await app.register(cranePlugin)
+  await app.register(operatorPlugin)
 
   return app
 }

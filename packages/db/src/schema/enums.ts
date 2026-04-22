@@ -36,6 +36,28 @@ export const craneTypeEnum = pgEnum('crane_type', ['tower', 'mobile', 'crawler',
 // deleted_at!=null → скрыт из UI полностью, история сохраняется.
 export const craneStatusEnum = pgEnum('crane_status', ['active', 'maintenance', 'retired'])
 
+// Жизненный цикл крановщика (employment status).
+//   active      → работает нормально, смены фиксируются
+//   blocked     → временно заблокирован (дисциплинарно), не может работать,
+//                 профиль остаётся виден самому оператору
+//   terminated  → трудовой договор расторгнут, не может работать; профиль
+//                 остаётся виден оператору — по законодательству РК (PDL)
+//                 субъект персональных данных имеет право читать свои данные,
+//                 в т.ч. после увольнения
+// Orthogonal к deleted_at: terminated + deleted_at=null → в списке как «уволен»;
+// deleted_at!=null → скрыт из UI полностью (permanent-удаление).
+export const operatorStatusEnum = pgEnum('operator_status', ['active', 'blocked', 'terminated'])
+
+// Доступность крановщика для назначения смен. Имеет смысл ТОЛЬКО при
+// status='active' (CHECK constraint на уровне БД). Nullable: у blocked/terminated
+// availability всегда NULL. Сейчас placeholder — endpoints смен появятся в
+// B3/shifts, там же логика перехода free ↔ busy ↔ on_shift.
+export const operatorAvailabilityEnum = pgEnum('operator_availability', [
+  'free',
+  'busy',
+  'on_shift',
+])
+
 // События auth для audit trail (CLAUDE.md §5.4)
 export const authEventTypeEnum = pgEnum('auth_event_type', [
   'login_success',
