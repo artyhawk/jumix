@@ -22,6 +22,16 @@ describe('applyPhoneMask', () => {
     expect(r.digits).toBe('7010001122')
     expect(r.formatted).toBe('+7 701 000 11 22')
   })
+
+  it('does not double-count the rendered +7 prefix during incremental typing', () => {
+    // Display was "+7 7", user types "0" → browser emits "+7 70".
+    // Digit "7" from the literal prefix must NOT be counted as user input.
+    expect(applyPhoneMask('+7 70').digits).toBe('70')
+    expect(applyPhoneMask('+7 70').formatted).toBe('+7 70')
+    // Longer chain — last digit just appended by user.
+    expect(applyPhoneMask('+7 701 000 112').digits).toBe('701000112')
+    expect(applyPhoneMask('+7 701 000 112').formatted).toBe('+7 701 000 11 2')
+  })
 })
 
 describe('toE164', () => {

@@ -16,16 +16,15 @@ export function formatKzPhoneDisplay(e164: string): string {
  * обрезает до 10 штук после KZ префикса 7/8 (оба приводим к одному набору).
  */
 export function applyPhoneMask(raw: string): { formatted: string; digits: string } {
-  // Вытаскиваем только цифры
-  let onlyDigits = raw.replace(/\D/g, '')
-  // Срезаем национальный префикс ТОЛЬКО когда вход явно содержит 11 цифр,
-  // начинающихся с 7/8 (полный +7XXXXXXXXXX или казахское 8XXXXXXXXXX).
-  // При живом вводе 10 цифр (701...) первая цифра — часть кода оператора,
-  // удалять её нельзя — иначе теряем символ при последовательном typing'е.
-  if (onlyDigits.length === 11 && (onlyDigits.startsWith('7') || onlyDigits.startsWith('8'))) {
-    onlyDigits = onlyDigits.slice(1)
-  } else if (onlyDigits.length > 11 && (onlyDigits.startsWith('7') || onlyDigits.startsWith('8'))) {
-    // Длиннее 11 — paste с лишним мусором, обрезаем префикс и truncate'им.
+  // Маска всегда рендерит литерал "+7 …", поэтому при live-typing input.value
+  // уже содержит "+7" перед тем, что пользователь реально печатает. Срезаем
+  // этот префикс ДО извлечения digits — иначе "7" из "+7" попадает в digits
+  // и сдвигает ввод (пользователь печатает "0", получает "+7 70").
+  const stripped = raw.startsWith('+7') ? raw.slice(2) : raw
+  let onlyDigits = stripped.replace(/\D/g, '')
+  // Paste полной 11-значной национальной формы ("77010001122" / "87010001122")
+  // — срезаем ведущий префикс. Не трогаем 10-значный ввод без префикса.
+  if (onlyDigits.length >= 11 && (onlyDigits.startsWith('7') || onlyDigits.startsWith('8'))) {
     onlyDigits = onlyDigits.slice(1)
   }
   const digits = onlyDigits.slice(0, 10)

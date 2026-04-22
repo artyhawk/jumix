@@ -166,19 +166,13 @@ export function DataTable<Row>({
                 }
                 tabIndex={onRowClick ? 0 : undefined}
                 className={cn(
-                  'group relative border-b border-border-subtle last:border-0',
+                  'group border-b border-border-subtle last:border-0',
                   'transition-colors duration-100',
                   onRowClick ? 'cursor-pointer hover:bg-layer-2' : '',
                   rowHeight,
                 )}
               >
-                {onRowClick ? (
-                  <td
-                    aria-hidden
-                    className="absolute left-0 top-0 h-full w-[2px] bg-transparent group-hover:bg-brand-500 transition-colors"
-                  />
-                ) : null}
-                {columns.map((col) => (
+                {columns.map((col, idx) => (
                   <td
                     key={col.key}
                     className={cn(
@@ -186,8 +180,15 @@ export function DataTable<Row>({
                       cellPy,
                       alignCls[col.align ?? 'left'],
                       col.muted ? 'text-text-secondary' : 'text-text-primary',
+                      idx === 0 && onRowClick ? 'relative' : '',
                     )}
                   >
+                    {idx === 0 && onRowClick ? (
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute left-0 top-0 h-full w-[2px] bg-transparent group-hover:bg-brand-500 transition-colors"
+                      />
+                    ) : null}
                     {col.cell(row)}
                   </td>
                 ))}
