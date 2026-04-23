@@ -9,7 +9,9 @@ import {
   MapPin,
   Plus,
   Shield,
+  UserPlus,
   Users,
+  UsersRound,
 } from 'lucide-react'
 
 /**
@@ -36,7 +38,12 @@ export interface CommandEntry {
   action?: CommandAction
 }
 
-export type CommandAction = 'logout' | 'create-organization' | 'create-site' | 'create-crane'
+export type CommandAction =
+  | 'logout'
+  | 'create-organization'
+  | 'create-site'
+  | 'create-crane'
+  | 'create-hire-request'
 
 export const COMMAND_REGISTRY: CommandEntry[] = [
   // ---- Navigation — superadmin ----
@@ -123,6 +130,24 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
     roles: ['owner'],
     href: '/my-cranes',
   },
+  {
+    id: 'nav.hire-requests',
+    label: 'Заявки на найм',
+    keywords: ['hires', 'hire requests', 'zayavki', 'найм', 'найми'],
+    icon: Shield,
+    group: 'navigation',
+    roles: ['owner'],
+    href: '/hire-requests',
+  },
+  {
+    id: 'nav.my-operators',
+    label: 'Мои операторы',
+    keywords: ['operators', 'my team', 'moi operatory', 'крановщики', 'команда'],
+    icon: UsersRound,
+    group: 'navigation',
+    roles: ['owner'],
+    href: '/my-operators',
+  },
 
   // ---- Actions — superadmin ----
   {
@@ -153,6 +178,15 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
     group: 'actions',
     roles: ['owner'],
     action: 'create-crane',
+  },
+  {
+    id: 'action.create-hire-request',
+    label: 'Нанять крановщика',
+    keywords: ['hire', 'new hire', 'nanyat', 'найм', 'добавить'],
+    icon: UserPlus,
+    group: 'actions',
+    roles: ['owner'],
+    action: 'create-hire-request',
   },
 
   // ---- System (all roles) ----

@@ -52,8 +52,13 @@ export const navItemsByRole: Record<UserRole, NavItem[]> = {
       icon: IconCrane as LucideIcon,
       section: 'operations',
     },
-    { labelKey: 'nav.myOperators', href: '/', icon: UsersRound, section: 'people' },
-    { labelKey: 'nav.hireRequests', href: '/', icon: ShieldCheck, section: 'people' },
+    { labelKey: 'nav.myOperators', href: '/my-operators', icon: UsersRound, section: 'people' },
+    {
+      labelKey: 'nav.hireRequests',
+      href: '/hire-requests',
+      icon: ShieldCheck,
+      section: 'people',
+    },
   ],
   operator: [
     { labelKey: 'nav.myProfile', href: '/', icon: UserCircle, section: 'people' },

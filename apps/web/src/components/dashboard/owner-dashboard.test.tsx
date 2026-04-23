@@ -138,13 +138,22 @@ describe('OwnerDashboard', () => {
     })
   })
 
-  it('renders two placeholder cards for upcoming metrics', async () => {
+  it('renders Активные операторы stat card linking to /my-operators', async () => {
+    getOwnerStats.mockResolvedValue(makeStats({ active: { sites: 0, cranes: 0, memberships: 5 } }))
     renderDash()
     await waitFor(() => {
-      expect(screen.getByText('Операторы на смене')).toBeInTheDocument()
+      const card = screen.getByRole('link', { name: /Активные операторы/ })
+      expect(card).toHaveAttribute('href', '/my-operators')
+    })
+  })
+
+  it('renders a single placeholder card for upcoming finance metric', async () => {
+    renderDash()
+    await waitFor(() => {
       expect(screen.getByText('Расходы за месяц')).toBeInTheDocument()
     })
-    expect(screen.getAllByText('Скоро').length).toBe(2)
+    expect(screen.getAllByText('Скоро').length).toBe(1)
+    expect(screen.queryByText('Операторы на смене')).toBeNull()
   })
 
   it('renders OwnerSitesMap + RecentSitesList in 2-col grid', async () => {

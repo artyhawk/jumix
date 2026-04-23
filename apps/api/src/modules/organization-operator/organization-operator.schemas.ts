@@ -51,6 +51,15 @@ export type ChangeOrganizationOperatorStatusInput = z.infer<
   typeof changeOrganizationOperatorStatusSchema
 >
 
+/**
+ * POST /:id/block accepts optional `reason` (audit metadata). Owner-facing
+ * convenience endpoint поверх changeStatus — fixes status='blocked'.
+ */
+export const blockOrganizationOperatorSchema = z
+  .object({ reason: reasonSchema.optional() })
+  .default({})
+export type BlockOrganizationOperatorInput = z.infer<typeof blockOrganizationOperatorSchema>
+
 export const rejectOrganizationOperatorSchema = z.object({
   reason: reasonSchema,
 })

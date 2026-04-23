@@ -44,6 +44,10 @@ export function useCommands() {
         router.push('/my-cranes?create=true')
         return
       }
+      if (cmd.action === 'create-hire-request') {
+        router.push('/hire-requests?create=true')
+        return
+      }
     },
     [router, logout],
   )

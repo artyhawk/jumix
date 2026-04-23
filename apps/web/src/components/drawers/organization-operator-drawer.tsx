@@ -14,15 +14,20 @@ import {
 } from '@/components/ui/drawer'
 import { LicenseStatusBadge } from '@/components/ui/license-status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
+import { useAuth } from '@/hooks/use-auth'
 import { isAppError } from '@/lib/api/errors'
 import type { ApprovalStatus, OperatorHireStatus, OrganizationOperator } from '@/lib/api/types'
 import { formatRelativeTime } from '@/lib/format/time'
 import {
+  useActivateOrganizationOperator,
   useApproveOrganizationOperator,
+  useBlockOrganizationOperator,
   useOrganizationOperator,
+  useTerminateOrganizationOperator,
 } from '@/lib/hooks/use-organization-operators'
 import { formatKzPhoneDisplay } from '@/lib/phone-format'
-import { ArrowRight, Building2, ShieldAlert } from 'lucide-react'
+import { ArrowRight, Building2, ShieldAlert, UserMinus } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { DetailRow } from './detail-row'
@@ -68,6 +73,7 @@ export function OrganizationOperatorDrawer({
   organizationName,
   onOpenCraneProfile,
 }: Props) {
+  const { user } = useAuth()
   const [rejectOpen, setRejectOpen] = useState(false)
   const query = useOrganizationOperator(id)
   const approve = useApproveOrganizationOperator()
@@ -90,6 +96,15 @@ export function OrganizationOperatorDrawer({
         .join(' ')
     : ''
 
+  const isSuperadmin = user?.role === 'superadmin'
+  const isOwnerOfHire = user?.role === 'owner' && hire?.organizationId === user.organizationId
+
+  const showSuperadminApproval = isSuperadmin && hire?.approvalStatus === 'pending'
+  const showOwnerActions = isOwnerOfHire && hire?.approvalStatus === 'approved'
+  const showRejectedNotice = Boolean(
+    hire?.approvalStatus === 'rejected' && (isOwnerOfHire || isSuperadmin),
+  )
+
   return (
     <>
       <DrawerRoot open={id !== null} onOpenChange={onOpenChange}>
@@ -107,10 +122,11 @@ export function OrganizationOperatorDrawer({
                 hire={hire}
                 organizationName={organizationName}
                 onOpenCraneProfile={onOpenCraneProfile}
+                showRejectedNotice={showRejectedNotice}
               />
             ) : null}
           </DrawerBody>
-          {hire?.approvalStatus === 'pending' ? (
+          {showSuperadminApproval && hire ? (
             <DrawerFooter className="flex-col-reverse md:flex-row">
               <Button
                 variant="ghost"
@@ -129,6 +145,8 @@ export function OrganizationOperatorDrawer({
                 Одобрить
               </Button>
             </DrawerFooter>
+          ) : showOwnerActions && hire ? (
+            <OwnerActionsFooter hire={hire} fullName={fullName} />
           ) : null}
         </DrawerContent>
       </DrawerRoot>
@@ -146,14 +164,164 @@ export function OrganizationOperatorDrawer({
   )
 }
 
+function OwnerActionsFooter({
+  hire,
+  fullName,
+}: {
+  hire: OrganizationOperator
+  fullName: string
+}) {
+  const [mode, setMode] = useState<'idle' | 'block' | 'terminate-confirm'>('idle')
+  const [reason, setReason] = useState('')
+  const block = useBlockOrganizationOperator()
+  const activate = useActivateOrganizationOperator()
+  const terminate = useTerminateOrganizationOperator()
+
+  const busy = block.isPending || activate.isPending || terminate.isPending
+
+  const resetFlow = () => {
+    setMode('idle')
+    setReason('')
+  }
+
+  const handleBlockSubmit = async () => {
+    try {
+      await block.mutateAsync({ id: hire.id, reason: reason.trim() || undefined })
+      toast.success('Оператор приостановлен')
+      resetFlow()
+    } catch (err) {
+      const message = isAppError(err) ? err.message : 'Попробуйте ещё раз'
+      toast.error('Не удалось приостановить', { description: message })
+    }
+  }
+
+  const handleActivate = async () => {
+    try {
+      await activate.mutateAsync(hire.id)
+      toast.success('Оператор разблокирован')
+    } catch (err) {
+      const message = isAppError(err) ? err.message : 'Попробуйте ещё раз'
+      toast.error('Не удалось разблокировать', { description: message })
+    }
+  }
+
+  const handleTerminate = async () => {
+    try {
+      await terminate.mutateAsync(hire.id)
+      toast.success('Оператор уволен')
+      resetFlow()
+    } catch (err) {
+      const message = isAppError(err) ? err.message : 'Попробуйте ещё раз'
+      toast.error('Не удалось уволить', { description: message })
+    }
+  }
+
+  if (hire.status === 'terminated') {
+    return (
+      <DrawerFooter className="flex-col items-start">
+        <div className="flex items-center gap-2 text-sm text-text-tertiary">
+          <UserMinus className="size-4" strokeWidth={1.5} aria-hidden />
+          <span>
+            Сотрудник уволен
+            {hire.terminatedAt ? ` · ${formatRelativeTime(hire.terminatedAt)}` : ''}
+          </span>
+        </div>
+      </DrawerFooter>
+    )
+  }
+
+  if (mode === 'block') {
+    return (
+      <DrawerFooter className="flex-col">
+        <div className="flex w-full flex-col gap-2">
+          <label htmlFor="block-reason" className="text-xs font-medium text-text-secondary">
+            Причина (необязательно)
+          </label>
+          <Textarea
+            id="block-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value.slice(0, 300))}
+            placeholder="Например: отпуск, больничный, нарушение"
+            rows={3}
+            maxLength={300}
+            autoFocus
+          />
+          <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end">
+            <Button variant="ghost" onClick={resetFlow} disabled={busy}>
+              Отмена
+            </Button>
+            <Button variant="primary" onClick={handleBlockSubmit} loading={block.isPending}>
+              Приостановить
+            </Button>
+          </div>
+        </div>
+      </DrawerFooter>
+    )
+  }
+
+  if (mode === 'terminate-confirm') {
+    return (
+      <DrawerFooter className="flex-col items-start">
+        <div className="text-sm text-text-primary">Уволить {fullName}?</div>
+        <div className="text-xs text-text-secondary">
+          Это действие нельзя отменить. Для повторного найма понадобится новая заявка.
+        </div>
+        <div className="flex w-full flex-col-reverse gap-2 md:flex-row md:justify-end">
+          <Button variant="ghost" onClick={resetFlow} disabled={busy}>
+            Отмена
+          </Button>
+          <Button variant="danger" onClick={handleTerminate} loading={terminate.isPending}>
+            Да, уволить
+          </Button>
+        </div>
+      </DrawerFooter>
+    )
+  }
+
+  return (
+    <DrawerFooter className="flex-col-reverse md:flex-row md:justify-end">
+      {hire.status === 'active' ? (
+        <Button
+          variant="ghost"
+          onClick={() => setMode('block')}
+          disabled={busy}
+          className="w-full md:w-auto"
+        >
+          Приостановить
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          onClick={handleActivate}
+          loading={activate.isPending}
+          disabled={busy && !activate.isPending}
+          className="w-full md:w-auto"
+        >
+          Разблокировать
+        </Button>
+      )}
+      <Button
+        variant="danger"
+        onClick={() => setMode('terminate-confirm')}
+        disabled={busy}
+        className="w-full md:w-auto"
+      >
+        Уволить
+      </Button>
+    </DrawerFooter>
+  )
+}
+
 function OrganizationOperatorDrawerBody({
   hire,
   organizationName,
   onOpenCraneProfile,
+  showRejectedNotice,
 }: {
   hire: OrganizationOperator
   organizationName?: string
   onOpenCraneProfile?: (craneProfileId: string) => void
+  showRejectedNotice: boolean
 }) {
   const cp = hire.craneProfile
   const fullName = [cp.lastName, cp.firstName, cp.patronymic].filter(Boolean).join(' ')
@@ -180,7 +348,7 @@ function OrganizationOperatorDrawerBody({
           {organizationName ?? hire.organizationId}
         </span>
       </div>
-      {hire.approvalStatus === 'rejected' && hire.rejectionReason ? (
+      {showRejectedNotice && hire.rejectionReason ? (
         <div className="flex items-start gap-2 rounded-[10px] border border-danger/25 bg-danger/10 p-3 text-sm text-danger">
           <ShieldAlert className="size-4 shrink-0 mt-0.5" strokeWidth={1.5} aria-hidden />
           <span>{hire.rejectionReason}</span>

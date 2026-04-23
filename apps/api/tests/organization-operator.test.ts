@@ -281,6 +281,9 @@ describe('POST /api/v1/organization-operators (hire)', () => {
     expect(json.craneProfile.lastName).toBe('Kasymov')
     expect(json.craneProfile.approvalStatus).toBe('approved')
     expect(json.craneProfile.phone).toBeUndefined()
+    // licenseStatus computed на boundary (B3-UI-3c): нет удостоверения → 'missing'.
+    expect(json.craneProfile.licenseStatus).toBe('missing')
+    expect(json.craneProfile.licenseExpiresAt).toBeNull()
 
     const audits = await handle.app.db.db
       .select()
@@ -432,7 +435,7 @@ describe('POST /api/v1/organization-operators (hire)', () => {
     expect(res.json().error.code).toBe('CRANE_PROFILE_NOT_APPROVED')
   })
 
-  it('409: ALREADY_MEMBER when hiring same profile twice into same org', async () => {
+  it('409: OPERATOR_ALREADY_HIRED when hiring same profile twice into same org', async () => {
     const profile = await createApprovedProfile()
     await createPendingHire(ownerAToken, profile)
     const res = await handle.app.inject({
@@ -442,7 +445,7 @@ describe('POST /api/v1/organization-operators (hire)', () => {
       payload: { craneProfileId: profile.craneProfileId },
     })
     expect(res.statusCode).toBe(409)
-    expect(res.json().error.code).toBe('ALREADY_MEMBER')
+    expect(res.json().error.code).toBe('OPERATOR_ALREADY_HIRED')
   })
 })
 
@@ -937,29 +940,7 @@ describe('PATCH /:id/status — CRITICAL terminated_at semantics', () => {
     expect((audits[0]?.metadata as { reason?: string })?.reason).toBe('resignation')
   })
 
-  it('CRITICAL: terminated → active keeps terminated_at (historical record)', async () => {
-    const op = await createOperationalHire(ownerAToken)
-    const term = await handle.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/organization-operators/${op.id}/status`,
-      headers: { authorization: `Bearer ${ownerAToken}` },
-      payload: { status: 'terminated' },
-    })
-    const terminatedDate = term.json().terminatedAt as string
-    expect(terminatedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
-
-    const recover = await handle.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/organization-operators/${op.id}/status`,
-      headers: { authorization: `Bearer ${ownerAToken}` },
-      payload: { status: 'active' },
-    })
-    expect(recover.statusCode).toBe(200)
-    expect(recover.json().status).toBe('active')
-    expect(recover.json().terminatedAt).toBe(terminatedDate)
-  })
-
-  it('CRITICAL: terminated → blocked keeps terminated_at', async () => {
+  it('CRITICAL: terminated → active — 409 INVALID_STATUS_TRANSITION (terminal)', async () => {
     const op = await createOperationalHire(ownerAToken)
     await handle.app.inject({
       method: 'PATCH',
@@ -967,24 +948,32 @@ describe('PATCH /:id/status — CRITICAL terminated_at semantics', () => {
       headers: { authorization: `Bearer ${ownerAToken}` },
       payload: { status: 'terminated' },
     })
-    const row1 = await handle.app.db.db
-      .select({ terminatedAt: organizationOperators.terminatedAt })
-      .from(organizationOperators)
-      .where(eq(organizationOperators.id, op.id))
-    const t1 = row1[0]?.terminatedAt
+    const recover = await handle.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/organization-operators/${op.id}/status`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { status: 'active' },
+    })
+    expect(recover.statusCode).toBe(409)
+    expect(recover.json().error.code).toBe('INVALID_STATUS_TRANSITION')
+  })
 
+  it('CRITICAL: terminated → blocked — 409 INVALID_STATUS_TRANSITION (terminal)', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    await handle.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/organization-operators/${op.id}/status`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { status: 'terminated' },
+    })
     const res = await handle.app.inject({
       method: 'PATCH',
       url: `/api/v1/organization-operators/${op.id}/status`,
       headers: { authorization: `Bearer ${ownerAToken}` },
       payload: { status: 'blocked' },
     })
-    expect(res.statusCode).toBe(200)
-    const row2 = await handle.app.db.db
-      .select({ terminatedAt: organizationOperators.terminatedAt })
-      .from(organizationOperators)
-      .where(eq(organizationOperators.id, op.id))
-    expect(row2[0]?.terminatedAt?.toISOString()).toBe(t1?.toISOString())
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('INVALID_STATUS_TRANSITION')
   })
 
   it('CRITICAL: idempotent terminated → terminated — NOT bump + NO new audit', async () => {
@@ -1024,7 +1013,9 @@ describe('PATCH /:id/status — CRITICAL terminated_at semantics', () => {
     expect(audits).toHaveLength(1)
   })
 
-  it('CRITICAL: terminated → active → terminated (rehire) — second audit written', async () => {
+  it('CRITICAL: rehire after terminate requires new hire request (terminal invariant)', async () => {
+    // После увольнения owner создаёт новый hire-request; identity на
+    // crane_profile сохраняется — softDelete освобождает UNIQUE-слот.
     const op = await createOperationalHire(ownerAToken)
     await handle.app.inject({
       method: 'PATCH',
@@ -1032,27 +1023,22 @@ describe('PATCH /:id/status — CRITICAL terminated_at semantics', () => {
       headers: { authorization: `Bearer ${ownerAToken}` },
       payload: { status: 'terminated' },
     })
-    await handle.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/organization-operators/${op.id}/status`,
+    const delRes = await handle.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/organization-operators/${op.id}`,
       headers: { authorization: `Bearer ${ownerAToken}` },
-      payload: { status: 'active' },
     })
-    await new Promise((r) => setTimeout(r, 25))
-    const res = await handle.app.inject({
-      method: 'PATCH',
-      url: `/api/v1/organization-operators/${op.id}/status`,
+    expect(delRes.statusCode).toBe(200)
+
+    const rehire = await handle.app.inject({
+      method: 'POST',
+      url: '/api/v1/organization-operators',
       headers: { authorization: `Bearer ${ownerAToken}` },
-      payload: { status: 'terminated' },
+      payload: { craneProfileId: op.craneProfileId },
     })
-    expect(res.statusCode).toBe(200)
-    const audits = await handle.app.db.db
-      .select()
-      .from(auditLog)
-      .where(
-        and(eq(auditLog.targetId, op.id), eq(auditLog.action, 'organization_operator.terminate')),
-      )
-    expect(audits.length).toBeGreaterThanOrEqual(2)
+    expect(rehire.statusCode).toBe(201)
+    expect(rehire.json().id).not.toBe(op.id)
+    expect(rehire.json().approvalStatus).toBe('pending')
   })
 
   it('200: idempotent active → active — no audit row', async () => {
@@ -1154,6 +1140,213 @@ describe('PATCH /:id/status — CRITICAL terminated_at semantics', () => {
       payload: { status: 'blocked' },
     })
     expect(res.statusCode).toBe(401)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POST /:id/{block,activate,terminate} — owner convenience wrappers
+// ---------------------------------------------------------------------------
+
+describe('POST /:id/block', () => {
+  it('200: owner blocks active hire + reason in audit', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/block`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: { reason: 'disciplinary' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('blocked')
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, op.id), eq(auditLog.action, 'organization_operator.block')))
+    expect(audits).toHaveLength(1)
+    expect((audits[0]?.metadata as { reason?: string })?.reason).toBe('disciplinary')
+  })
+
+  it('200: owner blocks without reason (optional)', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/block`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+      payload: {},
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('blocked')
+  })
+
+  it('409: INVALID_STATUS_TRANSITION when blocking terminated', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/terminate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/block`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('INVALID_STATUS_TRANSITION')
+  })
+
+  it('404: owner A cannot block foreign hire', async () => {
+    const foreign = await createOperationalHire(ownerBToken)
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${foreign.id}/block`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+describe('POST /:id/activate', () => {
+  it('200: owner activates blocked hire + audit', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/block`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/activate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('active')
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(
+        and(eq(auditLog.targetId, op.id), eq(auditLog.action, 'organization_operator.activate')),
+      )
+    expect(audits).toHaveLength(1)
+  })
+
+  it('200: idempotent — activate already active returns 200 no audit', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/activate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(
+        and(eq(auditLog.targetId, op.id), eq(auditLog.action, 'organization_operator.activate')),
+      )
+    expect(audits).toHaveLength(0)
+  })
+
+  it('409: INVALID_STATUS_TRANSITION when activating terminated', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/terminate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/activate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error.code).toBe('INVALID_STATUS_TRANSITION')
+  })
+})
+
+describe('POST /:id/terminate', () => {
+  it('200: owner terminates active hire + terminatedAt + audit', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/terminate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('terminated')
+    expect(res.json().terminatedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(
+        and(eq(auditLog.targetId, op.id), eq(auditLog.action, 'organization_operator.terminate')),
+      )
+    expect(audits).toHaveLength(1)
+  })
+
+  it('200: owner terminates blocked hire', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/block`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/terminate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('terminated')
+  })
+
+  it('CRITICAL: terminated is terminal — cannot block/activate after', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/terminate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    const blockRes = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/block`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(blockRes.statusCode).toBe(409)
+    expect(blockRes.json().error.code).toBe('INVALID_STATUS_TRANSITION')
+
+    const activateRes = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/activate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(activateRes.statusCode).toBe(409)
+    expect(activateRes.json().error.code).toBe('INVALID_STATUS_TRANSITION')
+  })
+
+  it('403: operator cannot terminate', async () => {
+    const op = await createOperationalHire(ownerAToken)
+    const pf = await handle.app.db.db
+      .select({ userId: craneProfiles.userId })
+      .from(craneProfiles)
+      .where(eq(craneProfiles.id, op.craneProfileId))
+    const opToken = await tokenForOperator(pf[0]?.userId ?? '')
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${op.id}/terminate`,
+      headers: { authorization: `Bearer ${opToken}` },
+    })
+    // operator не проходит канал list/get (404) — endpoint доступен но возвращает 404.
+    expect([403, 404]).toContain(res.statusCode)
+  })
+
+  it('CRITICAL: foreign org — 404', async () => {
+    const foreign = await createOperationalHire(ownerBToken)
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organization-operators/${foreign.id}/terminate`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(404)
   })
 })
 
@@ -1642,7 +1835,7 @@ describe('Data layer guarantees', () => {
       payload: { craneProfileId: profile.craneProfileId },
     })
     expect(res.statusCode).toBe(409)
-    expect(res.json().error.code).toBe('ALREADY_MEMBER')
+    expect(res.json().error.code).toBe('OPERATOR_ALREADY_HIRED')
   })
 
   it('FK ON DELETE RESTRICT: cannot delete organization with live organization_operator', async () => {

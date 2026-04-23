@@ -44,6 +44,21 @@ type RequestMeta = {
 
 const PG_UNIQUE_VIOLATION = '23505'
 
+/**
+ * State machine для operational status'а hire-записи (B3-UI-3c).
+ *
+ * `terminated` — terminal. Повторный найм оператора — через НОВУЮ hire request
+ * (identity живёт на crane_profile и остаётся approved; освобождается UNIQUE
+ * slot после softDelete hire'а). Это упрощает аудит («кого уволили, когда»)
+ * и исключает «зомби-наймы» где терминалка превращается обратно в активного
+ * работника без explicit'ного решения организации.
+ */
+const OPERATOR_STATUS_TRANSITIONS: Record<OperatorStatus, ReadonlySet<OperatorStatus>> = {
+  active: new Set(['blocked', 'terminated']),
+  blocked: new Set(['active', 'terminated']),
+  terminated: new Set(),
+}
+
 function isPgUniqueViolation(err: unknown): err is { code: string; constraint_name?: string } {
   return (
     typeof err === 'object' &&
@@ -142,7 +157,7 @@ export class OrganizationOperatorService {
     const existingHire = await repo.findActiveByProfileAndOrg(input.craneProfileId, organizationId)
     if (existingHire) {
       throw conflict(
-        'ALREADY_MEMBER',
+        'OPERATOR_ALREADY_HIRED',
         'This crane profile already has an active hire in this organization',
       )
     }
@@ -180,7 +195,7 @@ export class OrganizationOperatorService {
         err.constraint_name === 'organization_operators_profile_org_unique_active_idx'
       ) {
         throw conflict(
-          'ALREADY_MEMBER',
+          'OPERATOR_ALREADY_HIRED',
           'This crane profile already has an active hire in this organization',
         )
       }
@@ -273,6 +288,14 @@ export class OrganizationOperatorService {
 
     if (existing.status === input.status) {
       return existingWithUser
+    }
+
+    const allowed = OPERATOR_STATUS_TRANSITIONS[existing.status]
+    if (!allowed.has(input.status)) {
+      throw conflict(
+        'INVALID_STATUS_TRANSITION',
+        `Cannot transition organization operator from ${existing.status} to ${input.status}`,
+      )
     }
 
     const terminatedAt = computeTerminatedAt(existing, input.status)

@@ -1,7 +1,9 @@
 import { maskPhone } from '@jumix/shared'
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify'
+import { type LicenseStatus, computeLicenseStatus } from '../crane-profile/license-status'
 import type { HydratedOrganizationOperator } from './organization-operator.repository'
 import {
+  blockOrganizationOperatorSchema,
   changeOrganizationOperatorStatusSchema,
   hireOrganizationOperatorSchema,
   listOrganizationOperatorsQuerySchema,
@@ -24,7 +26,10 @@ import {
  *   GET    /api/v1/organization-operators            cursor-list
  *   GET    /api/v1/organization-operators/:id        read in scope
  *   PATCH  /api/v1/organization-operators/:id        update hiredAt
- *   PATCH  /api/v1/organization-operators/:id/status operational status change
+ *   PATCH  /api/v1/organization-operators/:id/status operational status change (generic)
+ *   POST   /api/v1/organization-operators/:id/block     owner block (optional reason)
+ *   POST   /api/v1/organization-operators/:id/activate  owner unblock
+ *   POST   /api/v1/organization-operators/:id/terminate owner terminate (irreversible)
  *   DELETE /api/v1/organization-operators/:id        soft-delete
  *   POST   /api/v1/organization-operators/:id/approve  superadmin approve (pipeline 2)
  *   POST   /api/v1/organization-operators/:id/reject   superadmin reject c `reason`
@@ -87,6 +92,40 @@ export const registerOrganizationOperatorRoutes: FastifyPluginAsync = async (
         return toPublicDTO(app, deleted, deleted.userPhone)
       })
 
+      scoped.post('/:id/block', async (request) => {
+        const { id } = organizationOperatorIdParamsSchema.parse(request.params)
+        const body = blockOrganizationOperatorSchema.parse(request.body ?? {})
+        const updated = await app.organizationOperatorService.changeStatus(
+          request.ctx,
+          id,
+          { status: 'blocked', reason: body.reason },
+          { ipAddress: request.ip },
+        )
+        return toPublicDTO(app, updated, updated.userPhone)
+      })
+
+      scoped.post('/:id/activate', async (request) => {
+        const { id } = organizationOperatorIdParamsSchema.parse(request.params)
+        const updated = await app.organizationOperatorService.changeStatus(
+          request.ctx,
+          id,
+          { status: 'active' },
+          { ipAddress: request.ip },
+        )
+        return toPublicDTO(app, updated, updated.userPhone)
+      })
+
+      scoped.post('/:id/terminate', async (request) => {
+        const { id } = organizationOperatorIdParamsSchema.parse(request.params)
+        const updated = await app.organizationOperatorService.changeStatus(
+          request.ctx,
+          id,
+          { status: 'terminated' },
+          { ipAddress: request.ip },
+        )
+        return toPublicDTO(app, updated, updated.userPhone)
+      })
+
       scoped.post('/:id/approve', async (request) => {
         const { id } = organizationOperatorIdParamsSchema.parse(request.params)
         const approved = await app.organizationOperatorService.approve(request.ctx, id, {
@@ -120,6 +159,8 @@ type PublicCraneProfileSnippet = {
   iin: string
   avatarUrl: string | null
   approvalStatus: 'pending' | 'approved' | 'rejected'
+  licenseStatus: LicenseStatus
+  licenseExpiresAt: string | null
 }
 
 type PublicCraneProfileSnippetWithPhone = PublicCraneProfileSnippet & {
@@ -153,6 +194,7 @@ async function toPublicDTO(
   userPhone: string,
 ): Promise<PublicOrganizationOperatorDTO> {
   const avatarUrl = await resolveAvatarUrl(app, row.profile.avatarKey)
+  const licenseStatus = computeLicenseStatus(row.profile.licenseExpiresAt, new Date())
   return {
     id: row.hire.id,
     craneProfileId: row.hire.craneProfileId,
@@ -174,6 +216,10 @@ async function toPublicDTO(
       iin: row.profile.iin,
       avatarUrl,
       approvalStatus: row.profile.approvalStatus,
+      licenseStatus,
+      licenseExpiresAt: row.profile.licenseExpiresAt
+        ? dateOnly(row.profile.licenseExpiresAt)
+        : null,
       phone: maskPhone(userPhone),
     },
     createdAt: row.hire.createdAt.toISOString(),
@@ -186,6 +232,7 @@ async function toPublicListDTO(
   row: HydratedOrganizationOperator,
 ): Promise<PublicOrganizationOperatorListItemDTO> {
   const avatarUrl = await resolveAvatarUrl(app, row.profile.avatarKey)
+  const licenseStatus = computeLicenseStatus(row.profile.licenseExpiresAt, new Date())
   return {
     id: row.hire.id,
     craneProfileId: row.hire.craneProfileId,
@@ -207,6 +254,10 @@ async function toPublicListDTO(
       iin: row.profile.iin,
       avatarUrl,
       approvalStatus: row.profile.approvalStatus,
+      licenseStatus,
+      licenseExpiresAt: row.profile.licenseExpiresAt
+        ? dateOnly(row.profile.licenseExpiresAt)
+        : null,
     },
     createdAt: row.hire.createdAt.toISOString(),
     updatedAt: row.hire.updatedAt.toISOString(),

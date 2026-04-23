@@ -10,7 +10,7 @@ import { formatRuLongDate } from '@/lib/format/date'
 import { pluralRu } from '@/lib/format/plural'
 import { useOwnerDashboardStats } from '@/lib/hooks/use-dashboard'
 import { IconCrane } from '@tabler/icons-react'
-import { HardHat, type IdCard, MapPin, Wallet } from 'lucide-react'
+import { type IdCard, MapPin, UsersRound, Wallet } from 'lucide-react'
 import { useMemo } from 'react'
 
 const SITES_FORMS = ['объект', 'объекта', 'объектов'] as const
@@ -18,9 +18,9 @@ const SITES_FORMS = ['объект', 'объекта', 'объектов'] as co
 /**
  * Owner-кабинет landing page. Hero + 4 stats grid + 2-col (map + recent list).
  *
- * MVP: живые stats — активные объекты + краны в работе из
- * `/dashboard/owner-stats`. Карточки «Операторы на смене» и «Расходы» —
- * placeholder'ы `—`, реализуются в этапе 3.
+ * MVP: живые stats — активные объекты + краны в работе + активные операторы
+ * из `/dashboard/owner-stats`. Карточка «Расходы» — placeholder'а `—`,
+ * реализуется в этапе 3.
  */
 export function OwnerDashboard() {
   const { user } = useAuth()
@@ -29,6 +29,7 @@ export function OwnerDashboard() {
   const formattedDate = useMemo(() => formatRuLongDate(), [])
   const activeSitesCount = stats.data?.active.sites ?? 0
   const activeCranesCount = stats.data?.active.cranes ?? 0
+  const activeOperatorsCount = stats.data?.active.memberships ?? 0
   const sitesLabel = `${activeSitesCount} ${pluralRu(activeSitesCount, SITES_FORMS)} активно`
 
   return (
@@ -62,7 +63,13 @@ export function OwnerDashboard() {
           />
         </StaggerItem>
         <StaggerItem>
-          <StatCardPlaceholder icon={HardHat} label="Операторы на смене" />
+          <StatCard
+            icon={UsersRound}
+            label="Активные операторы"
+            value={activeOperatorsCount}
+            loading={stats.isLoading}
+            href="/my-operators"
+          />
         </StaggerItem>
         <StaggerItem>
           <StatCardPlaceholder icon={Wallet} label="Расходы за месяц" />

@@ -81,6 +81,14 @@ describe('useCommands', () => {
     expect(push).toHaveBeenCalledWith('/my-cranes?create=true')
   })
 
+  it('owner: execute create-hire-request navigates to /hire-requests?create=true', () => {
+    authUser.user = { id: 'u-2', role: 'owner', organizationId: 'org-1', name: 'Owner' }
+    const { result } = renderHook(() => useCommands())
+    const createCmd = result.current.commands.find((c) => c.id === 'action.create-hire-request')!
+    act(() => result.current.execute(createCmd))
+    expect(push).toHaveBeenCalledWith('/hire-requests?create=true')
+  })
+
   it('execute with unknown action is a no-op', () => {
     const { result } = renderHook(() => useCommands())
     const fake: CommandEntry = {

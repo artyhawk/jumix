@@ -35,6 +35,18 @@ export function getOrganizationOperator(id: string) {
   })
 }
 
+export interface CreateHireRequestPayload {
+  craneProfileId: string
+  hiredAt?: string
+}
+
+export function createHireRequest(payload: CreateHireRequestPayload) {
+  return apiFetch<OrganizationOperator>('/api/v1/organization-operators', {
+    method: 'POST',
+    body: payload,
+  })
+}
+
 export function approveOrganizationOperator(id: string) {
   return apiFetch<OrganizationOperator>(`/api/v1/organization-operators/${id}/approve`, {
     method: 'POST',
@@ -45,5 +57,24 @@ export function rejectOrganizationOperator(id: string, reason: string) {
   return apiFetch<OrganizationOperator>(`/api/v1/organization-operators/${id}/reject`, {
     method: 'POST',
     body: { reason },
+  })
+}
+
+export function blockOrganizationOperator(id: string, reason?: string) {
+  return apiFetch<OrganizationOperator>(`/api/v1/organization-operators/${id}/block`, {
+    method: 'POST',
+    body: reason ? { reason } : {},
+  })
+}
+
+export function activateOrganizationOperator(id: string) {
+  return apiFetch<OrganizationOperator>(`/api/v1/organization-operators/${id}/activate`, {
+    method: 'POST',
+  })
+}
+
+export function terminateOrganizationOperator(id: string) {
+  return apiFetch<OrganizationOperator>(`/api/v1/organization-operators/${id}/terminate`, {
+    method: 'POST',
   })
 }

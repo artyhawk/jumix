@@ -4,10 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OrganizationOperator, Paginated } from '../api/types'
 import { qk } from '../query-keys'
 import {
+  useActivateOrganizationOperator,
   useApproveOrganizationOperator,
+  useBlockOrganizationOperator,
+  useCreateHireRequest,
   useOrganizationOperators,
   useOrganizationOperatorsInfinite,
   useRejectOrganizationOperator,
+  useTerminateOrganizationOperator,
 } from './use-organization-operators'
 
 vi.mock('../api/organization-operators', () => ({
@@ -15,17 +19,29 @@ vi.mock('../api/organization-operators', () => ({
   getOrganizationOperator: vi.fn(),
   approveOrganizationOperator: vi.fn(),
   rejectOrganizationOperator: vi.fn(),
+  createHireRequest: vi.fn(),
+  blockOrganizationOperator: vi.fn(),
+  activateOrganizationOperator: vi.fn(),
+  terminateOrganizationOperator: vi.fn(),
 }))
 
 import {
+  activateOrganizationOperator,
   approveOrganizationOperator,
+  blockOrganizationOperator,
+  createHireRequest,
   listOrganizationOperators,
   rejectOrganizationOperator,
+  terminateOrganizationOperator,
 } from '../api/organization-operators'
 
 const list = vi.mocked(listOrganizationOperators)
 const approve = vi.mocked(approveOrganizationOperator)
 const reject = vi.mocked(rejectOrganizationOperator)
+const create = vi.mocked(createHireRequest)
+const block = vi.mocked(blockOrganizationOperator)
+const activate = vi.mocked(activateOrganizationOperator)
+const terminate = vi.mocked(terminateOrganizationOperator)
 
 function makeHire(
   id: string,
@@ -59,6 +75,10 @@ beforeEach(() => {
   list.mockReset()
   approve.mockReset()
   reject.mockReset()
+  create.mockReset()
+  block.mockReset()
+  activate.mockReset()
+  terminate.mockReset()
 })
 
 describe('useOrganizationOperators', () => {
@@ -161,5 +181,103 @@ describe('useRejectOrganizationOperator', () => {
     })
 
     expect(reject).toHaveBeenCalledWith('h-1', 'duplicate')
+  })
+})
+
+describe('useCreateHireRequest', () => {
+  it('posts payload and invalidates dashboard + list', async () => {
+    create.mockResolvedValueOnce(makeHire('h-new', 'pending'))
+    const { client, Wrapper } = createQueryWrapper()
+    const spy = vi.spyOn(client, 'invalidateQueries')
+    const { result } = renderHook(() => useCreateHireRequest(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ craneProfileId: 'cp-new', hiredAt: '2026-04-20' })
+    })
+
+    expect(create).toHaveBeenCalledWith({ craneProfileId: 'cp-new', hiredAt: '2026-04-20' })
+    const keys = spy.mock.calls.map((c) => c[0]?.queryKey)
+    expect(keys).toEqual(expect.arrayContaining([qk.organizationOperators, qk.dashboard]))
+  })
+})
+
+describe('useBlockOrganizationOperator', () => {
+  it('optimistic flip active → blocked', async () => {
+    const key = qk.organizationOperatorsList({ approvalStatus: 'approved' })
+    const hire = makeHire('h-1', 'approved')
+    const { client, Wrapper } = createQueryWrapper()
+    client.setQueryData(key, { items: [hire], nextCursor: null })
+
+    block.mockResolvedValueOnce({ ...hire, status: 'blocked' })
+    const { result } = renderHook(() => useBlockOrganizationOperator(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: 'h-1', reason: 'disciplinary' })
+    })
+
+    expect(block).toHaveBeenCalledWith('h-1', 'disciplinary')
+  })
+
+  it('omits reason when not provided', async () => {
+    const hire = makeHire('h-1', 'approved')
+    block.mockResolvedValueOnce({ ...hire, status: 'blocked' })
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useBlockOrganizationOperator(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: 'h-1' })
+    })
+
+    expect(block).toHaveBeenCalledWith('h-1', undefined)
+  })
+
+  it('rolls back optimistic flip on error', async () => {
+    const key = qk.organizationOperatorsList({ approvalStatus: 'approved' })
+    const hire = makeHire('h-1', 'approved')
+    const { client, Wrapper } = createQueryWrapper()
+    client.setQueryData(key, { items: [hire], nextCursor: null })
+
+    block.mockRejectedValueOnce(new Error('boom'))
+    const { result } = renderHook(() => useBlockOrganizationOperator(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync({ id: 'h-1' }).catch(() => {})
+    })
+
+    const restored = client.getQueryData<Paginated<OrganizationOperator>>(key)
+    expect(restored?.items[0]?.status).toBe('active')
+  })
+})
+
+describe('useActivateOrganizationOperator', () => {
+  it('calls activate API', async () => {
+    const hire = makeHire('h-1', 'approved')
+    activate.mockResolvedValueOnce({ ...hire, status: 'active' })
+    const { Wrapper } = createQueryWrapper()
+    const { result } = renderHook(() => useActivateOrganizationOperator(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync('h-1')
+    })
+
+    expect(activate).toHaveBeenCalledWith('h-1')
+  })
+})
+
+describe('useTerminateOrganizationOperator', () => {
+  it('optimistic flip to terminated', async () => {
+    const key = qk.organizationOperatorsList({ approvalStatus: 'approved' })
+    const hire = makeHire('h-1', 'approved')
+    const { client, Wrapper } = createQueryWrapper()
+    client.setQueryData(key, { items: [hire], nextCursor: null })
+
+    terminate.mockResolvedValueOnce({ ...hire, status: 'terminated' })
+    const { result } = renderHook(() => useTerminateOrganizationOperator(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await result.current.mutateAsync('h-1')
+    })
+
+    expect(terminate).toHaveBeenCalledWith('h-1')
   })
 })

@@ -803,6 +803,92 @@ type OwnerDashboardStats = {
 
 ---
 
+## 12e. Owner hires + operators management (B3-UI-3c)
+
+### Workflow phase split
+
+Отношение owner ↔ оператор имеет две фазы с разной UX-семантикой: **submit → await** (workflow) и **ongoing management** (stable). Отдельные routes отражают это:
+
+- `/hire-requests` — workflow-страница. Только pending hires, доступна CTA «Нанять крановщика».
+- `/my-operators` — management-страница. Только approved memberships, FilterBar (status/search), DataTable. Здесь делается block/activate/terminate.
+
+Rejected hires скрыты в MVP (бесконечный накопитель без CTA удаления). Rejected-tab или dedicated page — backlog.
+
+Альтернатива (single `/my-operators` с approval filter) отвергнута: mental-models разные (submit-form vs management-table), микс pending со stable создавал бы шум в управлении.
+
+### License invariant pragmatic
+
+Owner может подать hire-request даже для crane_profile с `licenseStatus='missing'` или `'expired'`. Warning banner в step 2 CreateHireRequestDialog объясняет последствия, но submit **не блокируется**. Реальный work-gate — `canWork` (ADR 0005, rule #15, 3-gate: profile approved AND hire approved+active AND license valid).
+
+Обоснование: блокировать hire-request при expired license создаёт dead-lock — оператор может получить оффер на работу и уже в процессе обновления документов. UI warning сохраняет владельца awareness, backend `canWork` всё равно блокирует реальный выход на смену.
+
+### Status state machine (operators)
+
+```
+active  ↔ blocked        (bidir)
+active  →  terminated    (terminal)
+blocked →  terminated    (terminal)
+terminated → ∅           (irreversible)
+```
+
+`OPERATOR_STATUS_TRANSITIONS: Record<OperatorStatus, ReadonlySet<OperatorStatus>>` в `organization-operator.service.ts`. Попытка transition'а вне allowed set → 409 `INVALID_STATUS_TRANSITION`.
+
+Terminated — terminal by policy: restart = новая hire-request (softDelete освобождает UNIQUE-slot (craneProfileId, organizationId, deletedAt IS NULL); identity на crane_profile не трогается — тот же человек может быть перенанят в эту же или другую организацию). Это simpler audit trail: «кого уволили, когда» однозначно через audit_log + terminatedAt.
+
+### UI flows
+
+**CreateHireRequestDialog** — two-step (pattern совпадает с CreateSiteDialog, §12c):
+
+1. Search: `SearchInput` (debounce 300ms), `min 2 chars` UI-gate (показ hint; query fire'ит в background для simplicity, это OK — backend ограничивает limit=20), `useCraneProfiles({approvalStatus:'approved', search, limit: 20})`. `ProfileSearchResult` — radio-style `<button>` с `aria-pressed`, selected = border brand-500, 44px min-height.
+2. Confirm: summary card (Avatar + ФИО + IIN + LicenseStatusBadge), license warning banner conditional, `<input type="date">` hiredAt (default today через `todayISODate()`, max +1 год через `maxFutureDate(1)`), Назад + Создать заявку.
+
+409 `OPERATOR_ALREADY_HIRED` ловится в `handleSubmit` → специальный toast «Этот крановщик уже работает в вашей компании» (остальные ошибки — generic через AppError.message).
+
+**OrganizationOperatorDrawer footer** — role+status aware matrix:
+
+```
+(superadmin, pending)    → [Одобрить][Отклонить]       (B3-UI-2b)
+(superadmin, approved)   → ∅ (read-only identity view)
+(superadmin, rejected)   → rejection reason notice
+(owner, pending)         → ∅ (workflow pending — нет cancel flow в MVP)
+(owner, approved.active)    → [Приостановить][Уволить]
+(owner, approved.blocked)   → [Разблокировать][Уволить]
+(owner, approved.terminated) → «Сотрудник уволен · <дата>»
+(owner, rejected)        → rejection reason notice
+(owner, not-own-org)     → ∅ (cross-tenant hidden)
+```
+
+`canManage` = `isOwner && hire.organizationId === user.organizationId` OR `isSuperadmin`.
+
+Block-flow: click `[Приостановить]` → `setMode('block')` → footer reveals inline `<textarea>` (optional reason, max 300 chars, autoFocus) + [Отмена][Приостановить (submit)]. Empty reason → `undefined` в payload (строка-trim-check).
+
+Terminate-flow: click `[Уволить]` → `setMode('terminate-confirm')` → footer reveals warning text «Это действие нельзя отменить. Для повторного найма понадобится новая заявка.» + [Отмена][Да, уволить]. Inline confirmation (не native `confirm()`) — консистентно с crane retire в §12d.
+
+### Dashboard metric reuse
+
+OwnerDashboard placeholder «Операторы на смене» → real `StatCard` «Активные операторы» с `stats.active.memberships` (backend `getOwnerStats` уже возвращает этот field с B3-UI-3a). Field semantics: approved+active memberships в own org.
+
+«Операторы на смене» (real-time from mobile shifts) — отложено до shifts-endpoint. Grid 4 cards: Sites / Cranes / Operators / Expenses-placeholder.
+
+### Three pipelines complete
+
+После B3-UI-3c все три approval pipelines работают end-to-end:
+
+1. **crane_profile** registration (B2d-3 SMS signup → B3-UI-2b approve)
+2. **organization_operator** hire (B3-UI-3c submit → B3-UI-2b/2c approve)
+3. **crane** submission (B3-UI-3b submit → B3-UI-2b/2c approve)
+
+Owner full workflow: create site → submit crane → submit hire. Superadmin одобряет каждый gate. Все три surface'а разделяют общие паттерны: `TabsPills` в `/approvals`, `DataTable` + filters в global lists, `Drawer` + role-aware footer, optimistic mutations + rollback.
+
+### Testing caveats
+
+- **`buildOptimisticStatusMutation` закрывает mutationFn через explicit lambda** `(id: string) => mutationFn(id)` — react-query v5 передаёт `(vars, context)` во внутренний mutationFn, и прямой reference ломает `toHaveBeenCalledWith('h-1')` assertions. Wrapper-lambda дропает context-arg.
+- **`useCraneProfiles` внутри CreateHireRequestDialog** всегда вызывает API даже при search-length < 2 (гейтинг только UI-rendering). Тесты проверяют, что `screen.queryByText(<result>).not.toBeInTheDocument()` — НЕ `expect(list).not.toHaveBeenCalled()`.
+- **FilterChip/DropdownMenu** в тестах — использовать `screen.getByLabelText('Фильтр: <label>')` для trigger + `findByText` для option (item'ы mount'ятся после open). `getByText` на закрытом dropdown не находит option.
+- **Terminate-confirm mutation test flaky** в jsdom при paired с optimistic update (click «Да, уволить» → optimistic flip → invalidate → re-fetch). Разделили на два теста: (1) confirmation UI appears + mutation НЕ вызвана до подтверждения; (2) mutation itself — через hook test без drawer UI (optimistic flip assertions через `setQueriesData`).
+
+---
+
 ## 13. Связанные документы
 
 - [design-system.md](design-system.md) — цвет, typography, иконки, spacing.

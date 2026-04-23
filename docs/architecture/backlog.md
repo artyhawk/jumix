@@ -557,6 +557,34 @@ Post-MVP options:
 
 ---
 
+## Web — owner hires + operators (from B3-UI-3c)
+
+### Hire request cancellation
+
+Owner может только ждать решения superadmin'а после submit'а hire-request'а. Для UX «я передумал нанимать этого человека» нужен `DELETE /api/v1/organization-operators/:id` на pending-hire (уже работает в backend — `canDelete` разрешён во всех approval-state'ах) + UI кнопка «Отозвать» в drawer pending-hire + подтверждение. Триггер: явная просьба заказчика или подряд несколько «а как мне отменить заявку».
+
+### Rejected hires visibility
+
+Сейчас `/hire-requests` фильтрует только `approvalStatus='pending'`; rejected записи скрыты. Нужен либо dedicated tab («Отклонённые» — показать причину отказа superadmin'а, owner видит rejectionReason), либо dedicated page `/hire-requests/archive`. Без UI они накапливаются «в никуда». Триггер: более 20 отказов на демо-account'е заказчика.
+
+### Block reason audit trail
+
+Backend пишет `organization_operator.block` с `metadata.reason` в audit_log при блокировке. Но UI сейчас эту причину не отдаёт в drawer. Нужен «История блокировок» accordion в drawer с last N audit-events по этому hire'у (или dedicated `/my-operators/:id/history` page). Зависит от `audit.recent` backend endpoint'а — он уже есть, но пока superadmin-only; нужно расширить policy или сделать `/my-operators/:id/audit` owner-scoped.
+
+### Operator-site assignment
+
+Currently organization_operator никак не связан с site'ом — это логическая связь, которая появится когда крановщик встанет на смену. Shift-endpoint (Этап 2) вводит `shifts(id, organization_operator_id, site_id, started_at, ended_at)`. После этого появится mini-feature: в drawer'е `OrganizationOperatorDrawer` показывать «Последняя смена: <site>, <time>», в drawer'е `SiteDrawer` — «Назначенные крановщики». Не доступно до shifts.
+
+### Phone search в crane-profile list
+
+`GET /api/v1/crane-profiles?search=<q>` сейчас ILIKE'ит на `firstName/lastName/iin`. Для поиска по номеру телефона (ввод без `+7`-префикса, partial match) нужен `OR phone LIKE '+7' || $search`. Не для MVP — IIN/name достаточно. Триггер: owner жалуется что не может найти крановщика по номеру карточки.
+
+### Owner cancel before superadmin decision — soft-delete vs hard
+
+Если добавим «Отозвать заявку» (см. выше), нужно решение: soft-delete (`deleted_at=now`, history preserved) или hard-delete (страница чистая). Leaning to soft-delete (audit-trail priority) + отдельная policy `canCancel` = `isOwner && hire.organizationId === ctx.organizationId && approval_status === 'pending'`.
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:
