@@ -7,6 +7,7 @@ import { PageTransition } from '@/components/motion/page-transition'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { EmptyState } from '@/components/ui/empty-state'
 import { FilterBar } from '@/components/ui/filter-bar'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { SearchInput } from '@/components/ui/search-input'
@@ -15,7 +16,7 @@ import type { ApprovalStatus, Crane, CraneOperationalStatus, CraneType } from '@
 import { formatRelativeTime } from '@/lib/format/time'
 import { useCranesInfinite } from '@/lib/hooks/use-cranes'
 import { IconCrane } from '@tabler/icons-react'
-import { Plus, ShieldAlert } from 'lucide-react'
+import { Plus, Search, ShieldAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 
@@ -253,19 +254,24 @@ export default function MyCranesPage() {
           mobileSubtitle={(c) => TYPE_LABEL[c.type]}
           ariaLabel="Список кранов"
           empty={
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <IconCrane size={32} stroke={1.5} className="text-text-tertiary" aria-hidden />
-              <div className="text-sm text-text-secondary">
-                {search || approval || op || type
-                  ? 'Ничего не найдено по фильтрам'
-                  : 'У вас пока нет кранов'}
-              </div>
-              {!search && !approval && !op && !type ? (
-                <Button variant="primary" onClick={() => setParam('create', 'true')}>
-                  Добавить первый кран
-                </Button>
-              ) : null}
-            </div>
+            search || approval || op || type ? (
+              <EmptyState
+                icon={Search}
+                title="Ничего не найдено"
+                description="Попробуйте изменить параметры фильтров"
+              />
+            ) : (
+              <EmptyState
+                icon={IconCrane}
+                title="У вас пока нет кранов"
+                description="Добавьте первый кран — после одобрения платформой он появится в парке."
+                action={
+                  <Button variant="primary" onClick={() => setParam('create', 'true')}>
+                    Добавить первый кран
+                  </Button>
+                }
+              />
+            )
           }
         />
       )}

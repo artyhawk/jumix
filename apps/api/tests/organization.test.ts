@@ -607,6 +607,67 @@ describe('POST /api/v1/organizations/:id/activate', () => {
   })
 })
 
+describe('POST /api/v1/organizations/:id/archive', () => {
+  it('200: superadmin archives active organization + audit', async () => {
+    const org = await createOrganization(handle.app, { bin: '500000000004' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${org.id}/archive`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('archived')
+
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, org.id), eq(auditLog.action, 'organization.archive')))
+    expect(audits).toHaveLength(1)
+  })
+
+  it('200: superadmin archives suspended organization', async () => {
+    const org = await createOrganization(handle.app, {
+      bin: '500000000005',
+      status: 'suspended',
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${org.id}/archive`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('archived')
+  })
+
+  it('200: idempotent — archived→archived без шума audit', async () => {
+    const org = await createOrganization(handle.app, {
+      bin: '500000000006',
+      status: 'archived',
+    })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${org.id}/archive`,
+      headers: { authorization: `Bearer ${superadminToken}` },
+    })
+    expect(res.statusCode).toBe(200)
+    const audits = await handle.app.db.db
+      .select()
+      .from(auditLog)
+      .where(and(eq(auditLog.targetId, org.id), eq(auditLog.action, 'organization.archive')))
+    expect(audits).toHaveLength(0)
+  })
+
+  it('403: owner cannot archive', async () => {
+    const org = await createOrganization(handle.app, { bin: '500000000007' })
+    const res = await handle.app.inject({
+      method: 'POST',
+      url: `/api/v1/organizations/${org.id}/archive`,
+      headers: { authorization: `Bearer ${ownerAToken}` },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+})
+
 describe('Fixtures sanity', () => {
   it('Owner A user is in Org A', async () => {
     const rows = await handle.app.db.db

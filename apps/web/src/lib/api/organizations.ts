@@ -7,6 +7,14 @@ import type {
   Paginated,
 } from './types'
 
+export interface UpdateOrganizationInput {
+  name?: string
+  bin?: string
+  contactName?: string | null
+  contactPhone?: string | null
+  contactEmail?: string | null
+}
+
 export interface ListOrganizationsQuery {
   cursor?: string
   limit?: number
@@ -37,10 +45,21 @@ export function createOrganization(input: CreateOrganizationInput) {
   })
 }
 
+export function updateOrganization(id: string, patch: UpdateOrganizationInput) {
+  return apiFetch<Organization>(`/api/v1/organizations/${id}`, {
+    method: 'PATCH',
+    body: patch,
+  })
+}
+
 export function suspendOrganization(id: string) {
   return apiFetch<Organization>(`/api/v1/organizations/${id}/suspend`, { method: 'POST' })
 }
 
 export function activateOrganization(id: string) {
   return apiFetch<Organization>(`/api/v1/organizations/${id}/activate`, { method: 'POST' })
+}
+
+export function archiveOrganization(id: string) {
+  return apiFetch<Organization>(`/api/v1/organizations/${id}/archive`, { method: 'POST' })
 }

@@ -7,6 +7,7 @@ import { CreateSiteDialog } from '@/components/sites/create-site-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { EmptyState } from '@/components/ui/empty-state'
 import { FilterBar } from '@/components/ui/filter-bar'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { SearchInput } from '@/components/ui/search-input'
@@ -14,7 +15,7 @@ import { useAuth } from '@/hooks/use-auth'
 import type { Site, SiteStatus } from '@/lib/api/types'
 import { formatRelativeTime } from '@/lib/format/time'
 import { useSitesInfinite } from '@/lib/hooks/use-sites'
-import { MapPin, Plus, ShieldAlert } from 'lucide-react'
+import { MapPin, Plus, Search, ShieldAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 
@@ -185,21 +186,31 @@ export default function SitesPage() {
           }
           ariaLabel="Список объектов"
           empty={
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <MapPin className="size-8 text-text-tertiary" strokeWidth={1.5} aria-hidden />
-              <div className="text-sm text-text-secondary">
-                {search || status
-                  ? 'Ничего не найдено по фильтрам'
-                  : canCreate
-                    ? 'У вас пока нет объектов'
-                    : 'Объектов пока нет'}
-              </div>
-              {canCreate && !search && !status ? (
-                <Button variant="primary" onClick={() => setParam('create', 'true')}>
-                  Создать первый объект
-                </Button>
-              ) : null}
-            </div>
+            search || status ? (
+              <EmptyState
+                icon={Search}
+                title="Ничего не найдено"
+                description="Попробуйте изменить параметры фильтров"
+              />
+            ) : (
+              <EmptyState
+                icon={MapPin}
+                title={canCreate ? 'У вас пока нет объектов' : 'Объектов пока нет'}
+                description={
+                  canCreate
+                    ? 'Создайте первый объект — укажите название и область геозоны на карте.'
+                    : undefined
+                }
+                action={
+                  canCreate ? (
+                    <Button variant="primary" onClick={() => setParam('create', 'true')}>
+                      <Plus className="size-4" strokeWidth={1.5} aria-hidden />
+                      Создать объект
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )
           }
         />
       )}

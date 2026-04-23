@@ -3,6 +3,7 @@
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DensityToggle } from '@/components/ui/density-toggle'
 import {
   DropdownContent,
   DropdownItem,
@@ -81,6 +82,9 @@ export function Topbar({ user }: { user: AuthUser }) {
               ⌘K
             </kbd>
           </button>
+
+          {/* Density toggle — desktop only; на mobile cards всегда comfortable */}
+          <DensityToggle className="hidden md:inline-flex" />
 
           {/* Notifications */}
           <DropdownRoot>

@@ -5,6 +5,7 @@ import { PageTransition } from '@/components/motion/page-transition'
 import { MembershipCard } from '@/components/operator/membership-card'
 import { MembershipDrawer } from '@/components/operator/membership-drawer'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { useAuth } from '@/hooks/use-auth'
 import type { MeStatusMembership } from '@/lib/api/types'
 import { useMeStatus } from '@/lib/hooks/use-me'
@@ -84,16 +85,11 @@ export default function MembershipsPage() {
           ))}
         </div>
       ) : memberships.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-[12px] border border-dashed border-border-subtle bg-layer-2 py-12 px-6 text-center">
-          <Building2 className="size-8 text-text-tertiary" strokeWidth={1.5} aria-hidden />
-          <div className="text-sm font-medium text-text-primary">
-            Пока нет активных трудоустройств
-          </div>
-          <div className="max-w-md text-xs text-text-tertiary">
-            Вам нужен владелец организации, который подаст заявку на ваш найм. После одобрения
-            заявки платформой вы сможете выходить на смену.
-          </div>
-        </div>
+        <EmptyState
+          icon={Building2}
+          title="Пока нет активных трудоустройств"
+          description="Вам нужен владелец организации, который подаст заявку на ваш найм. После одобрения заявки платформой вы сможете выходить на смену."
+        />
       ) : (
         <ul className="flex flex-col gap-2" aria-label="Ваши трудоустройства">
           {memberships.map((m) => (

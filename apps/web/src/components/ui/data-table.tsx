@@ -1,5 +1,6 @@
 'use client'
 
+import { useDensity } from '@/lib/hooks/use-density'
 import { cn } from '@/lib/utils'
 import type { ReactNode } from 'react'
 import { Skeleton } from './skeleton'
@@ -64,7 +65,7 @@ export function DataTable<Row>({
   rows,
   rowKey,
   onRowClick,
-  density = 'default',
+  density: densityProp,
   loading,
   empty,
   hasMore,
@@ -75,6 +76,10 @@ export function DataTable<Row>({
   className,
   ariaLabel,
 }: DataTableProps<Row>) {
+  // Если density передан — уважаем (explicit override). Иначе — глобальная
+  // user-preference из localStorage (B3-UI-5a).
+  const { density: storedDensity } = useDensity()
+  const density = densityProp ?? storedDensity
   const rowHeight = density === 'compact' ? 'h-9' : 'min-h-[44px] md:h-11'
   const cellPy = density === 'compact' ? 'py-1.5' : 'py-2.5'
   const mobileColumns = columns.filter((c) => c.showOnMobile !== false)

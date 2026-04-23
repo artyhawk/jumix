@@ -3,11 +3,14 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   type ListOrganizationsQuery,
+  type UpdateOrganizationInput,
   activateOrganization,
+  archiveOrganization,
   createOrganization,
   getOrganization,
   listOrganizations,
   suspendOrganization,
+  updateOrganization,
 } from '../api/organizations'
 import type { CreateOrganizationInput } from '../api/types'
 import { qk } from '../query-keys'
@@ -69,6 +72,31 @@ export function useActivateOrganization() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: qk.organizations })
       qc.invalidateQueries({ queryKey: qk.dashboard })
+    },
+  })
+}
+
+export function useArchiveOrganization() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => archiveOrganization(id),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.organizations })
+      qc.invalidateQueries({ queryKey: qk.dashboard })
+    },
+  })
+}
+
+export function useUpdateOrganization() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: UpdateOrganizationInput }) =>
+      updateOrganization(id, patch),
+    onSuccess: (updated) => {
+      qc.setQueryData(qk.organizationDetail(updated.id), updated)
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.organizations })
     },
   })
 }

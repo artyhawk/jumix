@@ -120,7 +120,7 @@ describe('HireRequestsPage', () => {
 
   it('renders empty state + CTA when no pending hires', async () => {
     renderPage()
-    await waitFor(() => expect(screen.getAllByText('Нет запросов найма').length).toBe(1))
+    await waitFor(() => expect(screen.getAllByText('Нет активных заявок').length).toBe(1))
     const ctaButtons = screen.getAllByRole('button', { name: /Нанять крановщика/ })
     expect(ctaButtons.length).toBeGreaterThan(0)
   })

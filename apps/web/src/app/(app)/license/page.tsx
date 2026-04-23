@@ -6,6 +6,7 @@ import { LicenseUploadDialog } from '@/components/operator/license-upload-dialog
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
 import { LicenseStatusBadge } from '@/components/ui/license-status-badge'
 import { useAuth } from '@/hooks/use-auth'
 import { daysUntil, formatRuDate } from '@/lib/format/date'
@@ -119,22 +120,16 @@ export default function LicensePage() {
           </div>
         </Card>
       ) : (
-        <Card className="flex flex-col items-center gap-3 p-8 text-center">
-          <span className="inline-flex size-12 items-center justify-center rounded-lg bg-layer-3 text-text-tertiary">
-            <IdCard className="size-6" strokeWidth={1.5} aria-hidden />
-          </span>
-          <div>
-            <div className="text-base font-semibold text-text-primary">
-              Удостоверение не загружено
-            </div>
-            <div className="mt-1 text-sm text-text-secondary max-w-sm">
-              Загрузите действующее удостоверение крановщика, чтобы работа была разблокирована.
-            </div>
-          </div>
-          <Button variant="primary" onClick={() => setUpload(true)}>
-            Загрузить удостоверение
-          </Button>
-        </Card>
+        <EmptyState
+          icon={IdCard}
+          title="Удостоверение не загружено"
+          description="Загрузите действующее удостоверение крановщика, чтобы работа была разблокирована."
+          action={
+            <Button variant="primary" onClick={() => setUpload(true)}>
+              Загрузить удостоверение
+            </Button>
+          }
+        />
       )}
 
       {licenseStatus === 'expired' ? (

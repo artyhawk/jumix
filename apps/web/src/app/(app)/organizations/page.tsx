@@ -7,6 +7,7 @@ import { CreateOrganizationDialog } from '@/components/organizations/create-orga
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { EmptyState } from '@/components/ui/empty-state'
 import { FilterBar } from '@/components/ui/filter-bar'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { SearchInput } from '@/components/ui/search-input'
@@ -15,7 +16,7 @@ import type { Organization, OrganizationStatus } from '@/lib/api/types'
 import { formatRelativeTime } from '@/lib/format/time'
 import { useOrganizationsInfinite } from '@/lib/hooks/use-organizations'
 import { formatKzPhoneDisplay } from '@/lib/phone-format'
-import { Plus, ShieldAlert } from 'lucide-react'
+import { Building2, Plus, Search, ShieldAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 
@@ -173,11 +174,25 @@ export default function OrganizationsPage() {
           mobileSubtitle={(o) => <span className="font-mono-numbers">{o.bin}</span>}
           ariaLabel="Список организаций"
           empty={
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <div className="text-sm text-text-secondary">
-                {search || status ? 'Ничего не найдено по фильтрам' : 'Организаций пока нет'}
-              </div>
-            </div>
+            search || status ? (
+              <EmptyState
+                icon={Search}
+                title="Ничего не найдено"
+                description="Попробуйте изменить параметры фильтров"
+              />
+            ) : (
+              <EmptyState
+                icon={Building2}
+                title="Организаций пока нет"
+                description="Создайте первую организацию — она сразу станет активной."
+                action={
+                  <Button variant="primary" onClick={() => setParam('create', 'true')}>
+                    <Plus className="size-4" strokeWidth={1.5} aria-hidden />
+                    Создать организацию
+                  </Button>
+                }
+              />
+            )
           }
         />
       )}

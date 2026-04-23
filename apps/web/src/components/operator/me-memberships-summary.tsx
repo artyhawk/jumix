@@ -1,8 +1,8 @@
 'use client'
 
 import { MembershipCard } from '@/components/operator/membership-card'
+import { EmptyState } from '@/components/ui/empty-state'
 import type { MeStatusMembership } from '@/lib/api/types'
-import { cn } from '@/lib/utils'
 import { ArrowRight, Building2 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -24,17 +24,11 @@ export function MeMembershipsSummary({ memberships }: Props) {
 
   if (memberships.length === 0) {
     return (
-      <div
-        className={cn(
-          'flex flex-col items-center gap-2 rounded-[12px] border border-dashed border-border-subtle bg-layer-2 p-6 text-center',
-        )}
-      >
-        <Building2 className="size-8 text-text-tertiary" strokeWidth={1.5} aria-hidden />
-        <div className="text-sm text-text-secondary">Пока нет активных трудоустройств</div>
-        <div className="max-w-md text-xs text-text-tertiary">
-          Вам нужен владелец организации, который подаст заявку на ваш найм.
-        </div>
-      </div>
+      <EmptyState
+        icon={Building2}
+        title="Пока нет активных трудоустройств"
+        description="Вам нужен владелец организации, который подаст заявку на ваш найм."
+      />
     )
   }
 

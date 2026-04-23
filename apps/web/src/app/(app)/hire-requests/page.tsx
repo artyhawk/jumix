@@ -1,6 +1,5 @@
 'use client'
 
-import { EmptyQueue } from '@/components/approvals/empty-queue'
 import { QueueError } from '@/components/approvals/queue-error'
 import { QueueSkeleton } from '@/components/approvals/queue-skeleton'
 import { OrganizationOperatorDrawer } from '@/components/drawers/organization-operator-drawer'
@@ -10,9 +9,10 @@ import { PageHeader } from '@/components/layout/page-header'
 import { PageTransition } from '@/components/motion/page-transition'
 import { StaggerItem, StaggerList } from '@/components/motion/stagger-list'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { useAuth } from '@/hooks/use-auth'
 import { useOrganizationOperatorsInfinite } from '@/lib/hooks/use-organization-operators'
-import { Plus } from 'lucide-react'
+import { Plus, UserPlus } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 
@@ -76,12 +76,16 @@ export default function HireRequestsPage() {
       ) : isError ? (
         <QueueError onRetry={() => refetch()} />
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-12">
-          <EmptyQueue type="hires" />
-          <Button variant="primary" onClick={() => setParam('create', 'true')}>
-            Нанять крановщика
-          </Button>
-        </div>
+        <EmptyState
+          icon={UserPlus}
+          title="Нет активных заявок"
+          description="Подайте первую заявку на найм — после одобрения платформой крановщик появится в команде."
+          action={
+            <Button variant="primary" onClick={() => setParam('create', 'true')}>
+              Нанять крановщика
+            </Button>
+          }
+        />
       ) : (
         <StaggerList className="flex flex-col gap-2">
           {items.map((hire) => (

@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { EmptyState } from '@/components/ui/empty-state'
 import { FilterBar } from '@/components/ui/filter-bar'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { LicenseStatusBadge } from '@/components/ui/license-status-badge'
@@ -15,7 +16,7 @@ import { useAuth } from '@/hooks/use-auth'
 import type { OperatorHireStatus, OrganizationOperator } from '@/lib/api/types'
 import { formatRelativeTime } from '@/lib/format/time'
 import { useOrganizationOperatorsInfinite } from '@/lib/hooks/use-organization-operators'
-import { HardHat, ShieldAlert } from 'lucide-react'
+import { HardHat, Search, ShieldAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 
@@ -185,19 +186,27 @@ export default function MyOperatorsPage() {
           mobileSubtitle={(h) => h.craneProfile.iin}
           ariaLabel="Список операторов"
           empty={
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <HardHat className="size-8 text-text-tertiary" strokeWidth={1.5} aria-hidden />
-              <div className="text-sm text-text-secondary">
-                {search || hire
-                  ? 'Ничего не найдено по фильтрам'
-                  : 'У вас пока нет нанятых крановщиков'}
-              </div>
-              {!search && !hire ? (
-                <Button variant="primary" onClick={() => router.push('/hire-requests?create=true')}>
-                  Нанять крановщика
-                </Button>
-              ) : null}
-            </div>
+            search || hire ? (
+              <EmptyState
+                icon={Search}
+                title="Ничего не найдено"
+                description="Попробуйте изменить параметры фильтров"
+              />
+            ) : (
+              <EmptyState
+                icon={HardHat}
+                title="У вас пока нет нанятых крановщиков"
+                description="Подайте заявку на найм — после одобрения платформой крановщик появится в команде."
+                action={
+                  <Button
+                    variant="primary"
+                    onClick={() => router.push('/hire-requests?create=true')}
+                  >
+                    Нанять крановщика
+                  </Button>
+                }
+              />
+            )
           }
         />
       )}

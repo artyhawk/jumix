@@ -267,6 +267,9 @@ export interface OrganizationOperatorCraneProfileSnippet {
   iin: string
   avatarUrl: string | null
   licenseStatus: LicenseStatus
+  // Optional для backward-compat с test fixtures; backend всегда шлёт
+  // (B3-UI-3c DTO). Должен быть required когда все fixtures обновятся.
+  licenseExpiresAt?: string | null
 }
 
 export interface OrganizationOperator {

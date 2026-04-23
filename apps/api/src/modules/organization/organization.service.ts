@@ -233,6 +233,10 @@ export class OrganizationService {
     return this.changeStatus(ctx, id, 'active', meta)
   }
 
+  async archive(ctx: AuthContext, id: string, meta: RequestMeta): Promise<Organization> {
+    return this.changeStatus(ctx, id, 'archived', meta)
+  }
+
   private async changeStatus(
     ctx: AuthContext,
     id: string,

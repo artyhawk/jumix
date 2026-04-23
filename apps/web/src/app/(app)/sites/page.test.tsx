@@ -150,12 +150,12 @@ describe('SitesPage', () => {
     expect(replace).toHaveBeenCalledWith('/')
   })
 
-  it('empty state for owner shows "Создать первый объект" button', async () => {
+  it('empty state for owner shows "Создать объект" CTA', async () => {
     list.mockResolvedValueOnce({ items: [], nextCursor: null })
     renderPage()
     await waitFor(() => {
       expect(screen.getByText(/У вас пока нет объектов/)).toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: /Создать первый объект/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Создать объект/ })).toBeInTheDocument()
   })
 })

@@ -359,7 +359,7 @@ function OrganizationOperatorDrawerBody({
           {cp.iin}
         </DetailRow>
         <DetailRow label="Удостоверение">
-          <LicenseStatusBadge status={cp.licenseStatus} />
+          <LicenseStatusBadge status={cp.licenseStatus} enriched expiresAt={cp.licenseExpiresAt} />
         </DetailRow>
         {hire.phone ? (
           <DetailRow label="Телефон" mono>

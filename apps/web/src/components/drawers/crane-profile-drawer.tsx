@@ -154,14 +154,11 @@ function CraneProfileDrawerBody({ profile }: { profile: CraneProfile }) {
           {formatKzPhoneDisplay(profile.phone)}
         </DetailRow>
         <DetailRow label="Удостоверение">
-          <span className="inline-flex items-center gap-2">
-            <LicenseStatusBadge status={profile.licenseStatus} />
-            {profile.licenseExpiresAt ? (
-              <span className="text-text-tertiary font-mono-numbers">
-                до {new Date(profile.licenseExpiresAt).toLocaleDateString('ru-RU')}
-              </span>
-            ) : null}
-          </span>
+          <LicenseStatusBadge
+            status={profile.licenseStatus}
+            enriched
+            expiresAt={profile.licenseExpiresAt}
+          />
         </DetailRow>
         <DetailRow label="Создан">{formatRelativeTime(profile.createdAt)}</DetailRow>
         {profile.approvedAt ? (

@@ -6,6 +6,7 @@ import { PageTransition } from '@/components/motion/page-transition'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { EmptyState } from '@/components/ui/empty-state'
 import { FilterBar } from '@/components/ui/filter-bar'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { SearchInput } from '@/components/ui/search-input'
@@ -14,7 +15,7 @@ import type { ApprovalStatus, Crane, CraneOperationalStatus, CraneType } from '@
 import { formatRelativeTime } from '@/lib/format/time'
 import { useCranesInfinite } from '@/lib/hooks/use-cranes'
 import { IconCrane } from '@tabler/icons-react'
-import { ShieldAlert } from 'lucide-react'
+import { Search, ShieldAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 
@@ -234,13 +235,19 @@ export default function CranesPage() {
           mobileSubtitle={(c) => TYPE_LABEL[c.type]}
           ariaLabel="Список кранов"
           empty={
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <div className="text-sm text-text-secondary">
-                {search || approval || op || type
-                  ? 'Ничего не найдено по фильтрам'
-                  : 'Кранов пока нет'}
-              </div>
-            </div>
+            search || approval || op || type ? (
+              <EmptyState
+                icon={Search}
+                title="Ничего не найдено"
+                description="Попробуйте изменить параметры фильтров"
+              />
+            ) : (
+              <EmptyState
+                icon={IconCrane}
+                title="Кранов пока нет"
+                description="Краны появятся здесь после регистрации владельцами организаций."
+              />
+            )
           }
         />
       )}

@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { EmptyState } from '@/components/ui/empty-state'
 import { FilterBar } from '@/components/ui/filter-bar'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { LicenseStatusBadge } from '@/components/ui/license-status-badge'
@@ -15,7 +16,7 @@ import { useAuth } from '@/hooks/use-auth'
 import type { ApprovalStatus, CraneProfile, LicenseStatus } from '@/lib/api/types'
 import { formatRelativeTime } from '@/lib/format/time'
 import { useCraneProfilesInfinite } from '@/lib/hooks/use-crane-profiles'
-import { ShieldAlert } from 'lucide-react'
+import { HardHat, Search, ShieldAlert } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 
@@ -191,13 +192,19 @@ export default function CraneProfilesPage() {
           mobileSubtitle={(p) => <span className="font-mono-numbers">{p.iin}</span>}
           ariaLabel="Список крановщиков"
           empty={
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <div className="text-sm text-text-secondary">
-                {search || approval || license
-                  ? 'Ничего не найдено по фильтрам'
-                  : 'Крановщиков пока нет'}
-              </div>
-            </div>
+            search || approval || license ? (
+              <EmptyState
+                icon={Search}
+                title="Ничего не найдено"
+                description="Попробуйте изменить параметры фильтров"
+              />
+            ) : (
+              <EmptyState
+                icon={HardHat}
+                title="Крановщиков пока нет"
+                description="Новые профили появятся здесь после регистрации через мобильное приложение."
+              />
+            )
           }
         />
       )}

@@ -1,5 +1,6 @@
 'use client'
 
+import { EditOrganizationDialog } from '@/components/organizations/edit-organization-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,16 +12,19 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useAuth } from '@/hooks/use-auth'
 import { isAppError } from '@/lib/api/errors'
 import type { Organization, OrganizationStatus } from '@/lib/api/types'
 import { formatRelativeTime } from '@/lib/format/time'
 import {
   useActivateOrganization,
+  useArchiveOrganization,
   useOrganization,
   useSuspendOrganization,
 } from '@/lib/hooks/use-organizations'
 import { formatKzPhoneDisplay } from '@/lib/phone-format'
-import { Building2, ShieldAlert } from 'lucide-react'
+import { Archive, Building2, Pencil, Power, ShieldAlert } from 'lucide-react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { DetailRow } from './detail-row'
 
@@ -41,10 +45,14 @@ const STATUS_LABEL: Record<OrganizationStatus, string> = {
 }
 
 export function OrganizationDrawer({ id, onOpenChange }: Props) {
+  const { user } = useAuth()
   const query = useOrganization(id)
   const suspend = useSuspendOrganization()
   const activate = useActivateOrganization()
+  const archive = useArchiveOrganization()
   const org = query.data
+  const [editOpen, setEditOpen] = useState(false)
+  const [confirmArchive, setConfirmArchive] = useState(false)
 
   const handleSuspend = async () => {
     if (!org) return
@@ -68,50 +76,110 @@ export function OrganizationDrawer({ id, onOpenChange }: Props) {
     }
   }
 
-  const busy = suspend.isPending || activate.isPending
+  const handleArchive = async () => {
+    if (!org) return
+    try {
+      await archive.mutateAsync(org.id)
+      toast.success('Организация отправлена в архив')
+      setConfirmArchive(false)
+    } catch (err) {
+      const message = isAppError(err) ? err.message : 'Попробуйте ещё раз'
+      toast.error('Не удалось архивировать', { description: message })
+    }
+  }
+
+  const busy = suspend.isPending || activate.isPending || archive.isPending
+  const canManage = user?.role === 'superadmin'
+  const showFooter = canManage && org && org.status !== 'archived'
 
   return (
-    <DrawerRoot open={id !== null} onOpenChange={onOpenChange}>
-      <DrawerContent aria-describedby={undefined}>
-        <DrawerHeader className="pr-12">
-          <DrawerTitle>{org ? org.name : 'Организация'}</DrawerTitle>
-        </DrawerHeader>
-        <DrawerBody>
-          {query.isPending ? (
-            <OrganizationDrawerSkeleton />
-          ) : query.isError ? (
-            <OrganizationDrawerError />
-          ) : org ? (
-            <OrganizationDrawerBody org={org} />
-          ) : null}
-        </DrawerBody>
-        {org && org.status !== 'archived' ? (
-          <DrawerFooter className="flex-col-reverse md:flex-row">
-            {org.status === 'active' ? (
-              <Button
-                variant="ghost"
-                onClick={handleSuspend}
-                loading={suspend.isPending}
-                disabled={busy}
-                className="w-full md:w-auto"
-              >
-                Приостановить
-              </Button>
+    <>
+      <DrawerRoot open={id !== null} onOpenChange={onOpenChange}>
+        <DrawerContent aria-describedby={undefined}>
+          <DrawerHeader className="pr-12">
+            <DrawerTitle>{org ? org.name : 'Организация'}</DrawerTitle>
+          </DrawerHeader>
+          <DrawerBody>
+            {query.isPending ? (
+              <OrganizationDrawerSkeleton />
+            ) : query.isError ? (
+              <OrganizationDrawerError />
+            ) : org ? (
+              <OrganizationDrawerBody org={org} />
+            ) : null}
+          </DrawerBody>
+          {showFooter && org ? (
+            confirmArchive ? (
+              <DrawerFooter className="flex-col items-start">
+                <div className="text-sm text-text-primary">Отправить {org.name} в архив?</div>
+                <div className="text-xs text-text-secondary">
+                  Архивация — терминальное состояние. Доступ владельцев будет заблокирован.
+                </div>
+                <div className="flex w-full flex-col-reverse gap-2 md:flex-row md:justify-end">
+                  <Button variant="ghost" onClick={() => setConfirmArchive(false)} disabled={busy}>
+                    Отмена
+                  </Button>
+                  <Button variant="danger" onClick={handleArchive} loading={archive.isPending}>
+                    Да, архивировать
+                  </Button>
+                </div>
+              </DrawerFooter>
             ) : (
-              <Button
-                variant="primary"
-                onClick={handleActivate}
-                loading={activate.isPending}
-                disabled={busy}
-                className="w-full md:w-auto"
-              >
-                Активировать
-              </Button>
-            )}
-          </DrawerFooter>
-        ) : null}
-      </DrawerContent>
-    </DrawerRoot>
+              <DrawerFooter className="flex-col-reverse md:flex-row md:justify-between">
+                <div className="flex flex-col-reverse gap-2 md:flex-row">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setEditOpen(true)}
+                    disabled={busy}
+                    className="w-full md:w-auto"
+                  >
+                    <Pencil className="size-4" strokeWidth={1.5} aria-hidden />
+                    Редактировать
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setConfirmArchive(true)}
+                    disabled={busy}
+                    className="w-full md:w-auto"
+                  >
+                    <Archive className="size-4" strokeWidth={1.5} aria-hidden />
+                    Архивировать
+                  </Button>
+                </div>
+                {org.status === 'active' ? (
+                  <Button
+                    variant="secondary"
+                    onClick={handleSuspend}
+                    loading={suspend.isPending}
+                    disabled={busy && !suspend.isPending}
+                    className="w-full md:w-auto"
+                  >
+                    <Power className="size-4" strokeWidth={1.5} aria-hidden />
+                    Приостановить
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    onClick={handleActivate}
+                    loading={activate.isPending}
+                    disabled={busy && !activate.isPending}
+                    className="w-full md:w-auto"
+                  >
+                    <Power className="size-4" strokeWidth={1.5} aria-hidden />
+                    Активировать
+                  </Button>
+                )}
+              </DrawerFooter>
+            )
+          ) : null}
+        </DrawerContent>
+      </DrawerRoot>
+      <EditOrganizationDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        organization={org ?? null}
+      />
+    </>
   )
 }
 

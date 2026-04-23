@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { EmptyState } from '@/components/ui/empty-state'
 import { FilterBar } from '@/components/ui/filter-bar'
 import { FilterChip } from '@/components/ui/filter-chip'
 import { LicenseStatusBadge } from '@/components/ui/license-status-badge'
@@ -18,7 +19,7 @@ import type { ApprovalStatus, OperatorHireStatus, OrganizationOperator } from '@
 import { formatRelativeTime } from '@/lib/format/time'
 import { useOrganizationOperatorsInfinite } from '@/lib/hooks/use-organization-operators'
 import { useOrganizations } from '@/lib/hooks/use-organizations'
-import { Building2, ShieldAlert } from 'lucide-react'
+import { Building2, Search, ShieldAlert, Users } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -252,13 +253,19 @@ export default function OrganizationOperatorsPage() {
           mobileSubtitle={(h) => orgLookup.get(h.organizationId) ?? h.organizationId}
           ariaLabel="Список назначений"
           empty={
-            <div className="flex flex-col items-center gap-3 py-12 text-center">
-              <div className="text-sm text-text-secondary">
-                {search || approval || hire || orgId
-                  ? 'Ничего не найдено по фильтрам'
-                  : 'Назначений пока нет'}
-              </div>
-            </div>
+            search || approval || hire || orgId ? (
+              <EmptyState
+                icon={Search}
+                title="Ничего не найдено"
+                description="Попробуйте изменить параметры фильтров"
+              />
+            ) : (
+              <EmptyState
+                icon={Users}
+                title="Назначений пока нет"
+                description="Владельцы организаций подают заявки на найм — вы увидите их здесь."
+              />
+            )
           }
         />
       )}

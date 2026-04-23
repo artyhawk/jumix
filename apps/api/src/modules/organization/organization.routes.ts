@@ -17,6 +17,7 @@ import {
  *   PATCH  /api/v1/organizations/:id        superadmin (все поля) | owner (contacts)
  *   POST   /api/v1/organizations/:id/suspend   superadmin
  *   POST   /api/v1/organizations/:id/activate  superadmin
+ *   POST   /api/v1/organizations/:id/archive   superadmin (terminal)
  *
  * Все маршруты под authenticate — 401 без токена. Policy-checks и tenant scope
  * внутри service (не в handler'ах), handler только парсит body и мапит DTO.
@@ -80,6 +81,14 @@ export const registerOrganizationRoutes: FastifyPluginAsync = async (app: Fastif
       scoped.post('/:id/activate', async (request) => {
         const { id } = organizationIdParamsSchema.parse(request.params)
         const org = await app.organizationService.activate(request.ctx, id, {
+          ipAddress: request.ip,
+        })
+        return toPublicDTO(org)
+      })
+
+      scoped.post('/:id/archive', async (request) => {
+        const { id } = organizationIdParamsSchema.parse(request.params)
+        const org = await app.organizationService.archive(request.ctx, id, {
           ipAddress: request.ip,
         })
         return toPublicDTO(org)
