@@ -1,62 +1,129 @@
+import { MeIdentityCard } from '@/components/operator/me-identity-card'
+import { MeLicenseCard } from '@/components/operator/me-license-card'
+import { MeMembershipsSummary } from '@/components/operator/me-memberships-summary'
+import { MeScreenError } from '@/components/operator/me-screen-error'
+import { MeScreenSkeleton } from '@/components/operator/me-screen-skeleton'
+import { MeStatusCard } from '@/components/operator/me-status-card'
 import { Button } from '@/components/ui/button'
 import { SafeArea } from '@/components/ui/safe-area'
+import { useMeStatus } from '@/lib/hooks/use-me'
 import { useAuthStore } from '@/stores/auth'
 import { colors, spacing } from '@/theme/tokens'
 import { typography } from '@/theme/typography'
-import { StyleSheet, Text, View } from 'react-native'
+import type { MeStatusResponse } from '@jumix/shared'
+import { router } from 'expo-router'
+import { useCallback } from 'react'
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 /**
- * /me placeholder (M1). Полноценный экран (canWork indicator + identity
- * + license status + memberships) — в M2.
+ * Operator landing screen (M2). Shows canWork indicator + identity +
+ * license quick-glance + memberships summary. Pull-to-refresh invalidates
+ * /me/status query.
+ *
+ * Loading → MeScreenSkeleton, error → MeScreenError с retry.
  */
 export default function MeScreen() {
-  const user = useAuthStore((s) => s.user)
+  const query = useMeStatus()
   const logout = useAuthStore((s) => s.logout)
+
+  const handleRefresh = useCallback(() => {
+    void query.refetch()
+  }, [query])
+
+  if (query.isLoading) {
+    return (
+      <SafeArea edges={['bottom']}>
+        <MeScreenSkeleton />
+      </SafeArea>
+    )
+  }
+
+  if (query.isError || !query.data) {
+    return (
+      <SafeArea edges={['bottom']}>
+        <MeScreenError error={query.error} onRetry={handleRefresh} />
+      </SafeArea>
+    )
+  }
 
   return (
     <SafeArea edges={['bottom']}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={typography.heading1}>
-            Привет, {user?.name?.split(' ')[0] ?? 'крановщик'}
-          </Text>
-          <Text style={typography.bodySecondary}>
-            Профиль будет доступен в следующем обновлении (M2)
-          </Text>
-        </View>
+      <MeScreenContent
+        data={query.data}
+        isRefreshing={query.isFetching && !query.isLoading}
+        onRefresh={handleRefresh}
+        onLogout={() => void logout()}
+      />
+    </SafeArea>
+  )
+}
 
-        <View style={styles.placeholder}>
-          <Text style={typography.caption}>
-            Здесь появится: статус работоспособности, удостоверение, список компаний-работодателей.
-          </Text>
-        </View>
+function MeScreenContent({
+  data,
+  isRefreshing,
+  onRefresh,
+  onLogout,
+}: {
+  data: MeStatusResponse
+  isRefreshing: boolean
+  onRefresh: () => void
+  onLogout: () => void
+}) {
+  const { profile, memberships, licenseStatus, canWork, canWorkReasons } = data
 
-        <Button variant="danger" onPress={logout} fullWidth>
+  return (
+    <ScrollView
+      contentContainerStyle={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.brand500}
+          colors={[colors.brand500]}
+        />
+      }
+    >
+      <View style={styles.greeting}>
+        <Text style={typography.caption}>Здравствуйте,</Text>
+        <Text style={typography.heading2}>{profile.firstName}</Text>
+      </View>
+
+      <MeStatusCard canWork={canWork} reasons={canWorkReasons} />
+
+      <MeIdentityCard profile={profile} />
+
+      <MeLicenseCard
+        profile={profile}
+        licenseStatus={licenseStatus}
+        onManagePress={() => router.push('/(tabs)/license')}
+      />
+
+      <MeMembershipsSummary
+        memberships={memberships}
+        onViewAll={() => router.push('/memberships')}
+        onMembershipPress={(m) =>
+          router.push({ pathname: '/memberships/[id]', params: { id: m.id } })
+        }
+      />
+
+      <View style={styles.footer}>
+        <Button variant="ghost" onPress={onLogout} fullWidth>
           Выйти
         </Button>
       </View>
-    </SafeArea>
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: spacing.xl,
-    gap: spacing.xl,
-  },
-  header: {
-    gap: spacing.sm,
-  },
-  placeholder: {
-    flex: 1,
     padding: spacing.lg,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.borderSubtle,
-    backgroundColor: colors.layer2,
-    justifyContent: 'center',
-    alignItems: 'center',
+    gap: spacing.md,
+  },
+  greeting: {
+    gap: 2,
+  },
+  footer: {
+    marginTop: spacing.lg,
   },
 })

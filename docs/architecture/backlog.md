@@ -621,7 +621,31 @@ Leaning to first approach — UI responsibility, backend stays pure data.
 
 ---
 
-## Mobile (from M1)
+## Mobile (from M1 + M2)
+
+### Skeleton shimmer animation
+
+M2 ship'нул static skeleton (plain `View` с `colors.layer3` bg) — читается как loading благодаря shape + позиционированию. Shimmer pulse (Reanimated-based `useSharedValue + withRepeat` opacity 0.3 ↔ 0.7) — polish. Проблема: `react-native-reanimated` worklets не работают в jsdom (vitest env), тесты упадут. Решение когда делать: wrap Skeleton в `Platform.select({web: static, native: animated})` ИЛИ мокать reanimated в `tests/setup.ts` по polyfill-паттерну. До тех пор — static acceptable.
+
+### SVG icons + Lucide (hoist из M1-backlog)
+
+M2 продолжает использовать emoji-глифы (`✓`, `!`, `🏢`, `⚠`) как placeholder icons — работает но несогласовано с web'овыми Lucide иконками. Миграция: `lucide-react-native` (peer `react-native-svg`) — один импорт на весь app. Gate перед M8 polish. Triggers: UI review с заказчиком, стилистическое выравнивание с web.
+
+### Identity edit request flow (mobile UI)
+
+M2 показывает identity read-only на /me screen (мобилка + web identical limitation). Edit identity требует re-approval через superadmin'а (rename / IIN change invalidate старые documents). Backlog: mobile screen «Запросить изменение данных» с motivation textarea → creates pending `identity_change_requests` row → superadmin approve/reject → на approve обновляет `crane_profiles` и resets hire approvalStatus. Backend API ещё нет. Параллель — web backlog entry "identity edit flow" (B3-UI-4).
+
+### Avatar upload UI (mobile)
+
+Backend endpoint готов с B2d-2a (`POST /me/avatar/upload-url` + `/me/avatar/confirm`, platform key `crane-profiles/{id}/avatar/...`). Mobile UI нет — Avatar показывает backend-stored URL read-only или инициалы. Gate: когда UX dictate'ит кастомизацию (заказчик попросит / полевой feedback). Implementation: `expo-image-picker` (camera + library), crop 1:1, compress (JPEG q=0.8), PUT → confirm → invalidate meStatus.
+
+### Membership individual endpoint
+
+Currently `/memberships/[id]` detail screen берёт membership из `useMeStatus` cache (memberships array). Если operator имеет 100+ hire-записей — payload большой, всё загружается для detail screen. Backlog: `GET /api/v1/organization-operators/[my-hire-id]` endpoint с operator-scoped policy (operator может читать только свои hires). Триггер: когда типичный operator будет иметь > 10 active/historical memberships.
+
+### Rejected/terminated filter в /memberships list
+
+M2 показывает все memberships (approved + pending + rejected + terminated) в одном списке — для MVP достаточно, но UX может потребовать tabs (активные / история). Gate: user-feedback post-launch.
 
 ### Expo SDK 55 upgrade
 

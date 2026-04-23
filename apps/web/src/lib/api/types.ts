@@ -1,7 +1,29 @@
 /**
  * Типы, отзеркаливающие backend-контракты. Обновлять руками при изменении API;
  * когда появится сгенерированный OpenAPI — заменить на импорт из `@jumix/api-types`.
+ *
+ * M2: Types переиспользуемые между web + mobile — hoisted в `@jumix/shared`.
+ * Здесь local re-export (чтобы existing web imports через `@/lib/api/types`
+ * продолжали работать без массового refactor'а callsite'ов).
  */
+
+import type {
+  ApprovalStatus,
+  CraneProfile,
+  LicenseStatus,
+  MeStatusMembership,
+  MeStatusResponse,
+  OperatorHireStatus,
+} from '@jumix/shared'
+
+export type {
+  ApprovalStatus,
+  CraneProfile,
+  LicenseStatus,
+  MeStatusMembership,
+  MeStatusResponse,
+  OperatorHireStatus,
+}
 
 export type UserRole = 'superadmin' | 'owner' | 'operator'
 export type ClientKind = 'web' | 'mobile'
@@ -104,7 +126,6 @@ export interface RecentAuditResponse {
 
 // ---------- Shared approval / pagination ----------
 
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 export type ApprovalFilter = ApprovalStatus | 'all'
 
 export interface Paginated<T> {
@@ -143,58 +164,9 @@ export interface CreateOrganizationResponse {
   owner: { id: string; phone: string }
 }
 
-// ---------- Crane profiles ----------
-
-export type LicenseStatus = 'missing' | 'valid' | 'expiring_soon' | 'expiring_critical' | 'expired'
-
-export interface CraneProfile {
-  id: string
-  userId: string
-  firstName: string
-  lastName: string
-  patronymic: string | null
-  iin: string
-  phone: string
-  avatarUrl: string | null
-  approvalStatus: ApprovalStatus
-  rejectionReason: string | null
-  approvedAt: string | null
-  rejectedAt: string | null
-  licenseStatus: LicenseStatus
-  licenseExpiresAt: string | null
-  licenseUrl: string | null
-  licenseVersion?: number
-  createdAt: string
-  updatedAt: string
-}
-
-// ---------- Operator self-status (B3-UI-4) ----------
-
-export interface MeStatusMembership {
-  id: string
-  organizationId: string
-  organizationName: string
-  approvalStatus: ApprovalStatus
-  status: OperatorHireStatus
-  hiredAt: string | null
-  approvedAt: string | null
-  rejectedAt: string | null
-  terminatedAt: string | null
-  rejectionReason: string | null
-}
-
-/**
- * /me/status — single source-of-truth для operator web cabinet.
- * profile: полный DTO (как `GET /me`) + phone + license поля.
- * canWorkReasons: empty array когда canWork=true; иначе — blocking reasons.
- */
-export interface MeStatusResponse {
-  profile: CraneProfile
-  memberships: MeStatusMembership[]
-  licenseStatus: LicenseStatus
-  canWork: boolean
-  canWorkReasons: string[]
-}
+// ---------- Crane profiles / Operator self-status (B3-UI-4) ----------
+// LicenseStatus / CraneProfile / MeStatusMembership / MeStatusResponse
+// hoisted в @jumix/shared и re-exported at top-of-file.
 
 // ---------- Cranes ----------
 
@@ -256,8 +228,7 @@ export interface UpdateSiteInput {
 }
 
 // ---------- Organization operators (hires) ----------
-
-export type OperatorHireStatus = 'active' | 'blocked' | 'terminated'
+// OperatorHireStatus hoisted в @jumix/shared, re-exported at top-of-file.
 
 export interface OrganizationOperatorCraneProfileSnippet {
   id: string
