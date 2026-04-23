@@ -1,0 +1,163 @@
+name: jumix-prod
+
+# Production stack (B3-UI-5b). Запуск:
+#   docker compose -f infra/docker/docker-compose.prod.yml --env-file .env.prod up -d
+#
+# Volumes mounted в /var/lib/jumix/* на хосте — backup'ы снимаются с host
+# filesystem (см. scripts/backup-db.sh).
+#
+# SSL termination — на хостовом уровне (nginx service здесь слушает только
+# HTTP:80 внутри сети; внешний reverse proxy с certbot делает HTTPS→HTTP).
+# Для polit/edge deployments добавить certbot-sidecar.
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: jumix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: Asia/Almaty
+      PGTZ: Asia/Almaty
+    # NO host port exposure — доступ только внутри compose network.
+    volumes:
+      - /var/lib/jumix/postgres:/var/lib/postgresql/data
+      - /var/lib/jumix/backups/db:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  redis:
+    image: redis:7-alpine
+    container_name: jumix-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - /var/lib/jumix/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  minio:
+    image: minio/minio:latest
+    container_name: jumix-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - /var/lib/jumix/minio:/data
+    # Console порт 9001 для ручной администрации — expose на 127.0.0.1
+    # (SSH tunnel клиентом для доступа). Storage :9000 — только внутри сети.
+    ports:
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    container_name: jumix-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: "9000"
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      SMS_GATEWAY_URL: ${SMS_GATEWAY_URL}
+      SMS_GATEWAY_KEY: ${SMS_GATEWAY_KEY}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      TZ: Asia/Almaty
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    container_name: jumix-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+      NEXT_PUBLIC_TILES_URL: ${PUBLIC_TILES_URL:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      TZ: Asia/Almaty
+    depends_on:
+      - api
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: jumix-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # pmtiles host-mounted: оператор скачивает kz.pmtiles с protomaps.com
+      # и кладёт в /var/lib/jumix/tiles/ (см. README).
+      - /var/lib/jumix/tiles:/var/lib/jumix/tiles:ro
+    depends_on:
+      - api
+      - web
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"

@@ -4,6 +4,11 @@ import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect, useRef } from 'react'
 import { DARK_VECTOR_STYLE, DEFAULT_CENTER, DEFAULT_ZOOM } from './map-style'
+import { registerPmtilesProtocol } from './register-pmtiles'
+
+// Регистрируем `pmtiles://` handler на client module load — до первого
+// Map instance. Idempotent: повторные вызовы безопасны (см. register-pmtiles.ts).
+registerPmtilesProtocol()
 
 export interface BaseMapProps {
   /** Начальный центр `[lng, lat]`. Astana по умолчанию. */
