@@ -621,6 +621,64 @@ Leaning to first approach — UI responsibility, backend stays pure data.
 
 ---
 
+## Mobile (from M1)
+
+### Expo 53/55 + React 19 upgrade
+
+M1 shipped на Expo 52 + RN 0.76 + React 18 (стабильный stack, known-good peer-deps). Expo 53 добавил support React 19 early 2025, Expo 55 ожидается со стабильным RN 0.78 через несколько месяцев. Upgrade path: отдельная миграция с регресс-тестированием на iOS + Android simulators + real device. Триггер: когда web захочет фичу из React 19 (Suspense boundaries, Actions) — или когда Expo 55 LTS станет mainline.
+
+### Phone number edge cases
+
+Current: `phoneDigits` strips leading 7/8 если длина ≥ 11. Не покрыто:
+- Пробелы/дефисы в middle input (backspace странное поведение)
+- Copy/paste international format (+1...) — сейчас silently strip non-digits
+- `x8 701` (short spaces) — работает, но placeholder UI не подсказывает
+Backlog: polish phase в M8 перед TestFlight.
+
+### OTP autofill real-device testing
+
+jsdom не симулирует iOS SMS autofill из incoming message, Android SMS Retriever API. Unit tests проверяют markup (`textContentType='oneTimeCode'`, `autoComplete='sms-otp'`). Actual autofill validation — manual QA на physical devices: iPhone (iOS 17+) + Samsung/Pixel (Android 13+). Gate перед M8 release.
+
+### Real-device testing infrastructure
+
+Currently тестируем manually через Expo Go. Backlog:
+- **Detox** / **Maestro** e2e automation — CI runs на BrowserStack App Live (paid) или simulator matrix
+- Device farm rotation (iPhone SE-15, Pixel-Samsung Android 10-15) — Xcode Cloud / Firebase Test Lab
+- Accessibility audit (iOS Accessibility Inspector, Android TalkBack) — pre-release checklist
+
+### OTA updates (EAS Update)
+
+Expo EAS Update — push JS bundles без App Store review (критично для hotfixes между releases). Backlog: configure в M8 вместе с EAS Build pipeline. Channel strategy: `production` (stable) / `staging` (internal testing) / `preview` (new features behind flag).
+
+### Biometric unlock (FaceID / TouchID)
+
+After initial SMS login, защитить app re-open через biometrics — `expo-local-authentication`. Lookup: если user есть в store + last active < 7 дней + biometrics enrolled → FaceID challenge вместо logout-on-foreground. UX improvement, не blocker.
+
+### Offline-first data layer
+
+Critical для M5 (GPS tracking во время смены — сеть может пропадать на стройках). General pattern starts M4:
+- Mutation queue (persist queued requests → retry on connectivity)
+- Local cache (SQLite или MMKV) для shifts list / profile
+- Optimistic UI с conflict resolution (последний writer wins + audit)
+
+### Dark/light theme toggle
+
+Currently dark-only (matches web). Light theme — backlog, low priority: работа крановщика на улице в солнце — light theme читается хуже чем dark. Если заказчик настоятельно попросит — в M8 polish.
+
+### Push notifications (M7 placeholder)
+
+FCM через `expo-notifications`. Topics: license expiring warnings, shift assigned, incident updates. Permission flow: onboarding после первого login → Apple/Android permission prompt. Silent notifications для background GPS — отдельное разрешение iOS. Backlog до M7.
+
+### i18n
+
+Currently ru-only. KZ (казахский кириллица) — target secondary locale когда заказчик запросит. `i18next` + `react-i18next` + `@formatjs/intl-messageformat`. Lazy-load locales. Backlog до M8.
+
+### Lucide / SVG icons
+
+Tab bar сейчас emoji (👤🪪🏗️). Real SVG icons — `lucide-react-native` или `@expo/vector-icons`. Backlog в M2 (когда начнём serious UI polish).
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:
