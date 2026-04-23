@@ -18,4 +18,8 @@ config.resolver.nodeModulesPaths = [
 ]
 config.resolver.disableHierarchicalLookup = true
 
+// Исключаем test files из bundle — expo-router file-based routing иначе
+// пытается импортировать .test.tsx как routes (vitest падает runtime).
+config.resolver.blockList = [/.*\.test\.(ts|tsx|js|jsx)$/, /\/tests\/.*/]
+
 module.exports = config

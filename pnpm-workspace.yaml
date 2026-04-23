@@ -1,3 +1,8 @@
 packages:
-  - "apps/*"
+  # apps/mobile намеренно исключён — использует npm (flat node_modules)
+  # из-за несовместимости Metro bundler с pnpm nested-symlink структурой.
+  # Линк к @jumix/shared через `file:../../packages/shared` в mobile/package.json.
+  - "apps/api"
+  - "apps/web"
+  - "apps/worker"
   - "packages/*"
