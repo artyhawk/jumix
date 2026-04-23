@@ -623,9 +623,9 @@ Leaning to first approach — UI responsibility, backend stays pure data.
 
 ## Mobile (from M1)
 
-### Expo 53/55 + React 19 upgrade
+### Expo SDK 55 upgrade
 
-M1 shipped на Expo 52 + RN 0.76 + React 18 (стабильный stack, known-good peer-deps). Expo 53 добавил support React 19 early 2025, Expo 55 ожидается со стабильным RN 0.78 через несколько месяцев. Upgrade path: отдельная миграция с регресс-тестированием на iOS + Android simulators + real device. Триггер: когда web захочет фичу из React 19 (Suspense boundaries, Actions) — или когда Expo 55 LTS станет mainline.
+M1-fix shipped на Expo 54 + RN 0.81 + React 19.1 (official default от `create-expo-app` как of April 2026). SDK 55 released Feb 2026 (RN 0.83, React 19.2) — `latest` npm dist-tag уже `55.0.17`, но Expo Go app в App Store и default template ещё на 54 (Expo team gates transition до full ecosystem coverage). Upgrade path: когда `create-expo-app` default сменится на 55 и Expo Go обновится — отдельная миграция с полной регрессией на iOS + Android + real device. Breaking changes SDK 55 (уточнить в release notes при миграции): Legacy Architecture removed (`newArchEnabled: true` становится обязательным), `@expo/ui` API changes (DateTimePicker → DatePicker, etc), Expo Modules Core Swift 6 upgrade. Триггер: когда Expo Go в App Store обновится на 55 (до этого real device testing через 55 невозможен без dev build).
 
 ### Phone number edge cases
 
