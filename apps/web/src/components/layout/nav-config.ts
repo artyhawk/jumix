@@ -61,9 +61,9 @@ export const navItemsByRole: Record<UserRole, NavItem[]> = {
     },
   ],
   operator: [
-    { labelKey: 'nav.myProfile', href: '/', icon: UserCircle, section: 'people' },
-    { labelKey: 'nav.license', href: '/', icon: IdCard, section: 'people' },
-    { labelKey: 'nav.memberships', href: '/', icon: Building2, section: 'people' },
+    { labelKey: 'nav.myProfile', href: '/me', icon: UserCircle, section: 'people' },
+    { labelKey: 'nav.license', href: '/license', icon: IdCard, section: 'people' },
+    { labelKey: 'nav.memberships', href: '/memberships', icon: Building2, section: 'people' },
   ],
 }
 

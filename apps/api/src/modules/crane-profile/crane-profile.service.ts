@@ -192,26 +192,50 @@ export class CraneProfileService {
    */
   async getMeStatus(ctx: AuthContext): Promise<{
     profile: CraneProfile
+    userPhone: string
     memberships: MembershipWithOrganization[]
     licenseStatus: LicenseStatus
     canWork: boolean
+    canWorkReasons: string[]
   }> {
     if (ctx.role !== 'operator') {
       throw forbidden('FORBIDDEN', '/me is available to operators only')
     }
     const repo = this.repoFor(ctx)
-    const profile = await repo.findByUserId(ctx.userId)
-    if (!profile) throw profileNotFound()
+    const profileWithUser = await repo.findByUserIdWithUser(ctx.userId)
+    if (!profileWithUser) throw profileNotFound()
+    const { profile, userPhone } = profileWithUser
     const { rows } = await repo.listMembershipsForProfileWithOrg(profile.id)
     const licenseStatus = computeLicenseStatus(profile.licenseExpiresAt, new Date())
     // canWork — 3-gate (ADR 0005): identity approved + ≥1 approved+active hire
     // + license либо valid, либо в одной из "expiring" градаций (ТЗ §5.1.5.1
     // блокирует только при missing/expired; предупреждения не останавливают).
-    const canWork =
-      profile.approvalStatus === 'approved' &&
-      rows.some((m) => m.hire.approvalStatus === 'approved' && m.hire.status === 'active') &&
-      isLicenseValidForWork(licenseStatus)
-    return { profile, memberships: rows, licenseStatus, canWork }
+    const hasActiveHire = rows.some(
+      (m) => m.hire.approvalStatus === 'approved' && m.hire.status === 'active',
+    )
+    const licenseValid = isLicenseValidForWork(licenseStatus)
+    const canWork = profile.approvalStatus === 'approved' && hasActiveHire && licenseValid
+
+    // canWorkReasons — явный UX-помощник (B3-UI-4): operator видит причины
+    // блокировки в web cabinet. Порядок — от fundamental к specific: profile
+    // → hire → license.
+    const canWorkReasons: string[] = []
+    if (!canWork) {
+      if (profile.approvalStatus === 'pending') {
+        canWorkReasons.push('Профиль ожидает одобрения платформой')
+      } else if (profile.approvalStatus === 'rejected') {
+        canWorkReasons.push('Профиль отклонён платформой')
+      }
+      if (!hasActiveHire) {
+        canWorkReasons.push('Нет активных трудоустройств')
+      }
+      if (licenseStatus === 'missing') {
+        canWorkReasons.push('Удостоверение не загружено')
+      } else if (licenseStatus === 'expired') {
+        canWorkReasons.push('Срок действия удостоверения истёк')
+      }
+    }
+    return { profile, userPhone, memberships: rows, licenseStatus, canWork, canWorkReasons }
   }
 
   // ---------- admin mutations (superadmin) ----------

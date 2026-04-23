@@ -3,12 +3,15 @@ import { IconCrane } from '@tabler/icons-react'
 import {
   Building2,
   HardHat,
+  IdCard,
   LayoutDashboard,
   LogOut,
   type LucideIcon,
   MapPin,
   Plus,
   Shield,
+  Upload,
+  UserCircle,
   UserPlus,
   Users,
   UsersRound,
@@ -44,6 +47,7 @@ export type CommandAction =
   | 'create-site'
   | 'create-crane'
   | 'create-hire-request'
+  | 'upload-license'
 
 export const COMMAND_REGISTRY: CommandEntry[] = [
   // ---- Navigation — superadmin ----
@@ -187,6 +191,46 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
     group: 'actions',
     roles: ['owner'],
     action: 'create-hire-request',
+  },
+
+  // ---- Navigation — operator ----
+  {
+    id: 'nav.me',
+    label: 'Мой профиль',
+    keywords: ['profile', 'profil', 'моё', 'статус', 'me'],
+    icon: UserCircle,
+    group: 'navigation',
+    roles: ['operator'],
+    href: '/me',
+  },
+  {
+    id: 'nav.license',
+    label: 'Удостоверение',
+    keywords: ['license', 'udostoverenie', 'документ'],
+    icon: IdCard,
+    group: 'navigation',
+    roles: ['operator'],
+    href: '/license',
+  },
+  {
+    id: 'nav.memberships',
+    label: 'Компании',
+    keywords: ['memberships', 'kompanii', 'работа', 'orgs'],
+    icon: Building2,
+    group: 'navigation',
+    roles: ['operator'],
+    href: '/memberships',
+  },
+
+  // ---- Actions — operator ----
+  {
+    id: 'action.upload-license',
+    label: 'Загрузить удостоверение',
+    keywords: ['upload', 'license', 'zagruzit', 'удостоверение'],
+    icon: Upload,
+    group: 'actions',
+    roles: ['operator'],
+    action: 'upload-license',
   },
 
   // ---- System (all roles) ----

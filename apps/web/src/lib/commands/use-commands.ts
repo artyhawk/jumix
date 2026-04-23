@@ -48,6 +48,10 @@ export function useCommands() {
         router.push('/hire-requests?create=true')
         return
       }
+      if (cmd.action === 'upload-license') {
+        router.push('/license?upload=true')
+        return
+      }
     },
     [router, logout],
   )

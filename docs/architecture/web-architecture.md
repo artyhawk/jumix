@@ -889,6 +889,107 @@ Owner full workflow: create site → submit crane → submit hire. Superadmin о
 
 ---
 
+## 12f. Operator web cabinet (B3-UI-4)
+
+### Scope rationale
+
+Operator primarily использует mobile app (смены/GPS/СИЗ/incidents, M1-M8). Web cabinet — minimal surface для edge cases:
+
+- Upload license с ноутбука (частый сценарий: новое удостоверение, сканер на компьютере)
+- Check approval status (после submit через public registration — operator заходит проверить «одобрили ли меня»)
+- View memberships (где я работаю + rejection reasons если отклонили)
+
+Не daily workflow — operator открывает web изредка. staleTime на queries адекватен 60s (не hot-path).
+
+### Three-page structure
+
+- `/me` — overview landing: MeStatusCard (canWork indicator) + MeIdentityCard + MeLicenseCard + MeMembershipsSummary (first 3)
+- `/license` — dedicated upload + detail с expiry formatting + warning banners
+- `/memberships` — read-only list с MembershipDrawer для extended details
+
+Все три pages используют same `useMeStatus` query — single source of truth. DTO `/me/status` возвращает всё нужное (profile + memberships + licenseStatus + canWork + canWorkReasons) одним запросом. Operator **не может** fetch memberships через `/organization-operators` (policy filters by organizationId которого operator не имеет в ctx — возвращает empty list).
+
+### `/me/status` DTO evolution (B3-UI-4)
+
+Минимальный mobile-shape (B2d-3) расширен для web:
+
+```ts
+// Before (B2d-3 mobile):
+{ profile: {id, approvalStatus, rejectionReason}, memberships: [...], licenseStatus, canWork }
+
+// After (B3-UI-4):
+{
+  profile: FullCraneProfileDTO,  // toPublicDTO — identity + phone + license
+  memberships: [{
+    ...,
+    hiredAt, approvedAt, rejectedAt, terminatedAt, rejectionReason  // new
+  }],
+  licenseStatus,
+  canWork,
+  canWorkReasons: string[]  // new — empty when canWork=true
+}
+```
+
+Backward-compatible additive — flat `organizationName` на membership сохранён (mobile). Web использует full shape.
+
+### License upload flow
+
+Three-phase orchestration в `useUploadLicense` mutation:
+
+1. **Request URL** — `POST /me/license/upload-url` {contentType, filename} → {uploadUrl, key, version, headers, expiresAt}
+2. **Client PUT** — `fetch(uploadUrl, {method:'PUT', body: file, headers: {'Content-Type': file.type, ...backendHeaders}})` — прямая загрузка в MinIO (не через backend — byte-heavy bypass backend)
+3. **Confirm** — `POST /me/license/confirm` {key, expiresAt} → HEAD + prefix-match + atomic state update (увеличивает licenseVersion, обнуляет warning flags)
+
+Error boundaries:
+- Client-side pre-upload validation (content-type + size) — **inline error** в FilePicker (НЕ toast, less disruptive)
+- Step 2 non-OK → LICENSE_UPLOAD_FAILED — toast + **keep dialog open** для retry
+- Step 3 AppError (e.g., LICENSE_CONFIRM_KEY_MISMATCH) — toast с server message
+
+`onSuccess` invalidates `qk.meStatus` — UI re-fetches, canWork flips если license был блокером, licenseStatus badge обновляется.
+
+### FilePicker primitive
+
+Reusable drag-drop zone в `components/ui/file-picker.tsx`. Structure ограничена useSemanticElements lint-rule:
+
+```
+<div>  (drag-handlers)
+  <input type="file" className="sr-only">
+  <button onClick={openPicker}>   (primary — opens native picker)
+    <!-- content: placeholder OR file metadata -->
+  </button>
+  <button> (optional — remove file)  (sibling, не nested)
+</div>
+```
+
+Nested `<button>`s запрещены biome's `useSemanticElements` — remove-button рендерится как sibling с `absolute` positioning. Drag-drop не работает на mobile (как обычно), но tap → native file picker.
+
+### Testing caveats
+
+- **Dialog portal rendering** — `container.querySelector('input[type="file"]')` возвращает null потому что RadixDialog.Portal рендерит content вне component root. Use `document.querySelector` или `screen.*` queries.
+- **`userEvent.upload` respects accept attr** — файл с non-matching type молча не триггерит onChange. Для invalid-type validation tests используй `fireEvent.change(input)` после `Object.defineProperty(input, 'files', {value: [file]})` — bypass accept-check, имитирует drop или user-clicks-through.
+- **jsdom + globalThis.fetch mocking** — `const originalFetch = globalThis.fetch; globalThis.fetch = mock; afterEach(() => { globalThis.fetch = originalFetch })`. Vitest не auto-restores globals.
+- **`canWorkReasons` order deterministic** — service computes в фиксированном порядке (profile → hire → license). Tests assert через `.toContain` или `arrayContaining` — НЕ positional equality (добавление нового reason-типа не должно ломать тесты).
+
+### Role redirect semantics
+
+Root `(app)/page.tsx` routes by role:
+- superadmin → `/dashboard` (platform overview)
+- owner → `/dashboard` (org-scoped overview, B3-UI-3a)
+- operator → `/me` (self-profile)
+
+Operator НЕ имеет dashboard — role не уполномочена видеть aggregate stats. `/me` полностью заменяет dashboard concept для этой роли: canWork status + identity + license quick-access + memberships summary.
+
+### Read-only memberships invariant
+
+Operator видит memberships (approved/pending/rejected/blocked/terminated) но **не может** mutate:
+- No create — owner action (owner submits hire-request)
+- No terminate — owner action
+- No approve/reject — superadmin action
+
+Это consistent с ADR 0003 (M:N hire model — owner как hirer, superadmin как approver). Rejection reasons surfaced critical UX — operator понимает WHY отклонили (может быть identity issue → admin path через superadmin).
+
+---
+
 ## 13. Связанные документы
 
 - [design-system.md](design-system.md) — цвет, typography, иконки, spacing.

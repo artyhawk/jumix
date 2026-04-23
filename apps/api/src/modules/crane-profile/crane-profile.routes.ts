@@ -64,17 +64,17 @@ export const registerCraneProfileRoutes: FastifyPluginAsync = async (app: Fastif
       })
 
       scoped.get('/me/status', async (request) => {
-        const { profile, memberships, licenseStatus, canWork } =
+        const { profile, userPhone, memberships, licenseStatus, canWork, canWorkReasons } =
           await app.craneProfileService.getMeStatus(request.ctx)
+        // DTO expanded in B3-UI-4: web operator cabinet reuses /me/status как
+        // single source-of-truth (profile + memberships + license + canWork).
+        // Flat `organizationName` остаётся для обратной совместимости с mobile.
         return {
-          profile: {
-            id: profile.id,
-            approvalStatus: profile.approvalStatus,
-            rejectionReason: profile.rejectionReason,
-          },
+          profile: await toPublicDTO(app, profile, userPhone),
           memberships: memberships.map(toMembershipStatusDTO),
           licenseStatus,
           canWork,
+          canWorkReasons,
         }
       })
 
@@ -329,6 +329,11 @@ type MeStatusMembershipDTO = {
   organizationName: string
   approvalStatus: 'pending' | 'approved' | 'rejected'
   status: 'active' | 'blocked' | 'terminated'
+  hiredAt: string | null
+  approvedAt: string | null
+  rejectedAt: string | null
+  terminatedAt: string | null
+  rejectionReason: string | null
 }
 
 function toMembershipStatusDTO(row: MembershipWithOrganization): MeStatusMembershipDTO {
@@ -338,6 +343,11 @@ function toMembershipStatusDTO(row: MembershipWithOrganization): MeStatusMembers
     organizationName: row.organizationName,
     approvalStatus: row.hire.approvalStatus,
     status: row.hire.status,
+    hiredAt: dateOnly(row.hire.hiredAt),
+    approvedAt: row.hire.approvedAt ? row.hire.approvedAt.toISOString() : null,
+    rejectedAt: row.hire.rejectedAt ? row.hire.rejectedAt.toISOString() : null,
+    terminatedAt: dateOnly(row.hire.terminatedAt),
+    rejectionReason: row.hire.rejectionReason,
   }
 }
 

@@ -49,9 +49,16 @@ describe('getCommandsForRole', () => {
     expect(commands.some((c) => c.id === 'nav.approvals')).toBe(false)
   })
 
-  it('operator sees only system commands', () => {
+  it('operator sees navigation (me/license/memberships) + action (upload-license) + system', () => {
     const commands = getCommandsForRole('operator')
-    expect(commands.every((c) => c.group === 'system')).toBe(true)
+    expect(commands.some((c) => c.id === 'nav.me')).toBe(true)
+    expect(commands.some((c) => c.id === 'nav.license')).toBe(true)
+    expect(commands.some((c) => c.id === 'nav.memberships')).toBe(true)
+    expect(commands.some((c) => c.id === 'action.upload-license')).toBe(true)
     expect(commands.some((c) => c.id === 'system.logout')).toBe(true)
+    // operator не видит superadmin/owner actions
+    expect(commands.some((c) => c.id === 'action.create-organization')).toBe(false)
+    expect(commands.some((c) => c.id === 'action.create-site')).toBe(false)
+    expect(commands.some((c) => c.id === 'action.create-hire-request')).toBe(false)
   })
 })

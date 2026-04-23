@@ -1,5 +1,11 @@
 import { apiFetch } from './client'
-import type { ApprovalFilter, CraneProfile, LicenseStatus, Paginated } from './types'
+import type {
+  ApprovalFilter,
+  CraneProfile,
+  LicenseStatus,
+  MeStatusResponse,
+  Paginated,
+} from './types'
 
 export type LicenseStatusFilter = LicenseStatus | 'all'
 
@@ -39,5 +45,47 @@ export function rejectCraneProfile(id: string, reason: string) {
   return apiFetch<CraneProfile>(`/api/v1/crane-profiles/${id}/reject`, {
     method: 'POST',
     body: { reason },
+  })
+}
+
+// ---------- Operator self-endpoints (B3-UI-4) ----------
+
+/**
+ * /me/status — single source-of-truth для operator web cabinet. Возвращает
+ * profile + memberships + licenseStatus + canWork + canWorkReasons.
+ */
+export function getMeStatus() {
+  return apiFetch<MeStatusResponse>('/api/v1/crane-profiles/me/status', { method: 'GET' })
+}
+
+export interface LicenseUploadUrlRequest {
+  contentType: 'image/jpeg' | 'image/png' | 'application/pdf'
+  filename: string
+}
+
+export interface LicenseUploadUrlResponse {
+  uploadUrl: string
+  key: string
+  version: number
+  headers: Record<string, string>
+  expiresAt: string
+}
+
+export function requestLicenseUploadUrl(body: LicenseUploadUrlRequest) {
+  return apiFetch<LicenseUploadUrlResponse>('/api/v1/crane-profiles/me/license/upload-url', {
+    method: 'POST',
+    body,
+  })
+}
+
+export interface ConfirmLicenseRequest {
+  key: string
+  expiresAt: string
+}
+
+export function confirmLicense(body: ConfirmLicenseRequest) {
+  return apiFetch<CraneProfile>('/api/v1/crane-profiles/me/license/confirm', {
+    method: 'POST',
+    body,
   })
 }

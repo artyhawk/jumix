@@ -585,6 +585,42 @@ Currently organization_operator никак не связан с site'ом — э
 
 ---
 
+## Web — operator cabinet (from B3-UI-4)
+
+### Identity edit request flow
+
+Operator не может править свои ФИО/ИИН — это требует re-approval (смена ИИН = potentially разный человек). Нужен flow: operator submits change-request → `crane_profile.approvalStatus` flips back to pending + `previousApprovalStatus` snapshot → superadmin reviews diff + approves/rejects. Zero UI ship в MVP (редкая операция — люди не меняют ИИН часто). Триггер: user error при regstrации + запрос поменять.
+
+### Phone change with SMS re-verification
+
+Backend `/me/phone-change` endpoint не существует. Новый phone → send OTP → verify → update `users.phone`. Нужен для operator user-story «поменял номер». Dependency: extend SmsAuthService с новым flow. Backlog до B3-UI-4 post-MVP feedback.
+
+### Avatar upload UI для operator
+
+Backend endpoint `POST /me/avatar/upload-url` + confirm уже работают (B2d-2a). UI surface для operator — minimal priority (cosmetic, не блокирует work). Мobile app добавит (self-profile screen). Web сейчас read-only — показывает avatar если загружен через mobile, но upload UI отсутствует. Триггер: заказчик просит «нашим крановщикам нужно поставить фото с web».
+
+### License version history
+
+Backend сохраняет все версии (key pattern `crane-profiles/{id}/license/v{N}/filename`), но UI показывает только current. Нужен «История удостоверений» section на `/license` page — список previous versions с upload dates, optional access к старым файлам. Для compliance audit важно. Retention policy для старых версий — отдельный backlog item (см. Storage §4).
+
+### Re-registration after profile rejection
+
+ADR 0004 backlog: operator с `approvalStatus='rejected'` сейчас не может submit новую registration (IIN conflict). Нужен admin-only un-reject endpoint или soft-delete previous + new registration. UI-side: `/me` для rejected operator показывает rejection reason + link «Подать заявку заново» (disabled + backend-blocked в MVP).
+
+### Operator-side license warning notifications
+
+Backend cron `license-expiry-scan` uploads warnings в audit_log но push-уведомления крановщику — backlog (notifications module). Когда появится — web `/license` should show «Push-уведомление отправлено» badge на warning. Mobile-primary, но web consistency.
+
+### `canWorkReasons` localization / i18n
+
+Сейчас reasons — plain strings на русском, computed в backend service. Когда добавится KZ locale (post-MVP), нужен один из:
+- Перенести reasons в i18n keys на frontend (`me.canWork.reasons.profilePending`) — backend отдаёт enum-like strings, фронт переводит
+- Backend принимает `Accept-Language` header и возвращает localized
+
+Leaning to first approach — UI responsibility, backend stays pure data.
+
+---
+
 ## Storage (from B2a)
 
 Решения зафиксированы в [storage.md](storage.md) §10. Краткий список:

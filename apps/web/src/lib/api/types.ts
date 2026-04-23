@@ -163,8 +163,37 @@ export interface CraneProfile {
   licenseStatus: LicenseStatus
   licenseExpiresAt: string | null
   licenseUrl: string | null
+  licenseVersion?: number
   createdAt: string
   updatedAt: string
+}
+
+// ---------- Operator self-status (B3-UI-4) ----------
+
+export interface MeStatusMembership {
+  id: string
+  organizationId: string
+  organizationName: string
+  approvalStatus: ApprovalStatus
+  status: OperatorHireStatus
+  hiredAt: string | null
+  approvedAt: string | null
+  rejectedAt: string | null
+  terminatedAt: string | null
+  rejectionReason: string | null
+}
+
+/**
+ * /me/status — single source-of-truth для operator web cabinet.
+ * profile: полный DTO (как `GET /me`) + phone + license поля.
+ * canWorkReasons: empty array когда canWork=true; иначе — blocking reasons.
+ */
+export interface MeStatusResponse {
+  profile: CraneProfile
+  memberships: MeStatusMembership[]
+  licenseStatus: LicenseStatus
+  canWork: boolean
+  canWorkReasons: string[]
 }
 
 // ---------- Cranes ----------

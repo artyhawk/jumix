@@ -189,16 +189,32 @@ type LicenseStatusKind = 'missing' | 'valid' | 'expiring_soon' | 'expiring_criti
 async function meStatus(token: string | null): Promise<{
   statusCode: number
   body: {
-    profile?: { id: string; approvalStatus: Approval; rejectionReason: string | null }
+    profile?: {
+      id: string
+      approvalStatus: Approval
+      rejectionReason: string | null
+      firstName?: string
+      lastName?: string
+      iin?: string
+      phone?: string
+      licenseStatus?: LicenseStatusKind
+      licenseExpiresAt?: string | null
+    }
     memberships?: Array<{
       id: string
       organizationId: string
       organizationName: string
       approvalStatus: Approval
       status: HireStatus
+      hiredAt?: string | null
+      approvedAt?: string | null
+      rejectedAt?: string | null
+      terminatedAt?: string | null
+      rejectionReason?: string | null
     }>
     licenseStatus?: LicenseStatusKind
     canWork?: boolean
+    canWorkReasons?: string[]
     error?: { code: string }
   }
 }> {
@@ -397,23 +413,31 @@ describe('GET /api/v1/crane-profiles/me/status — multiple memberships', () => 
 })
 
 describe('GET /api/v1/crane-profiles/me/status — DTO shape', () => {
-  it('profile object contains ONLY {id, approvalStatus, rejectionReason} — никаких iin/phone/avatar', async () => {
+  it('profile DTO содержит полный identity + phone (B3-UI-4 extension)', async () => {
     const { accessToken } = await createOperator({ approvalStatus: 'pending' })
     const { body } = await meStatus(accessToken)
-    expect(Object.keys(body.profile ?? {}).sort()).toEqual([
-      'approvalStatus',
-      'id',
-      'rejectionReason',
+    // phone (masked) + identity поля теперь exposed для web operator cabinet.
+    // Шейп совпадает с `GET /me` (toPublicDTO).
+    expect(body.profile?.firstName).toEqual(expect.any(String))
+    expect(body.profile?.lastName).toEqual(expect.any(String))
+    expect(body.profile?.iin).toEqual(expect.any(String))
+    expect(body.profile?.phone).toMatch(/^\+7/)
+    expect(body.profile?.approvalStatus).toBe('pending')
+  })
+
+  it('top-level keys — profile/memberships/licenseStatus/canWork/canWorkReasons', async () => {
+    const { accessToken } = await createOperator({ approvalStatus: 'pending' })
+    const { body } = await meStatus(accessToken)
+    expect(Object.keys(body).sort()).toEqual([
+      'canWork',
+      'canWorkReasons',
+      'licenseStatus',
+      'memberships',
+      'profile',
     ])
   })
 
-  it('top-level keys include licenseStatus alongside profile/memberships/canWork', async () => {
-    const { accessToken } = await createOperator({ approvalStatus: 'pending' })
-    const { body } = await meStatus(accessToken)
-    expect(Object.keys(body).sort()).toEqual(['canWork', 'licenseStatus', 'memberships', 'profile'])
-  })
-
-  it('membership DTO contains {id, organizationId, organizationName, approvalStatus, status}', async () => {
+  it('membership DTO содержит даты + rejection reason (B3-UI-4 extension)', async () => {
     const { accessToken, profileId } = await createOperator({
       approvalStatus: 'approved',
       licenseExpiresAt: futureDate(365),
@@ -421,13 +445,84 @@ describe('GET /api/v1/crane-profiles/me/status — DTO shape', () => {
     await createHire(profileId, { approvalStatus: 'approved', status: 'active' })
     const { body } = await meStatus(accessToken)
     expect(body.memberships).toHaveLength(1)
-    expect(Object.keys(body.memberships?.[0] ?? {}).sort()).toEqual([
+    const keys = Object.keys(body.memberships?.[0] ?? {}).sort()
+    expect(keys).toEqual([
       'approvalStatus',
+      'approvedAt',
+      'hiredAt',
       'id',
       'organizationId',
       'organizationName',
+      'rejectedAt',
+      'rejectionReason',
       'status',
+      'terminatedAt',
     ])
+  })
+})
+
+/**
+ * B3-UI-4: canWorkReasons — human-readable причины блокировки для web UI.
+ * Computed на service boundary; empty array когда canWork=true.
+ */
+describe('GET /api/v1/crane-profiles/me/status — canWorkReasons (B3-UI-4)', () => {
+  it('canWork=true → canWorkReasons пуст', async () => {
+    const { accessToken, profileId } = await createOperator({
+      approvalStatus: 'approved',
+      licenseExpiresAt: futureDate(365),
+    })
+    await createHire(profileId, { approvalStatus: 'approved', status: 'active' })
+    const { body } = await meStatus(accessToken)
+    expect(body.canWork).toBe(true)
+    expect(body.canWorkReasons).toEqual([])
+  })
+
+  it('pending profile → «Профиль ожидает одобрения платформой»', async () => {
+    const { accessToken } = await createOperator({ approvalStatus: 'pending' })
+    const { body } = await meStatus(accessToken)
+    expect(body.canWorkReasons).toContain('Профиль ожидает одобрения платформой')
+  })
+
+  it('rejected profile → «Профиль отклонён платформой»', async () => {
+    const { accessToken } = await createOperator({ approvalStatus: 'rejected' })
+    const { body } = await meStatus(accessToken)
+    expect(body.canWorkReasons).toContain('Профиль отклонён платформой')
+  })
+
+  it('approved profile без hires → «Нет активных трудоустройств»', async () => {
+    const { accessToken } = await createOperator({ approvalStatus: 'approved' })
+    const { body } = await meStatus(accessToken)
+    expect(body.canWorkReasons).toContain('Нет активных трудоустройств')
+  })
+
+  it('missing license → «Удостоверение не загружено»', async () => {
+    const { accessToken, profileId } = await createOperator({ approvalStatus: 'approved' })
+    await createHire(profileId, { approvalStatus: 'approved', status: 'active' })
+    const { body } = await meStatus(accessToken)
+    expect(body.canWorkReasons).toContain('Удостоверение не загружено')
+  })
+
+  it('expired license → «Срок действия удостоверения истёк»', async () => {
+    const { accessToken, profileId } = await createOperator({
+      approvalStatus: 'approved',
+      licenseExpiresAt: pastDate(1),
+    })
+    await createHire(profileId, { approvalStatus: 'approved', status: 'active' })
+    const { body } = await meStatus(accessToken)
+    expect(body.canWorkReasons).toContain('Срок действия удостоверения истёк')
+  })
+
+  it('multiple blockers: pending profile + no hires + no license → все 3 reasons', async () => {
+    const { accessToken } = await createOperator({ approvalStatus: 'pending' })
+    const { body } = await meStatus(accessToken)
+    expect(body.canWorkReasons).toEqual(
+      expect.arrayContaining([
+        'Профиль ожидает одобрения платформой',
+        'Нет активных трудоустройств',
+        'Удостоверение не загружено',
+      ]),
+    )
+    expect(body.canWorkReasons?.length).toBe(3)
   })
 })
 

@@ -88,12 +88,18 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Выйти')).toBeInTheDocument()
   })
 
-  it('role-aware: operator sees only system commands (logout)', () => {
+  it('role-aware: operator sees navigation (me/license/memberships) + actions + logout', () => {
     authState.user = { id: 'u-3', role: 'operator', organizationId: null, name: 'Op' }
     render(<CommandPalette />)
     openPalette()
-    expect(screen.queryByText('Переход')).toBeNull()
+    expect(screen.getByText('Мой профиль')).toBeInTheDocument()
+    expect(screen.getByText('Удостоверение')).toBeInTheDocument()
+    expect(screen.getByText('Компании')).toBeInTheDocument()
+    expect(screen.getByText('Загрузить удостоверение')).toBeInTheDocument()
     expect(screen.getByText('Выйти')).toBeInTheDocument()
+    // operator не видит superadmin/owner entries
+    expect(screen.queryByText('Обзор платформы')).toBeNull()
+    expect(screen.queryByText('Нанять крановщика')).toBeNull()
   })
 
   it('fuzzy search matches "одоб" to Заявки via keywords', async () => {

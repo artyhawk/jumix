@@ -46,4 +46,7 @@ export const qk = {
   sitesList: (query: ListSitesQuery) => ['sites', 'list', query] as const,
   sitesInfinite: (query: Omit<ListSitesQuery, 'cursor'>) => ['sites', 'infinite', query] as const,
   siteDetail: (id: string) => ['sites', 'detail', id] as const,
+
+  me: ['me'] as const,
+  meStatus: ['me', 'status'] as const,
 }
