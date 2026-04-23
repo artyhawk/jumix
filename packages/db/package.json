@@ -16,7 +16,9 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/seed.ts",
+    "db:seed:demo": "tsx scripts/seed-demo.ts",
     "db:reset": "drizzle-kit drop && pnpm db:generate && pnpm db:migrate && pnpm db:seed",
+    "admin:create-superadmin": "tsx scripts/create-superadmin.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
