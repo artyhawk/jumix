@@ -2,6 +2,33 @@ import { pluralRu } from '@jumix/shared'
 
 const DAY_FORMS = ['день', 'дня', 'дней'] as const
 
+/** YYYY-MM-DD (ISO calendar date) из Date без UTC-time shift. */
+export function toIsoDate(d: Date): string {
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
+/** Tomorrow в local-time как Date. Используется как minimum для license expiry. */
+export function tomorrowDate(now: Date = new Date()): Date {
+  const d = new Date(now)
+  d.setDate(d.getDate() + 1)
+  return d
+}
+
+/** YYYY-MM-DD строка завтрашнего дня (initial value для expiry input). */
+export function tomorrowIso(now: Date = new Date()): string {
+  return toIsoDate(tomorrowDate(now))
+}
+
+/** Максимальная разумная дата истечения (+20 лет, backend-инвариант). */
+export function maxExpiryDate(now: Date = new Date()): Date {
+  const d = new Date(now)
+  d.setFullYear(d.getFullYear() + 20)
+  return d
+}
+
 /**
  * `12 апреля 2027` — без weekday, для metadata и expiry dates.
  * Accepts ISO string or Date. Использует Intl.DateTimeFormat 'ru-RU' —

@@ -621,7 +621,23 @@ Leaning to first approach — UI responsibility, backend stays pure data.
 
 ---
 
-## Mobile (from M1 + M2)
+## Mobile (from M1 + M2 + M3)
+
+### License OCR extraction
+
+Auto-fill expiry date из фото удостоверения (на mobile picker path). Typical workflow: user takes photo → OCR service (Google ML Kit on-device / Tesseract WASM / backend ML endpoint) → пытается извлечь дату срока → prefill `expiresAt` в modal → user confirms/corrects. Reduces input friction (сейчас user вручную набирает expiry). Post-MVP — требует ML pipeline decision + accuracy tuning для кириллицы. Не блокер.
+
+### License version history view (mobile)
+
+Backend сохраняет old license versions в key pattern `crane-profiles/{id}/license/v{N}/*` (ADR 0005). Mobile screen «История удостоверения» — timeline/list всех version'ов с upload date + status (superseded/current). Compliance audit surface. Requires new backend endpoint `GET /me/license/versions` (currently нет — retrieves только current). Post-MVP.
+
+### PDF preview на mobile
+
+Currently `FilePreview` компонент показывает только PDF icon + filename для PDF мимы (нет inline preview). Полноценный render требует `react-native-pdf` (native bridge) или WebView с pdf.js. Minor UX polish — user видит что это PDF через icon + filename, достаточно для MVP. Gate: когда юзеры начнут жаловаться «хочу увидеть содержимое перед upload».
+
+### Multi-file uploads (mobile)
+
+Если operator захочет прикрепить доп документы (сертификаты, training records, страховки) — batch picker + batch upload + separate storage layout. Backend endpoints тоже отсутствуют. Отдельная vertical за пределами M3 (license-specific).
 
 ### Skeleton shimmer animation
 

@@ -87,5 +87,53 @@ vi.mock('react-native-safe-area-context', async () => {
   }
 })
 
+// expo-file-system/legacy — upload task + file info (M3)
+vi.mock('expo-file-system/legacy', () => ({
+  createUploadTask: vi.fn(),
+  getInfoAsync: vi.fn(async () => ({ exists: true, size: 1024 })),
+  FileSystemUploadType: { BINARY_CONTENT: 'binary', MULTIPART: 'multipart' },
+}))
+
+// expo-image-manipulator — compress
+vi.mock('expo-image-manipulator', () => ({
+  manipulateAsync: vi.fn(async (uri: string) => ({
+    uri: `${uri}-compressed.jpg`,
+    width: 1600,
+    height: 1200,
+  })),
+  SaveFormat: { JPEG: 'jpeg', PNG: 'png' },
+}))
+
+// expo-image-picker — camera + gallery
+vi.mock('expo-image-picker', () => ({
+  requestCameraPermissionsAsync: vi.fn(async () => ({ status: 'granted' })),
+  requestMediaLibraryPermissionsAsync: vi.fn(async () => ({ status: 'granted' })),
+  launchCameraAsync: vi.fn(async () => ({ canceled: true, assets: [] })),
+  launchImageLibraryAsync: vi.fn(async () => ({ canceled: true, assets: [] })),
+  MediaTypeOptions: { Images: 'Images' },
+}))
+
+// expo-document-picker — PDF
+vi.mock('expo-document-picker', () => ({
+  getDocumentAsync: vi.fn(async () => ({ canceled: true, assets: [] })),
+}))
+
+// @react-native-community/datetimepicker — replace с no-op component
+vi.mock('@react-native-community/datetimepicker', () => ({
+  default: () => null,
+}))
+
+// @expo/react-native-action-sheet — inline tap passthrough для тестов
+vi.mock('@expo/react-native-action-sheet', async () => {
+  const React = await import('react')
+  return {
+    ActionSheetProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+    useActionSheet: () => ({
+      showActionSheetWithOptions: vi.fn(),
+    }),
+  }
+})
+
 // global fetch mock (per-test overrides)
 globalThis.fetch = vi.fn()

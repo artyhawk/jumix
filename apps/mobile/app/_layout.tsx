@@ -1,5 +1,6 @@
 import { SplashScreen } from '@/components/splash-screen'
 import { useAuthStore } from '@/stores/auth'
+import { ActionSheetProvider } from '@expo/react-native-action-sheet'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -54,15 +55,17 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <SafeAreaProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="memberships" />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-          <StatusBar style="light" />
-        </SafeAreaProvider>
+        <ActionSheetProvider>
+          <SafeAreaProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="memberships" />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+            <StatusBar style="light" />
+          </SafeAreaProvider>
+        </ActionSheetProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   )

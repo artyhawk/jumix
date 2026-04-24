@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { daysUntil, formatDate, formatExpiryCountdown } from './date'
+import {
+  daysUntil,
+  formatDate,
+  formatExpiryCountdown,
+  maxExpiryDate,
+  toIsoDate,
+  tomorrowDate,
+  tomorrowIso,
+} from './date'
 
 describe('formatDate', () => {
   it('форматирует ISO в русскую дату', () => {
@@ -73,5 +81,35 @@ describe('formatExpiryCountdown', () => {
     const r = formatExpiryCountdown('2026-04-24T12:00:00Z', NOW)
     expect(r.text).toBe('Через 1 день')
     expect(r.tone).toBe('warning')
+  })
+})
+
+describe('toIsoDate', () => {
+  it('форматирует Date → YYYY-MM-DD (local time, no UTC shift)', () => {
+    expect(toIsoDate(new Date(2026, 3, 15))).toBe('2026-04-15') // month 0-indexed: 3=April
+    expect(toIsoDate(new Date(2026, 0, 1))).toBe('2026-01-01')
+    expect(toIsoDate(new Date(2026, 11, 31))).toBe('2026-12-31')
+  })
+})
+
+describe('tomorrowIso / tomorrowDate', () => {
+  const NOW = new Date(2026, 3, 23, 12, 0, 0)
+
+  it('tomorrowDate возвращает +1 день', () => {
+    expect(toIsoDate(tomorrowDate(NOW))).toBe('2026-04-24')
+  })
+
+  it('tomorrowIso возвращает YYYY-MM-DD +1 день', () => {
+    expect(tomorrowIso(NOW)).toBe('2026-04-24')
+  })
+})
+
+describe('maxExpiryDate', () => {
+  const NOW = new Date(2026, 3, 23, 12, 0, 0)
+
+  it('+20 лет от now', () => {
+    const max = maxExpiryDate(NOW)
+    expect(max.getFullYear()).toBe(2046)
+    expect(max.getMonth()).toBe(3)
   })
 })

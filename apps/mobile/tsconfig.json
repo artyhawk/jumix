@@ -13,7 +13,8 @@
     },
     "types": ["node", "@testing-library/jest-dom"],
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": false
   },
   "include": [
     "app/**/*.ts",
