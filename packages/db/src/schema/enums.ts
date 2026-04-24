@@ -95,6 +95,13 @@ export const operatorAvailabilityEnum = pgEnum('operator_availability', [
   'on_shift',
 ])
 
+// Жизненный цикл смены (M4, ADR 0006). Ортогонален deleted-at (смены не
+// soft-delete'ятся в MVP — история трудовая, должна быть неизменной).
+//   active → работает прямо сейчас
+//   paused → advisory pause (перерыв), GPS ping'и продолжают приниматься
+//   ended  → завершена (terminal)
+export const shiftStatusEnum = pgEnum('shift_status', ['active', 'paused', 'ended'])
+
 // События auth для audit trail (CLAUDE.md §5.4)
 export const authEventTypeEnum = pgEnum('auth_event_type', [
   'login_success',

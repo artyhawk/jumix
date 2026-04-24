@@ -14,6 +14,7 @@ import dashboardPlugin from './modules/dashboard/dashboard.plugin'
 import organizationOperatorPlugin from './modules/organization-operator/organization-operator.plugin'
 import organizationPlugin from './modules/organization/organization.plugin'
 import registrationPlugin from './modules/registration/registration.plugin'
+import shiftPlugin from './modules/shift/shift.plugin'
 import sitePlugin from './modules/site/site.plugin'
 import authenticatePlugin from './plugins/authenticate'
 import bullmqPlugin from './plugins/bullmq'
@@ -81,6 +82,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(craneProfilePlugin)
   await app.register(organizationOperatorPlugin)
   await app.register(registrationPlugin)
+  await app.register(shiftPlugin)
   await app.register(dashboardPlugin)
   await app.register(auditPlugin)
 

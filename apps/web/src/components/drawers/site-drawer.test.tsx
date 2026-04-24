@@ -13,6 +13,17 @@ vi.mock('@/lib/api/sites', () => ({
   archiveSite: vi.fn(),
   activateSite: vi.fn(),
 }))
+vi.mock('@/lib/api/shifts', () => ({
+  listOwnerShifts: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+  listMyShifts: vi.fn(),
+  getMyActiveShift: vi.fn(),
+  getShift: vi.fn(),
+  getAvailableCranes: vi.fn(),
+  startShift: vi.fn(),
+  pauseShift: vi.fn(),
+  resumeShift: vi.fn(),
+  endShift: vi.fn(),
+}))
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
@@ -26,6 +37,7 @@ vi.mock('@/hooks/use-auth', () => ({
   }),
 }))
 
+import * as shiftsApi from '@/lib/api/shifts'
 import * as sitesApi from '@/lib/api/sites'
 import { SiteDrawer } from './site-drawer'
 
@@ -61,6 +73,9 @@ beforeEach(() => {
   complete.mockReset()
   archive.mockReset()
   activate.mockReset()
+  // Default shift list — empty. Tests интересующиеся shift-ами переопределяют.
+  vi.mocked(shiftsApi.listOwnerShifts).mockReset()
+  vi.mocked(shiftsApi.listOwnerShifts).mockResolvedValue({ items: [], nextCursor: null })
 })
 
 describe('SiteDrawer', () => {
@@ -117,6 +132,64 @@ describe('SiteDrawer', () => {
     renderDrawer('s-1')
     await screen.findByRole('button', { name: /Восстановить/ })
     expect(screen.queryByRole('button', { name: /Сдать/ })).toBeNull()
+  })
+
+  it('renders active shifts section (empty state)', async () => {
+    get.mockResolvedValue(makeSite())
+    vi.mocked(shiftsApi.listOwnerShifts).mockResolvedValueOnce({ items: [], nextCursor: null })
+    renderDrawer('s-1')
+    await waitFor(() => {
+      expect(screen.getByText('Текущие смены')).toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(screen.getByText('Нет активных смен')).toBeInTheDocument()
+    })
+  })
+
+  it('renders active shifts list with operator + crane info', async () => {
+    get.mockResolvedValue(makeSite())
+    vi.mocked(shiftsApi.listOwnerShifts).mockResolvedValueOnce({
+      items: [
+        {
+          id: 'sh-1',
+          craneId: 'c-1',
+          operatorId: 'u-1',
+          craneProfileId: 'cp-1',
+          organizationId: 'org-1',
+          siteId: 's-1',
+          status: 'active',
+          startedAt: '2026-04-24T09:00:00Z',
+          endedAt: null,
+          pausedAt: null,
+          totalPauseSeconds: 0,
+          notes: null,
+          createdAt: '2026-04-24T09:00:00Z',
+          updatedAt: '2026-04-24T09:00:00Z',
+          crane: {
+            id: 'c-1',
+            model: 'Liebherr 550',
+            inventoryNumber: 'INV-001',
+            type: 'tower',
+            capacityTon: 12,
+          },
+          site: { id: 's-1', name: 'Site', address: null },
+          organization: { id: 'org-1', name: 'Org' },
+          operator: {
+            id: 'cp-1',
+            firstName: 'Иван',
+            lastName: 'Петров',
+            patronymic: null,
+          },
+        },
+      ],
+      nextCursor: null,
+    })
+    renderDrawer('s-1')
+    await waitFor(() => {
+      expect(screen.getByText(/Петров Иван/)).toBeInTheDocument()
+    })
+    expect(screen.getByText(/Liebherr 550/)).toBeInTheDocument()
+    expect(screen.getByText('На смене')).toBeInTheDocument()
   })
 
   it('clicking Архивировать flows through inline confirmation', async () => {

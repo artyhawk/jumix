@@ -1,4 +1,4 @@
-import { craneProfiles, cranes, organizationOperators } from '@jumix/db'
+import { craneProfiles, cranes, organizationOperators, shifts } from '@jumix/db'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type TestAppHandle, buildTestApp } from './helpers/build-test-app'
 import { createOrganization, createUser, signTokenFor } from './helpers/fixtures'
@@ -401,7 +401,7 @@ describe('GET /api/v1/dashboard/owner-stats — authorization', () => {
 })
 
 describe('GET /api/v1/dashboard/owner-stats — counters scoped to own org', () => {
-  it('counters reflect owner own-org fixtures and ignore other orgs', async () => {
+  it('pending.cranes counts own-org pending approvals and ignores foreign orgs', async () => {
     // baseline для owner'а
     const baselineRes = await handle.app.inject({
       method: 'GET',
@@ -413,20 +413,9 @@ describe('GET /api/v1/dashboard/owner-stats — counters scoped to own org', () 
       pending: { cranes: number; hires: number }
     }
 
-    // foreign org - не должна попасть в owner counters
     const foreignOrg = await createOrganization(handle.app, {
-      name: 'Foreign Org',
-      bin: '650000000099',
-    })
-
-    // +1 own active crane (approved + active)
-    await handle.app.db.db.insert(cranes).values({
-      organizationId: ownerOrgId,
-      type: 'tower',
-      model: 'OwnActive',
-      capacityTon: '5.00',
-      approvalStatus: 'approved',
-      status: 'active',
+      name: 'Foreign Pending',
+      bin: '650000000098',
     })
 
     // +1 own pending crane
@@ -439,24 +428,14 @@ describe('GET /api/v1/dashboard/owner-stats — counters scoped to own org', () 
       status: 'active',
     })
 
-    // +1 foreign approved+active crane — НЕ должен попасть в owner.active.cranes
+    // foreign pending — не должен попасть в owner counters
     await handle.app.db.db.insert(cranes).values({
       organizationId: foreignOrg.id,
       type: 'tower',
-      model: 'ForeignActive',
+      model: 'ForeignPending',
       capacityTon: '5.00',
-      approvalStatus: 'approved',
+      approvalStatus: 'pending',
       status: 'active',
-    })
-
-    // +1 own retired crane — НЕ должен попасть в active (ne retired)
-    await handle.app.db.db.insert(cranes).values({
-      organizationId: ownerOrgId,
-      type: 'tower',
-      model: 'OwnRetired',
-      capacityTon: '5.00',
-      approvalStatus: 'approved',
-      status: 'retired',
     })
 
     const after = await handle.app.inject({
@@ -467,7 +446,209 @@ describe('GET /api/v1/dashboard/owner-stats — counters scoped to own org', () 
     expect(after.statusCode).toBe(200)
     const stats = after.json() as typeof baseline
 
-    expect(stats.active.cranes).toBe(baseline.active.cranes + 1)
     expect(stats.pending.cranes).toBe(baseline.pending.cranes + 1)
+  })
+
+  // M4: active.cranes теперь = distinct operating cranes (active/paused shift),
+  // а не approved+active fleet. Fleet size access'ится через /my-cranes.
+  it('active.cranes counts distinct cranes with active or paused shifts in own org', async () => {
+    const baselineRes = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/owner-stats',
+      headers: { authorization: `Bearer ${ownerToken}` },
+    })
+    const baseline = baselineRes.json() as {
+      active: { sites: number; cranes: number; memberships: number }
+      pending: { cranes: number; hires: number }
+    }
+
+    const foreignOrg = await createOrganization(handle.app, {
+      name: 'Foreign Ops',
+      bin: '650000000097',
+    })
+
+    // Site через API (owner token) — проще чем raw SQL с PostGIS.
+    const siteRes = await handle.app.inject({
+      method: 'POST',
+      url: '/api/v1/sites',
+      headers: { authorization: `Bearer ${ownerToken}` },
+      payload: { name: 'Ops Site', latitude: 51.1, longitude: 71.4, radiusM: 200 },
+    })
+    expect(siteRes.statusCode).toBe(201)
+    const ownSiteId = siteRes.json().id
+
+    // 2 approved+active cranes attached к site
+    const [c1] = await handle.app.db.db
+      .insert(cranes)
+      .values({
+        organizationId: ownerOrgId,
+        siteId: ownSiteId,
+        type: 'tower',
+        model: 'OpsC1',
+        capacityTon: '5.00',
+        approvalStatus: 'approved',
+        status: 'active',
+      })
+      .returning({ id: cranes.id })
+    const [c2] = await handle.app.db.db
+      .insert(cranes)
+      .values({
+        organizationId: ownerOrgId,
+        siteId: ownSiteId,
+        type: 'tower',
+        model: 'OpsC2',
+        capacityTon: '5.00',
+        approvalStatus: 'approved',
+        status: 'active',
+      })
+      .returning({ id: cranes.id })
+    if (!c1 || !c2) throw new Error('crane insert failed')
+
+    // Foreign crane (shift ниже) — не должен попасть в owner counter.
+    const foreignSiteRes = await handle.app.inject({
+      method: 'POST',
+      url: '/api/v1/sites',
+      headers: {
+        authorization: `Bearer ${await signTokenFor(
+          handle.app,
+          await createUser(handle.app, {
+            role: 'owner',
+            phone: nextPhone(),
+            organizationId: foreignOrg.id,
+            name: 'Foreign Owner',
+          }),
+        )}`,
+      },
+      payload: { name: 'Foreign Site', latitude: 51.1, longitude: 71.4, radiusM: 200 },
+    })
+    expect(foreignSiteRes.statusCode).toBe(201)
+    const foreignSiteId = foreignSiteRes.json().id
+
+    const [fc] = await handle.app.db.db
+      .insert(cranes)
+      .values({
+        organizationId: foreignOrg.id,
+        siteId: foreignSiteId,
+        type: 'tower',
+        model: 'ForeignOpsCrane',
+        capacityTon: '5.00',
+        approvalStatus: 'approved',
+        status: 'active',
+      })
+      .returning({ id: cranes.id })
+    if (!fc) throw new Error('foreign crane insert failed')
+
+    // crane_profiles + users для двух операторов (own org) + один foreign.
+    const userOp1 = await createUser(handle.app, {
+      role: 'operator',
+      phone: nextPhone(),
+      organizationId: null,
+      name: 'Op1',
+    })
+    const [cp1] = await handle.app.db.db
+      .insert(craneProfiles)
+      .values({
+        userId: userOp1.id,
+        firstName: 'Op',
+        lastName: '1',
+        iin: iinFor(11_000_001),
+        approvalStatus: 'approved',
+      })
+      .returning({ id: craneProfiles.id })
+    if (!cp1) throw new Error('cp1 insert failed')
+
+    const userOp2 = await createUser(handle.app, {
+      role: 'operator',
+      phone: nextPhone(),
+      organizationId: null,
+      name: 'Op2',
+    })
+    const [cp2] = await handle.app.db.db
+      .insert(craneProfiles)
+      .values({
+        userId: userOp2.id,
+        firstName: 'Op',
+        lastName: '2',
+        iin: iinFor(11_000_002),
+        approvalStatus: 'approved',
+      })
+      .returning({ id: craneProfiles.id })
+    if (!cp2) throw new Error('cp2 insert failed')
+
+    const userOpF = await createUser(handle.app, {
+      role: 'operator',
+      phone: nextPhone(),
+      organizationId: null,
+      name: 'OpF',
+    })
+    const [cpF] = await handle.app.db.db
+      .insert(craneProfiles)
+      .values({
+        userId: userOpF.id,
+        firstName: 'Op',
+        lastName: 'F',
+        iin: iinFor(11_000_003),
+        approvalStatus: 'approved',
+      })
+      .returning({ id: craneProfiles.id })
+    if (!cpF) throw new Error('cpF insert failed')
+
+    // hires approved+active
+    await handle.app.db.db.insert(organizationOperators).values({
+      craneProfileId: cp1.id,
+      organizationId: ownerOrgId,
+      approvalStatus: 'approved',
+      status: 'active',
+    })
+    await handle.app.db.db.insert(organizationOperators).values({
+      craneProfileId: cp2.id,
+      organizationId: ownerOrgId,
+      approvalStatus: 'approved',
+      status: 'active',
+    })
+    await handle.app.db.db.insert(organizationOperators).values({
+      craneProfileId: cpF.id,
+      organizationId: foreignOrg.id,
+      approvalStatus: 'approved',
+      status: 'active',
+    })
+
+    // active shift на c1, paused shift на c2, foreign active shift.
+    await handle.app.db.db.insert(shifts).values({
+      craneId: c1.id,
+      operatorId: userOp1.id,
+      craneProfileId: cp1.id,
+      organizationId: ownerOrgId,
+      siteId: ownSiteId,
+      status: 'active',
+    })
+    await handle.app.db.db.insert(shifts).values({
+      craneId: c2.id,
+      operatorId: userOp2.id,
+      craneProfileId: cp2.id,
+      organizationId: ownerOrgId,
+      siteId: ownSiteId,
+      status: 'paused',
+      pausedAt: new Date(),
+    })
+    await handle.app.db.db.insert(shifts).values({
+      craneId: fc.id,
+      operatorId: userOpF.id,
+      craneProfileId: cpF.id,
+      organizationId: foreignOrg.id,
+      siteId: foreignSiteId,
+      status: 'active',
+    })
+
+    const after = await handle.app.inject({
+      method: 'GET',
+      url: '/api/v1/dashboard/owner-stats',
+      headers: { authorization: `Bearer ${ownerToken}` },
+    })
+    expect(after.statusCode).toBe(200)
+    const stats = after.json() as typeof baseline
+
+    // +2: own c1 (active shift) + own c2 (paused shift). Foreign не считается.
+    expect(stats.active.cranes).toBe(baseline.active.cranes + 2)
   })
 })

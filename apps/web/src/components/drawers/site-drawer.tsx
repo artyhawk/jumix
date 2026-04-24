@@ -16,8 +16,9 @@ import { useAuth } from '@/hooks/use-auth'
 import { isAppError } from '@/lib/api/errors'
 import type { Site, SiteStatus } from '@/lib/api/types'
 import { formatRelativeTime } from '@/lib/format/time'
+import { useOwnerShifts } from '@/lib/hooks/use-shifts'
 import { useActivateSite, useArchiveSite, useCompleteSite, useSite } from '@/lib/hooks/use-sites'
-import { Archive, CheckCheck, MapPin, RotateCcw, ShieldAlert } from 'lucide-react'
+import { Archive, CheckCheck, Clock, MapPin, RotateCcw, ShieldAlert } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -214,7 +215,56 @@ function SiteDrawerBody({ site }: { site: Site }) {
         {site.notes ? <DetailRow label="Заметки">{site.notes}</DetailRow> : null}
         <DetailRow label="Создан">{formatRelativeTime(site.createdAt)}</DetailRow>
       </dl>
+
+      <SiteActiveShifts siteId={site.id} />
     </div>
+  )
+}
+
+function SiteActiveShifts({ siteId }: { siteId: string }) {
+  const { data, isPending, isError } = useOwnerShifts({ siteId, status: 'live', limit: 20 })
+  const items = data?.items ?? []
+
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="text-sm font-semibold text-text-primary">Текущие смены</h3>
+      {isPending ? (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : isError ? (
+        <p className="text-sm text-text-tertiary">Не удалось загрузить смены</p>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-text-tertiary">Нет активных смен</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {items.map((shift) => (
+            <li
+              key={shift.id}
+              className="flex flex-col gap-1 rounded-md border border-layer-3 bg-layer-2 p-3 text-sm"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-medium text-text-primary">
+                  {shift.operator.lastName} {shift.operator.firstName}
+                </div>
+                <Badge variant={shift.status === 'paused' ? 'pending' : 'active'}>
+                  {shift.status === 'paused' ? 'Перерыв' : 'На смене'}
+                </Badge>
+              </div>
+              <div className="text-text-tertiary">
+                {shift.crane.model}
+                {shift.crane.inventoryNumber ? ` · ${shift.crane.inventoryNumber}` : ''}
+              </div>
+              <div className="flex items-center gap-1 text-xs text-text-tertiary">
+                <Clock className="size-3" strokeWidth={1.5} aria-hidden />
+                <span>Начало: {formatRelativeTime(shift.startedAt)}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 

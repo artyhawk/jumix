@@ -2,6 +2,7 @@ import type { ListCraneProfilesQuery } from './api/crane-profiles'
 import type { ListCranesQuery } from './api/cranes'
 import type { ListOrganizationOperatorsQuery } from './api/organization-operators'
 import type { ListOrganizationsQuery } from './api/organizations'
+import type { ListOwnerShiftsQuery } from './api/shifts'
 import type { ListSitesQuery } from './api/sites'
 
 /**
@@ -49,4 +50,10 @@ export const qk = {
 
   me: ['me'] as const,
   meStatus: ['me', 'status'] as const,
+
+  shifts: ['shifts'] as const,
+  shiftsOwner: (query: ListOwnerShiftsQuery) => ['shifts', 'owner', query] as const,
+  shiftsOwnerInfinite: (query: Omit<ListOwnerShiftsQuery, 'cursor'>) =>
+    ['shifts', 'owner-infinite', query] as const,
+  shiftDetail: (id: string) => ['shifts', 'detail', id] as const,
 }

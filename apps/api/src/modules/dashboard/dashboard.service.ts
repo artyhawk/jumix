@@ -5,9 +5,10 @@ import {
   cranes,
   organizationOperators,
   organizations,
+  shifts,
   sites,
 } from '@jumix/db'
-import { and, count, eq, gte, isNull, ne } from 'drizzle-orm'
+import { and, count, countDistinct, eq, gte, inArray, isNull, ne } from 'drizzle-orm'
 import { AppError } from '../../lib/errors'
 import { dashboardPolicy } from './dashboard.policy'
 
@@ -43,7 +44,12 @@ export type DashboardStats = {
  * useOwnerDashboardStats).
  *
  *   active.sites          — сайты status='active' (без archived/completed/soft-deleted)
- *   active.cranes         — approved + не-retired (operational fleet)
+ *   active.cranes         — **operating cranes (M4, ADR 0006)** — distinct crane_id
+ *                           из shifts со status IN ('active', 'paused') в этой org.
+ *                           Label на web «Кранов в работе» совпадает с новой
+ *                           семантикой. Fleet size (approved+active) теперь
+ *                           access'ится через /my-cranes list, отдельный
+ *                           dashboard-card под него не нужен.
  *   active.memberships    — approved + active hires (нанятые крановщики)
  *   pending.cranes        — pending заявки на собственные cranes (для footer-action)
  *   pending.hires         — pending заявки на найм
@@ -166,22 +172,19 @@ export class DashboardService {
     const orgId = ctx.organizationId
     const db = this.database.db
 
-    const [activeSites, activeCranes, activeMemberships, pendingCranes, pendingHires] =
+    const [activeSites, operatingCranes, activeMemberships, pendingCranes, pendingHires] =
       await Promise.all([
         db
           .select({ value: count() })
           .from(sites)
           .where(and(eq(sites.organizationId, orgId), eq(sites.status, 'active'))),
+        // M4 semantic: «кранов в работе» — distinct crane_id с active|paused
+        // shift. Было: approved+active fleet size.
         db
-          .select({ value: count() })
-          .from(cranes)
+          .select({ value: countDistinct(shifts.craneId) })
+          .from(shifts)
           .where(
-            and(
-              eq(cranes.organizationId, orgId),
-              eq(cranes.approvalStatus, 'approved'),
-              ne(cranes.status, 'retired'),
-              isNull(cranes.deletedAt),
-            ),
+            and(eq(shifts.organizationId, orgId), inArray(shifts.status, ['active', 'paused'])),
           ),
         db
           .select({ value: count() })
@@ -219,7 +222,7 @@ export class DashboardService {
     return {
       active: {
         sites: firstCount(activeSites),
-        cranes: firstCount(activeCranes),
+        cranes: firstCount(operatingCranes),
         memberships: firstCount(activeMemberships),
       },
       pending: {

@@ -10,6 +10,8 @@ export {
   cranes,
   craneProfiles,
   organizationOperators,
+  shifts,
+  shiftStatusEnum,
   userRoleEnum,
   userStatusEnum,
   organizationStatusEnum,
@@ -58,6 +60,10 @@ export {
   type NewOrganizationOperator,
   CRANE_PROFILE_APPROVAL_STATUSES,
   ORGANIZATION_OPERATOR_APPROVAL_STATUSES,
+  SHIFT_STATUSES,
+  type Shift,
+  type ShiftStatus,
+  type NewShift,
 } from './schema/index'
 
 export { createDatabase, type DatabaseClient, type CreateDatabaseOptions } from './client'

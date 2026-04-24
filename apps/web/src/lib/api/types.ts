@@ -9,20 +9,32 @@
 
 import type {
   ApprovalStatus,
+  AvailableCrane,
   CraneProfile,
+  EndShiftPayload,
   LicenseStatus,
   MeStatusMembership,
   MeStatusResponse,
   OperatorHireStatus,
+  Shift,
+  ShiftStatus,
+  ShiftWithRelations,
+  StartShiftPayload,
 } from '@jumix/shared'
 
 export type {
   ApprovalStatus,
+  AvailableCrane,
   CraneProfile,
+  EndShiftPayload,
   LicenseStatus,
   MeStatusMembership,
   MeStatusResponse,
   OperatorHireStatus,
+  Shift,
+  ShiftStatus,
+  ShiftWithRelations,
+  StartShiftPayload,
 }
 
 export type UserRole = 'superadmin' | 'owner' | 'operator'
