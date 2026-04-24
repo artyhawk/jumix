@@ -4,6 +4,7 @@ import {
   getAvailableCranes,
   getMyActiveShift,
   getShift,
+  getShiftPath,
   listMyShifts,
   pauseShift,
   resumeShift,
@@ -25,6 +26,7 @@ export const MY_ACTIVE_SHIFT_KEY = ['shifts', 'my', 'active'] as const
 export const AVAILABLE_CRANES_KEY = ['shifts', 'available-cranes'] as const
 export const MY_SHIFTS_HISTORY_KEY = ['shifts', 'my', 'history'] as const
 export const SHIFT_DETAIL_KEY = (id: string) => ['shifts', 'detail', id] as const
+export const SHIFT_PATH_KEY = (id: string) => ['shifts', 'path', id] as const
 
 function mobileRetry(failureCount: number, error: unknown): boolean {
   if (error instanceof NetworkError) return failureCount < 3
@@ -74,6 +76,25 @@ export function useShiftDetail(id: string | null | undefined) {
       return getShift(id)
     },
     enabled: Boolean(id),
+    retry: mobileRetry,
+    retryDelay: mobileRetryDelay,
+  })
+}
+
+/**
+ * Shift path — используется на detail screen после end. staleTime 5min —
+ * path смены не меняется после end (все pings уже ingested). sampleRate
+ * undefined = server default 1 (все pings).
+ */
+export function useShiftPath(id: string | null | undefined, sampleRate?: number) {
+  return useQuery({
+    queryKey: id ? [...SHIFT_PATH_KEY(id), sampleRate ?? 1] : ['shifts', 'path', 'disabled'],
+    queryFn: () => {
+      if (!id) throw new Error('shift id is required')
+      return getShiftPath(id, sampleRate)
+    },
+    enabled: Boolean(id),
+    staleTime: 5 * 60_000,
     retry: mobileRetry,
     retryDelay: mobileRetryDelay,
   })

@@ -1,4 +1,8 @@
 import { SplashScreen } from '@/components/splash-screen'
+// M5-b: регистрация background location task. Import at module-top для
+// гарантии что TaskManager.defineTask вызван до первого startLocationUpdates.
+// ADR 0007 §7 — Expo requirement.
+import '@/lib/tracking/task'
 import { useAuthStore } from '@/stores/auth'
 import { ActionSheetProvider } from '@expo/react-native-action-sheet'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

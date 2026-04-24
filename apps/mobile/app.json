@@ -19,7 +19,10 @@
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "Нужен доступ к камере, чтобы сфотографировать удостоверение крановщика",
-        "NSPhotoLibraryUsageDescription": "Нужен доступ к галерее, чтобы выбрать фото удостоверения крановщика"
+        "NSPhotoLibraryUsageDescription": "Нужен доступ к галерее, чтобы выбрать фото удостоверения крановщика",
+        "NSLocationWhenInUseUsageDescription": "Jumix использует местоположение, чтобы отслеживать смены и границы объектов",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Jumix отслеживает местоположение в фоне во время смены — для геозон объектов",
+        "UIBackgroundModes": ["location"]
       }
     },
     "android": {
@@ -29,7 +32,15 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0A0B"
       },
-      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE"]
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -41,6 +52,18 @@
         {
           "photosPermission": "Нужен доступ к галерее, чтобы выбрать фото удостоверения крановщика",
           "cameraPermission": "Нужен доступ к камере, чтобы сфотографировать удостоверение крановщика"
+        }
+      ],
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Jumix использует местоположение, чтобы отслеживать смены и границы объектов",
+          "locationAlwaysPermission": "Jumix отслеживает местоположение в фоне во время смены — для геозон объектов",
+          "locationWhenInUsePermission": "Jumix использует местоположение во время смены",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ]
     ],

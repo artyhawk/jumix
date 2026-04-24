@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { SafeArea } from '@/components/ui/safe-area'
 import { isApiError } from '@/lib/api/errors'
+import { useForegroundTracking } from '@/lib/hooks/use-foreground-tracking'
+import { useGeofenceState } from '@/lib/hooks/use-geofence-state'
 import { useMeStatus } from '@/lib/hooks/use-me'
 import {
   useEndShift,
@@ -10,10 +12,11 @@ import {
   usePauseShift,
   useResumeShift,
 } from '@/lib/hooks/use-shifts'
+import { stopTracking } from '@/lib/tracking/lifecycle'
 import { colors, spacing } from '@/theme/tokens'
 import { typography } from '@/theme/typography'
 import { router } from 'expo-router'
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
 
 /**
@@ -29,6 +32,28 @@ export default function ShiftsIndexScreen() {
   const resume = useResumeShift()
   const endMutation = useEndShift()
 
+  const shift = active.data ?? null
+
+  // M5-b tracking. Pass site coords в hooks чтобы geofence calc'ился
+  // client-side. Стоп-tracking делаем на end (ниже в handleEnd.onSuccess).
+  const trackedShift = useMemo(
+    () => (shift ? { id: shift.id, status: shift.status } : null),
+    [shift],
+  )
+  const trackedSite = useMemo(
+    () =>
+      shift
+        ? {
+            latitude: shift.site.latitude,
+            longitude: shift.site.longitude,
+            geofenceRadiusM: shift.site.geofenceRadiusM,
+          }
+        : null,
+    [shift],
+  )
+  useForegroundTracking(trackedShift, trackedSite)
+  const geofence = useGeofenceState(shift?.id ?? null)
+
   const isMutating = pause.isPending || resume.isPending || endMutation.isPending
 
   const handleEnd = useCallback(
@@ -42,6 +67,10 @@ export default function ShiftsIndexScreen() {
             endMutation.mutate(
               { id },
               {
+                onSuccess: () => {
+                  // Остановить background tracking + clear SQLite context.
+                  void stopTracking()
+                },
                 onError: (err) => {
                   const msg = isApiError(err) ? err.message : 'Попробуйте ещё раз'
                   Alert.alert('Не удалось завершить', msg)
@@ -59,8 +88,6 @@ export default function ShiftsIndexScreen() {
     void active.refetch()
     void me.refetch()
   }, [active, me])
-
-  const shift = active.data ?? null
 
   return (
     <SafeArea edges={['top', 'bottom']}>
@@ -87,6 +114,8 @@ export default function ShiftsIndexScreen() {
             onResume={() => resume.mutate(shift.id)}
             onEnd={() => handleEnd(shift.id)}
             isPending={isMutating}
+            geofenceState={geofence.state}
+            lastPingAgeMs={geofence.lastPingAgeMs}
           />
         ) : me.data && !me.data.canWork ? (
           <View style={styles.blockCard}>

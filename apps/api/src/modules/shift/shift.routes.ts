@@ -153,7 +153,14 @@ type PublicShiftDTO = {
     type: 'tower' | 'mobile' | 'crawler' | 'overhead'
     capacityTon: number
   }
-  site: { id: string; name: string; address: string | null }
+  site: {
+    id: string
+    name: string
+    address: string | null
+    latitude: number
+    longitude: number
+    geofenceRadiusM: number
+  }
   organization: { id: string; name: string }
   operator: { id: string; firstName: string; lastName: string; patronymic: string | null }
 }

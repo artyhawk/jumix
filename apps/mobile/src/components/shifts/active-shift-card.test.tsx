@@ -26,7 +26,14 @@ function makeShift(overrides: Partial<ShiftWithRelations> = {}): ShiftWithRelati
       type: 'tower',
       capacityTon: 10,
     },
-    site: { id: 's-1', name: 'Тестовый объект', address: null },
+    site: {
+      id: 's-1',
+      name: 'Тестовый объект',
+      address: null,
+      latitude: 51.128,
+      longitude: 71.43,
+      geofenceRadiusM: 200,
+    },
     organization: { id: 'org-1', name: 'ТОО' },
     operator: { id: 'cp-1', firstName: 'A', lastName: 'B', patronymic: null },
     ...overrides,
@@ -66,5 +73,73 @@ describe('ActiveShiftCard', () => {
       <ActiveShiftCard shift={makeShift()} onPause={vi.fn()} onResume={vi.fn()} onEnd={vi.fn()} />,
     )
     expect(screen.getByText(/Liebherr · INV-5/)).toBeInTheDocument()
+  })
+
+  it('geofenceState=inside → «На объекте» badge visible', () => {
+    render(
+      <ActiveShiftCard
+        shift={makeShift()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onEnd={vi.fn()}
+        geofenceState="inside"
+      />,
+    )
+    expect(screen.getByText('На объекте')).toBeInTheDocument()
+  })
+
+  it('geofenceState=outside → danger banner с site name', () => {
+    render(
+      <ActiveShiftCard
+        shift={makeShift()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onEnd={vi.fn()}
+        geofenceState="outside"
+      />,
+    )
+    expect(screen.getByText('Вы покинули объект')).toBeInTheDocument()
+    // «Тестовый объект» появляется дважды: в banner + в InfoRow ниже.
+    expect(screen.getAllByText(/Тестовый объект/).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('geofenceState=unknown → ни banner, ни badge', () => {
+    render(
+      <ActiveShiftCard
+        shift={makeShift()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onEnd={vi.fn()}
+        geofenceState="unknown"
+      />,
+    )
+    expect(screen.queryByText('На объекте')).toBeNull()
+    expect(screen.queryByText('Вы покинули объект')).toBeNull()
+  })
+
+  it('lastPingAgeMs > 2 минут → stale GPS warning', () => {
+    render(
+      <ActiveShiftCard
+        shift={makeShift()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onEnd={vi.fn()}
+        lastPingAgeMs={150_000}
+      />,
+    )
+    expect(screen.getByText(/GPS не обновлялся/)).toBeInTheDocument()
+  })
+
+  it('lastPingAgeMs < 2 минут → no warning', () => {
+    render(
+      <ActiveShiftCard
+        shift={makeShift()}
+        onPause={vi.fn()}
+        onResume={vi.fn()}
+        onEnd={vi.fn()}
+        lastPingAgeMs={30_000}
+      />,
+    )
+    expect(screen.queryByText(/GPS не обновлялся/)).toBeNull()
   })
 })

@@ -4,9 +4,11 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { SafeArea } from '@/components/ui/safe-area'
 import { isApiError } from '@/lib/api/errors'
 import { useAvailableCranes, useStartShift } from '@/lib/hooks/use-shifts'
+import { startTracking, stopTracking } from '@/lib/tracking/lifecycle'
+import { PermissionDeniedError, showPermissionAlert } from '@/lib/tracking/permissions'
 import { colors, font, spacing } from '@/theme/tokens'
 import { typography } from '@/theme/typography'
-import type { AvailableCrane } from '@jumix/shared'
+import type { AvailableCrane, ShiftWithRelations } from '@jumix/shared'
 import { router } from 'expo-router'
 import { useMemo, useState } from 'react'
 import { Alert, FlatList, StyleSheet, Text, View } from 'react-native'
@@ -30,7 +32,34 @@ export default function StartShiftScreen() {
     startShift.mutate(
       { craneId: selectedId },
       {
-        onSuccess: () => router.back(),
+        onSuccess: async (shift: ShiftWithRelations) => {
+          // M5-b: запустить GPS tracking после успешного start. Если
+          // permission denied — shift остаётся активным, но без GPS
+          // (tracking можно включить позже через Settings). Советуем
+          // user'у через Alert.
+          try {
+            await startTracking({
+              shiftId: shift.id,
+              site: {
+                id: shift.site.id,
+                latitude: shift.site.latitude,
+                longitude: shift.site.longitude,
+                geofenceRadiusM: shift.site.geofenceRadiusM,
+              },
+            })
+            router.back()
+          } catch (err) {
+            if (err instanceof PermissionDeniedError) {
+              // Cleanup — context cache был set'нут, но tracking не пошёл.
+              await stopTracking()
+              showPermissionAlert(err.kind)
+            } else {
+              // Unknown — логируем в бэкграунде, возвращаем user.
+              console.warn('startTracking failed', err)
+            }
+            router.back()
+          }
+        },
         onError: (err) => {
           const msg = isApiError(err) ? err.message : 'Попробуйте ещё раз'
           Alert.alert('Не удалось начать смену', msg)

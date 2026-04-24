@@ -17,6 +17,7 @@ export type {
   ShiftWithRelations,
   ShiftCraneSummary,
   ShiftSiteSummary,
+  ShiftSiteRef,
   ShiftOrganizationSummary,
   ShiftOperatorSummary,
   AvailableCrane,

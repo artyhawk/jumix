@@ -3,7 +3,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { SafeArea } from '@/components/ui/safe-area'
 import { formatDate } from '@/lib/format/date'
 import { formatDuration, formatTime } from '@/lib/format/duration'
-import { useShiftDetail } from '@/lib/hooks/use-shifts'
+import { useShiftDetail, useShiftPath } from '@/lib/hooks/use-shifts'
 import { colors, font, radius, spacing } from '@/theme/tokens'
 import { typography } from '@/theme/typography'
 import type { ShiftWithRelations } from '@jumix/shared'
@@ -51,6 +51,9 @@ export default function ShiftDetailScreen() {
 
 function ShiftDetailBody({ shift }: { shift: ShiftWithRelations }) {
   const duration = computeShiftDurationSeconds(shift)
+  // Path stats — только для ended смен; ongoing refresh'ится через
+  // useMyActiveShift, здесь не тратим network.
+  const path = useShiftPath(shift.status === 'ended' ? shift.id : null)
 
   return (
     <View style={styles.content}>
@@ -72,6 +75,15 @@ function ShiftDetailBody({ shift }: { shift: ShiftWithRelations }) {
         ) : null}
       </View>
 
+      {shift.status === 'ended' && path.data ? (
+        <View style={styles.block}>
+          <Text style={typography.overline}>Маршрут</Text>
+          <Row label="GPS точек" value={String(path.data.pings.length)} mono />
+          <Row label="На объекте" value={`${onSiteCount(path.data.pings)}`} mono />
+          <Row label="Вне объекта" value={`${offSiteCount(path.data.pings)}`} mono />
+        </View>
+      ) : null}
+
       <View style={styles.block}>
         <Row label="Кран" value={shift.crane.model} />
         {shift.crane.inventoryNumber ? (
@@ -90,6 +102,14 @@ function ShiftDetailBody({ shift }: { shift: ShiftWithRelations }) {
       ) : null}
     </View>
   )
+}
+
+function onSiteCount(pings: Array<{ insideGeofence: boolean | null }>): number {
+  return pings.filter((p) => p.insideGeofence === true).length
+}
+
+function offSiteCount(pings: Array<{ insideGeofence: boolean | null }>): number {
+  return pings.filter((p) => p.insideGeofence === false).length
 }
 
 const STATUS_LABEL: Record<ShiftWithRelations['status'], string> = {

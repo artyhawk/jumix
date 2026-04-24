@@ -36,6 +36,15 @@ export interface ShiftSiteSummary {
   id: string
   name: string
   address: string | null
+  /**
+   * Site coordinates + geofence radius — нужны mobile client'у для
+   * client-side geofence computation (ADR 0007 §3). Surface'ятся в
+   * каждом shift-endpoint'е, включая `/my/active`, чтобы mobile мог
+   * init'ить tracking context без дополнительного round-trip'а.
+   */
+  latitude: number
+  longitude: number
+  geofenceRadiusM: number
 }
 
 export interface ShiftOrganizationSummary {
@@ -63,13 +72,24 @@ export interface ShiftWithRelations extends Shift {
   operator: ShiftOperatorSummary
 }
 
+/**
+ * Minimal site shape для списков / эмbedded references — без PostGIS
+ * coords. Используется в AvailableCrane, ActiveShiftLocation. Если
+ * нужны coords (tracking init) — ShiftSiteSummary (полный).
+ */
+export interface ShiftSiteRef {
+  id: string
+  name: string
+  address: string | null
+}
+
 export interface AvailableCrane {
   id: string
   model: string
   inventoryNumber: string | null
   type: 'tower' | 'mobile' | 'crawler' | 'overhead'
   capacityTon: number
-  site: ShiftSiteSummary
+  site: ShiftSiteRef
   organization: ShiftOrganizationSummary
 }
 
@@ -131,7 +151,7 @@ export interface ActiveShiftLocation {
   minutesSinceLastPing: number
   crane: ShiftCraneSummary
   operator: ShiftOperatorSummary
-  site: ShiftSiteSummary
+  site: ShiftSiteRef
 }
 
 /**

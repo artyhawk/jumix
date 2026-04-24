@@ -42,10 +42,20 @@ export type AuditMeta = {
 
 type ShiftRow = typeof shifts.$inferSelect
 
+export type ShiftSiteSummary = {
+  id: string
+  name: string
+  address: string | null
+  /** PostGIS geography → ST_Y/ST_X extraction (M5-b, для mobile geofence init). */
+  latitude: number
+  longitude: number
+  geofenceRadiusM: number
+}
+
 export type ShiftWithRelations = {
   shift: Shift
   crane: Pick<Crane, 'id' | 'model' | 'inventoryNumber' | 'type' | 'capacityTon'>
-  site: { id: string; name: string; address: string | null }
+  site: ShiftSiteSummary
   organization: { id: string; name: string }
   operator: { id: string; firstName: string; lastName: string; patronymic: string | null }
 }
@@ -127,10 +137,32 @@ export type ListOwnerParams = {
   organizationId?: string
 }
 
+/**
+ * Site select с PostGIS coords extraction. ST_X/ST_Y могут вернуть
+ * string (double-как-текст) от postgres-js → Number() в hydrate.
+ */
+const SITE_SELECT = {
+  id: sites.id,
+  name: sites.name,
+  address: sites.address,
+  latitude: sql<string | number>`ST_Y(${sites.geofenceCenter}::geometry)`.as('site_latitude'),
+  longitude: sql<string | number>`ST_X(${sites.geofenceCenter}::geometry)`.as('site_longitude'),
+  geofenceRadiusM: sites.geofenceRadiusM,
+} as const
+
+type SiteJoinRow = {
+  id: string
+  name: string
+  address: string | null
+  latitude: string | number
+  longitude: string | number
+  geofenceRadiusM: number
+}
+
 type JoinedRow = {
   shift: ShiftRow
   crane: typeof cranes.$inferSelect
-  site: typeof sites.$inferSelect
+  site: SiteJoinRow
   organization: typeof organizations.$inferSelect
   profile: typeof craneProfiles.$inferSelect
 }
@@ -149,6 +181,9 @@ function mapRelations(row: JoinedRow): ShiftWithRelations {
       id: row.site.id,
       name: row.site.name,
       address: row.site.address,
+      latitude: Number(row.site.latitude),
+      longitude: Number(row.site.longitude),
+      geofenceRadiusM: row.site.geofenceRadiusM,
     },
     organization: {
       id: row.organization.id,
@@ -182,7 +217,7 @@ export class ShiftRepository {
       .select({
         shift: shifts,
         crane: cranes,
-        site: sites,
+        site: SITE_SELECT,
         organization: organizations,
         profile: craneProfiles,
       })
@@ -213,7 +248,7 @@ export class ShiftRepository {
       .select({
         shift: shifts,
         crane: cranes,
-        site: sites,
+        site: SITE_SELECT,
         organization: organizations,
         profile: craneProfiles,
       })
@@ -250,7 +285,7 @@ export class ShiftRepository {
       .select({
         shift: shifts,
         crane: cranes,
-        site: sites,
+        site: SITE_SELECT,
         organization: organizations,
         profile: craneProfiles,
       })
@@ -294,7 +329,7 @@ export class ShiftRepository {
       .select({
         shift: shifts,
         crane: cranes,
-        site: sites,
+        site: SITE_SELECT,
         organization: organizations,
         profile: craneProfiles,
       })
@@ -347,7 +382,7 @@ export class ShiftRepository {
     const rows = await this.database.db
       .select({
         crane: cranes,
-        site: sites,
+        site: SITE_SELECT,
         organization: organizations,
       })
       .from(cranes)
@@ -536,7 +571,7 @@ export class ShiftRepository {
         shift: shifts,
         ping: shiftLocationPings,
         crane: cranes,
-        site: sites,
+        site: SITE_SELECT,
         profile: craneProfiles,
         rn: sql<number>`ROW_NUMBER() OVER (PARTITION BY ${shifts.id} ORDER BY ${shiftLocationPings.recordedAt} DESC)`.as(
           'rn',

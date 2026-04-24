@@ -172,7 +172,14 @@ describe('SiteDrawer', () => {
             type: 'tower',
             capacityTon: 12,
           },
-          site: { id: 's-1', name: 'Site', address: null },
+          site: {
+            id: 's-1',
+            name: 'Site',
+            address: null,
+            latitude: 51.128,
+            longitude: 71.43,
+            geofenceRadiusM: 200,
+          },
           organization: { id: 'org-1', name: 'Org' },
           operator: {
             id: 'cp-1',

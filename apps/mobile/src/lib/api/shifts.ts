@@ -1,6 +1,9 @@
 import type {
   AvailableCrane,
   EndShiftPayload,
+  IngestPingsPayload,
+  IngestPingsResponse,
+  ShiftPath,
   ShiftWithRelations,
   StartShiftPayload,
 } from '@jumix/shared'
@@ -65,4 +68,32 @@ export async function endShift(
     method: 'POST',
     body: payload,
   })
+}
+
+// ---------- M5-b: GPS pings (ADR 0007) ----------
+
+/**
+ * Batch-ingest до 100 pings. Server partial-reject'ит невалидные (future
+ * timestamps, stale), valid — инсертит. Client marks synced только
+ * accepted'ы (по порядку); rejected retry'ить не пытаемся — они навсегда
+ * invalid.
+ */
+export async function ingestPings(
+  shiftId: string,
+  payload: IngestPingsPayload,
+): Promise<IngestPingsResponse> {
+  return apiFetch<IngestPingsResponse>(`/api/v1/shifts/${shiftId}/pings`, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/**
+ * Shift path — все pings смены ASC. sampleRate=N downsample'ит для
+ * polyline rendering (500 pings / 5 = 100 points). Используется на
+ * shift detail screen после end.
+ */
+export async function getShiftPath(shiftId: string, sampleRate?: number): Promise<ShiftPath> {
+  const qs = sampleRate && sampleRate > 1 ? `?sampleRate=${sampleRate}` : ''
+  return apiFetch<ShiftPath>(`/api/v1/shifts/${shiftId}/path${qs}`)
 }
