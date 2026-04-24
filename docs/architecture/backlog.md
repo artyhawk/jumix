@@ -668,6 +668,79 @@ Advisory pause удобен, но 8-часовая пауза очевидно b
 
 ---
 
+## Shifts GPS tracking (from M5)
+
+### Ping retention job
+
+`shift_location_pings` растёт на ~480 rows/day/active-operator. Без cleanup через 3 года = 50M+ rows на 100 operators. Backlog: BullMQ cron `'0 3 * * *'` (daily 3am) `DELETE FROM shift_location_pings WHERE created_at < now() - interval '90 days'` с batching (10k rows per iteration чтобы не lock table). Gate: когда table >10M rows или replication lag от bulk-delete становится заметным.
+
+### Partitioning by month
+
+Когда `shift_location_pings` > 50M rows — partition by `created_at` month. PostgreSQL 12+ native partitioning, партиции старше retention policy — `DROP` вместо `DELETE`. Миграция со сбросом history (accept data loss) либо online partition-migrate (pg_partman). Backlog.
+
+### Configurable sampling rate per-org
+
+Сейчас hardcoded 15s foreground / 60s background. Строгие компании (финансовый аудит) могут хотеть 5s; нестрогие (небольшой парк кранов) — 120s. Backlog: `organization_settings.gps_sampling_rate_seconds` + `organization_settings.gps_geofence_strict_mode`. Gate: когда заказчик запросит toggle.
+
+### Strict geofence mode
+
+Advisory exit (M5 decision) может не подходить всем. Hard mode: при exit > N секунд → auto-pause смены, notification owner'у, operator не может resume пока не вернётся. Per-org setting (backlog выше). Gate: 3+ заказчиков запросят «жёсткий режим».
+
+### PostGIS spatial index
+
+Primary M5 queries не geospatial (filter by shift_id). PostGIS добавим когда появятся:
+- **Bounding box query** — owner map viewport load (только pings в viewport bbox).
+- **Heat map analytics** — где крановщики чаще всего работают / проводят время.
+- **Incident radius search** — «все pings в радиусе 50m от точки инцидента».
+
+`ALTER TABLE shift_location_pings ADD COLUMN geom geography(Point,4326) GENERATED ALWAYS AS (ST_MakePoint(longitude, latitude)::geography) STORED; CREATE INDEX ... USING gist(geom);`
+
+### WebSocket real-time push
+
+Polling 30s — adequate для MVP (100+ concurrent shifts, низкая нагрузка). Upgrade на pub/sub когда:
+- \>500 concurrent shifts (каждый poll 30s × N owners = заметный DB load).
+- Owner UI требует мгновенного визуала (крановщик вышел за зону → marker flash в real-time).
+
+Stack: Redis pub/sub + `fastify-websocket`, channel per-organization, emit on ingestPings geofence transition detection. Backlog.
+
+### Ping anomaly detection (teleport)
+
+Если между consecutive pings distance > max feasible (e.g., 1km за 30s = 120 km/h — слишком быстро для наземного оператора) — indicates GPS spoofing, data forgery, либо device issue. Server-side computed anomaly flag + audit event `shift.gps_anomaly` → surface в owner audit feed. Also: `shift_location_pings.anomaly_reason` nullable column. Backlog — требует baseline data (какие скорости нормальны) + тюнинг thresholds.
+
+### Offline indicator persistence
+
+Mobile queue с большим количеством pending pings (>100) = proxy для длительного offline period. Backlog: persistent warning banner «N pings не отправлены. Проверьте подключение» до успешного flush. Current UX: silent queue.
+
+### Owner map — shift path polyline overlay
+
+Site drawer сейчас показывает «активные смены на объекте» как list. Map upgrade: при click на shift row — render polyline path этой смены поверх map (использует `GET /shifts/:id/path`). Visual audit trail: «где кран двигался за смену». Requires MapLibre LineLayer + time-scrubber control. Gate: после M5-c web slice ship'а.
+
+### Location analytics
+
+- **Speed histogram** — время на разных скоростях (static < 1 km/h, slow 1-5, moving 5-20, fast >20).
+- **Heat map density** — где операторы проводят больше всего времени.
+- **Time-at-location** — минуты inside vs outside geofence (baseline для payroll?).
+
+Requires PostGIS + aggregation pipelines. Post-MVP analytics phase.
+
+### Route optimization suggestions
+
+ML-based: «если оператор работает на участке A и B одновременно, оптимизировать порядок посещений / сэкономить на топливе». Far future, требует per-crane trip planning data + real dispatcher. Out of scope construction-крановщиков (в отличие от delivery).
+
+### Real-device QA infrastructure
+
+Simulator GPS fake, battery не measurable, permission flows не воспроизводят real. Backlog: device lab setup:
+- Physical iPhone (iOS 17+) + Android (Xiaomi + Samsung + Pixel).
+- Scripted QA: permission grant/deny paths, airplane mode offline → online, background kill recovery, 2-hour battery baseline.
+- Third-party service (LambdaTest, BrowserStack Real Device) если lab impractical.
+Gate: перед M8 store release.
+
+### Background-safe logging
+
+Background task (TaskManager) не имеет reliable console.log (JS runtime отличается). Debug через Sentry breadcrumbs с fallback на local SQLite error log table. Backlog — implement при первом production incident reconstruction.
+
+---
+
 ## Mobile (from M1 + M2 + M3)
 
 ### License OCR extraction

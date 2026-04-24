@@ -22,4 +22,10 @@ export type {
   AvailableCrane,
   StartShiftPayload,
   EndShiftPayload,
+  LocationPing,
+  IngestPingsPayload,
+  IngestPingsResponse,
+  IngestPingsRejection,
+  ActiveShiftLocation,
+  ShiftPath,
 } from './api/shift'

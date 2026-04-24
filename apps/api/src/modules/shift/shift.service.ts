@@ -3,6 +3,8 @@ import {
   type Crane,
   type CraneProfile,
   type DatabaseClient,
+  type ShiftLocationPing,
+  auditLog,
   craneProfiles,
   cranes,
   organizationOperators,
@@ -12,11 +14,19 @@ import type { FastifyBaseLogger } from 'fastify'
 import { AppError } from '../../lib/errors'
 import type { CraneProfileService } from '../crane-profile/crane-profile.service'
 import { shiftPolicy } from './shift.policy'
-import { type AvailableCrane, ShiftRepository, type ShiftWithRelations } from './shift.repository'
+import {
+  type AvailableCrane,
+  type LatestActiveLocationRow,
+  ShiftRepository,
+  type ShiftWithRelations,
+} from './shift.repository'
 import type {
   EndShiftInput,
+  IngestPingsInput,
   ListMyShiftsQuery,
   ListOwnerShiftsQuery,
+  OwnerLocationsLatestQuery,
+  ShiftPathQuery,
   StartShiftInput,
 } from './shift.schemas'
 
@@ -41,6 +51,51 @@ import type {
 
 type RequestMeta = {
   ipAddress: string | null
+}
+
+export type IngestPingsResult = {
+  accepted: number
+  rejected: Array<{ index: number; reason: string }>
+}
+
+/**
+ * DTO-ready ping-with-context для owner map. `minutesSinceLastPing` computed
+ * в момент query (не хранится). `insideGeofence` re-derived в service: client
+ * мог прислать null (unknown) или mismatch с сервер-side site radius — на
+ * этом endpoint мы re-check через Haversine vs site.geofenceRadiusM, чтобы
+ * owner видел консистентную картину независимо от client state.
+ */
+export type ActiveLocationDTO = {
+  shiftId: string
+  craneId: string
+  operatorId: string
+  siteId: string
+  latitude: number
+  longitude: number
+  accuracyMeters: number | null
+  recordedAt: string
+  insideGeofence: boolean | null
+  minutesSinceLastPing: number
+  crane: {
+    id: string
+    model: string
+    inventoryNumber: string | null
+    type: string
+    capacityTon: number
+  }
+  operator: { id: string; firstName: string; lastName: string; patronymic: string | null }
+  site: { id: string; name: string; address: string | null }
+}
+
+export type ShiftPathDTO = {
+  shiftId: string
+  pings: Array<{
+    latitude: number
+    longitude: number
+    accuracyMeters: number | null
+    recordedAt: string
+    insideGeofence: boolean | null
+  }>
 }
 
 const PG_UNIQUE_VIOLATION = '23505'
@@ -68,6 +123,36 @@ function conflict(code: string, message: string): AppError {
 }
 function unprocessable(code: string, message: string, details?: Record<string, unknown>): AppError {
   return new AppError({ statusCode: 422, code, message, details })
+}
+
+function pingToSummary(p: ShiftLocationPing): ShiftPathDTO['pings'][number] {
+  return {
+    latitude: p.latitude,
+    longitude: p.longitude,
+    accuracyMeters: p.accuracyMeters,
+    recordedAt: p.recordedAt.toISOString(),
+    insideGeofence: p.insideGeofence,
+  }
+}
+
+function toActiveLocationDTO(row: LatestActiveLocationRow, nowMs: number): ActiveLocationDTO {
+  const pingMs = row.ping.recordedAt.getTime()
+  const minutesSinceLastPing = Math.max(0, Math.floor((nowMs - pingMs) / 60_000))
+  return {
+    shiftId: row.shift.id,
+    craneId: row.shift.craneId,
+    operatorId: row.shift.operatorId,
+    siteId: row.shift.siteId,
+    latitude: row.ping.latitude,
+    longitude: row.ping.longitude,
+    accuracyMeters: row.ping.accuracyMeters,
+    recordedAt: row.ping.recordedAt.toISOString(),
+    insideGeofence: row.ping.insideGeofence,
+    minutesSinceLastPing,
+    crane: row.crane,
+    operator: row.operator,
+    site: row.site,
+  }
 }
 
 export class ShiftService {
@@ -334,6 +419,186 @@ export class ShiftService {
       throw forbidden('FORBIDDEN', '/shifts/available-cranes is operator-only')
     }
     return this.repoFor(ctx).listAvailableCranes(ctx.userId)
+  }
+
+  // ---------- M5: location pings (ADR 0007) ----------
+
+  /**
+   * Batch-ingest location pings от mobile клиента. Validations:
+   *   - shift принадлежит ctx.userId (operator-only);
+   *   - shift.status ∈ (active, paused) — ended shifts reject всё;
+   *   - per-ping: latitude/longitude уже валидированы Zod'ом до сервиса;
+   *     здесь NaN-guard и recordedAt sanity (не в будущем более чем на 5 мин).
+   *
+   * Partial reject: невалидные pings не блокируют валидные — inserting все
+   * разрешённые, возвращаем {accepted, rejected[]}. Client markет synced
+   * только accepted'ы (по порядку), остальные retry'им позже.
+   *
+   * Geofence transition audit: сравниваем `insideGeofence` последнего нового
+   * ping'а (из этого batch'а) с state *последнего ping'а ДО batch'а*. Если
+   * состояние изменилось — пишем `shift.geofence_exit` или `shift.geofence_entry`.
+   * Переходы internal-к-batch игнорируем (в batch'е может быть 5 pings
+   * inside → 10 outside → 3 inside — нам интересна только итоговая граница).
+   * Advisory UX (mobile banner) работает на клиенте, сервер только логирует.
+   */
+  async ingestPings(
+    ctx: AuthContext,
+    shiftId: string,
+    input: IngestPingsInput,
+    meta: RequestMeta,
+  ): Promise<IngestPingsResult> {
+    const repo = this.repoFor(ctx)
+    const existing = await repo.findInScopeWithRelations(shiftId)
+    if (!existing) throw shiftNotFound()
+
+    if (!shiftPolicy.canIngestPings(ctx, existing.shift)) {
+      throw forbidden('FORBIDDEN', 'Only the shift owner can ingest pings')
+    }
+
+    if (existing.shift.status === 'ended') {
+      throw unprocessable('SHIFT_ENDED', 'Cannot ingest pings for ended shift')
+    }
+
+    // Validate per-ping (Zod уже покрыл numeric ranges, здесь — business edge-cases).
+    const now = Date.now()
+    const FUTURE_TOLERANCE_MS = 5 * 60 * 1000
+    const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 дней — safety bound
+    const accepted: Array<{
+      index: number
+      ping: IngestPingsInput['pings'][number]
+      recordedAt: Date
+    }> = []
+    const rejected: Array<{ index: number; reason: string }> = []
+
+    for (let i = 0; i < input.pings.length; i += 1) {
+      const p = input.pings[i]
+      if (!p) continue
+      const ts = Date.parse(p.recordedAt)
+      if (Number.isNaN(ts)) {
+        rejected.push({ index: i, reason: 'INVALID_TIMESTAMP' })
+        continue
+      }
+      if (ts > now + FUTURE_TOLERANCE_MS) {
+        rejected.push({ index: i, reason: 'FUTURE_TIMESTAMP' })
+        continue
+      }
+      if (ts < now - MAX_AGE_MS) {
+        rejected.push({ index: i, reason: 'STALE_TIMESTAMP' })
+        continue
+      }
+      accepted.push({ index: i, ping: p, recordedAt: new Date(ts) })
+    }
+
+    if (accepted.length === 0) {
+      return { accepted: 0, rejected }
+    }
+
+    // Previous latest ping (до этого batch'а) — для transition detection.
+    const prevLatest = await repo.findLatestPingForShift(shiftId)
+
+    await repo.insertPings(
+      accepted.map((a) => ({
+        shiftId,
+        latitude: a.ping.latitude.toFixed(7),
+        longitude: a.ping.longitude.toFixed(7),
+        accuracyMeters: a.ping.accuracyMeters,
+        recordedAt: a.recordedAt,
+        insideGeofence: a.ping.insideGeofence,
+      })),
+    )
+
+    // Transition detection: compare prev state vs latest-in-batch (по
+    // recordedAt ASC — берём max).
+    const sortedAccepted = [...accepted].sort(
+      (a, b) => a.recordedAt.getTime() - b.recordedAt.getTime(),
+    )
+    const newestInBatch = sortedAccepted[sortedAccepted.length - 1]
+    const prevInside = prevLatest?.insideGeofence ?? null
+    const nextInside = newestInBatch?.ping.insideGeofence ?? null
+
+    // Write audit только когда обе стороны определены и состояние сменилось.
+    // null на одной стороне (unknown) не считаем transition'ом — слишком шумно.
+    if (prevInside !== null && nextInside !== null && prevInside !== nextInside) {
+      const action = nextInside ? 'shift.geofence_entry' : 'shift.geofence_exit'
+      await this.database.db.insert(auditLog).values({
+        actorUserId: ctx.userId,
+        actorRole: ctx.role,
+        action,
+        targetType: 'shift',
+        targetId: shiftId,
+        organizationId: existing.shift.organizationId,
+        metadata: {
+          recordedAt: newestInBatch?.recordedAt.toISOString(),
+          latitude: newestInBatch?.ping.latitude,
+          longitude: newestInBatch?.ping.longitude,
+          accuracyMeters: newestInBatch?.ping.accuracyMeters,
+        },
+        ipAddress: meta.ipAddress,
+      })
+    }
+
+    return { accepted: accepted.length, rejected }
+  }
+
+  /**
+   * Latest location per active/paused shift в scope owner'а/superadmin'а.
+   * Используется owner'ским map'ом (polling 30s). Stale-detection через
+   * `minutesSinceLastPing` — на клиенте > 10 минут = marker-warning стиль.
+   */
+  async getLatestLocations(
+    ctx: AuthContext,
+    params: OwnerLocationsLatestQuery,
+  ): Promise<ActiveLocationDTO[]> {
+    if (!shiftPolicy.canListLocationsForOrg(ctx)) {
+      throw forbidden('FORBIDDEN', '/shifts/owner/locations-latest is owner/superadmin only')
+    }
+    const rows = await this.repoFor(ctx).listLatestActiveLocations({
+      organizationId: ctx.role === 'owner' ? ctx.organizationId : undefined,
+      siteId: params.siteId,
+    })
+    const now = Date.now()
+    return rows.map((r) => toActiveLocationDTO(r, now))
+  }
+
+  /**
+   * Shift path — все pings смены ASC по времени. sampleRate downsample'ит
+   * (каждый N-ый). Для 500 pings + sampleRate=5 → 100 точек polyline, что
+   * достаточно для визуализации маршрута без перегрузки network/render'а.
+   */
+  async getShiftPath(
+    ctx: AuthContext,
+    shiftId: string,
+    query: ShiftPathQuery,
+  ): Promise<ShiftPathDTO> {
+    const repo = this.repoFor(ctx)
+    const existing = await repo.findInScopeWithRelations(shiftId)
+    if (!existing) throw shiftNotFound()
+    if (!shiftPolicy.canReadPath(ctx, existing.shift)) throw shiftNotFound()
+
+    const rate = query.sampleRate
+    const all = await repo.listPingsForShift(shiftId)
+    const sampled = rate === 1 ? all : all.filter((_, i) => i % rate === 0)
+    return {
+      shiftId,
+      pings: sampled.map(pingToSummary),
+    }
+  }
+
+  /**
+   * Operator's own latest ping — debugging/backup path. В MVP mobile
+   * рассчитывает state локально, но endpoint полезен для QA.
+   */
+  async getMyActiveLocation(
+    ctx: AuthContext,
+  ): Promise<{ shiftId: string; ping: ShiftLocationPing } | null> {
+    if (ctx.role !== 'operator') {
+      throw forbidden('FORBIDDEN', '/shifts/my/active/location is operator-only')
+    }
+    const active = await this.repoFor(ctx).findActiveForOperator(ctx.userId)
+    if (!active) return null
+    const ping = await this.repoFor(ctx).findLatestPingForShift(active.id)
+    if (!ping) return null
+    return { shiftId: active.id, ping }
   }
 
   // ---------- internal helpers ----------

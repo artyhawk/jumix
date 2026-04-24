@@ -37,4 +37,31 @@ export const shiftPolicy = {
   canListMy: (ctx: AuthContext): boolean => ctx.role === 'operator',
 
   canListAvailableCranes: (ctx: AuthContext): boolean => ctx.role === 'operator',
+
+  // ---------- M5: GPS tracking (ADR 0007) ----------
+
+  /**
+   * Ingest location pings — строго operator-владелец shift'а. Owner/superadmin
+   * не могут «писать GPS за оператора» — business invariant (данные должны
+   * приходить с устройства крановщика, не из веб-панели).
+   */
+  canIngestPings: (ctx: AuthContext, shift: Pick<Shift, 'operatorId'>): boolean => {
+    if (ctx.role !== 'operator') return false
+    return ctx.userId === shift.operatorId
+  },
+
+  /**
+   * Read path — совпадает с canRead shift (operator-own / owner-org /
+   * superadmin). Path — telemetry data, same scope что и shift DTO.
+   */
+  canReadPath: (ctx: AuthContext, shift: Pick<Shift, 'operatorId' | 'organizationId'>): boolean => {
+    if (ctx.role === 'superadmin') return true
+    if (ctx.role === 'owner') return ctx.organizationId === shift.organizationId
+    if (ctx.role === 'operator') return ctx.userId === shift.operatorId
+    return false
+  },
+
+  /** Latest locations list — owner/superadmin (same scope как /shifts/owner). */
+  canListLocationsForOrg: (ctx: AuthContext): boolean =>
+    ctx.role === 'owner' || ctx.role === 'superadmin',
 }

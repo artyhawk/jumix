@@ -64,6 +64,9 @@ export {
   type Shift,
   type ShiftStatus,
   type NewShift,
+  shiftLocationPings,
+  type ShiftLocationPing,
+  type NewShiftLocationPing,
 } from './schema/index'
 
 export { createDatabase, type DatabaseClient, type CreateDatabaseOptions } from './client'

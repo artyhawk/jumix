@@ -5,18 +5,21 @@ import {
   type CraneStatus,
   type CraneType,
   type DatabaseClient,
+  type NewShiftLocationPing,
   type OperatorStatus,
   type Shift,
+  type ShiftLocationPing,
   type ShiftStatus,
   auditLog,
   craneProfiles,
   cranes,
   organizationOperators,
   organizations,
+  shiftLocationPings,
   shifts,
   sites,
 } from '@jumix/db'
-import { type SQL, and, desc, eq, inArray, isNull, lt } from 'drizzle-orm'
+import { type SQL, and, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
 
 /**
  * ShiftRepository — data access для shifts (M4, ADR 0006).
@@ -57,6 +60,14 @@ export type AvailableCrane = {
   organization: { id: string; name: string }
 }
 
+export type LatestActiveLocationRow = {
+  shift: Shift
+  ping: ShiftLocationPing
+  crane: Pick<Crane, 'id' | 'model' | 'inventoryNumber' | 'type' | 'capacityTon'>
+  site: { id: string; name: string; address: string | null }
+  operator: { id: string; firstName: string; lastName: string; patronymic: string | null }
+}
+
 function hydrate(row: ShiftRow): Shift {
   return {
     id: row.id,
@@ -73,6 +84,21 @@ function hydrate(row: ShiftRow): Shift {
     notes: row.notes,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  }
+}
+
+function hydratePing(row: typeof shiftLocationPings.$inferSelect): ShiftLocationPing {
+  // latitude/longitude — drizzle numeric → строка; конвертируем в число.
+  // accuracy_meters — real, обычно уже number, но для безопасности тоже коэрсим.
+  return {
+    id: row.id,
+    shiftId: row.shiftId,
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+    accuracyMeters: row.accuracyMeters === null ? null : Number(row.accuracyMeters),
+    recordedAt: row.recordedAt,
+    insideGeofence: row.insideGeofence,
+    createdAt: row.createdAt,
   }
 }
 
@@ -456,6 +482,96 @@ export class ShiftRepository {
 
       return hydrate(row)
     })
+  }
+
+  // ---------- M5: location pings (ADR 0007) ----------
+
+  /**
+   * Batch insert pings. Возвращает inserted rows (для response counting).
+   * Не в транзакции с audit_log — geofence-transition audit пишется отдельно
+   * в service после анализа state change.
+   */
+  async insertPings(values: NewShiftLocationPing[]): Promise<ShiftLocationPing[]> {
+    if (values.length === 0) return []
+    const rows = await this.database.db.insert(shiftLocationPings).values(values).returning()
+    return rows.map(hydratePing)
+  }
+
+  /** Latest ping per shift by recorded_at DESC. Null если нет pings. */
+  async findLatestPingForShift(shiftId: string): Promise<ShiftLocationPing | null> {
+    const rows = await this.database.db
+      .select()
+      .from(shiftLocationPings)
+      .where(eq(shiftLocationPings.shiftId, shiftId))
+      .orderBy(desc(shiftLocationPings.recordedAt))
+      .limit(1)
+    return rows[0] ? hydratePing(rows[0]) : null
+  }
+
+  /** Все pings shift'а в хронологическом порядке (ASC). */
+  async listPingsForShift(shiftId: string): Promise<ShiftLocationPing[]> {
+    const rows = await this.database.db
+      .select()
+      .from(shiftLocationPings)
+      .where(eq(shiftLocationPings.shiftId, shiftId))
+      .orderBy(shiftLocationPings.recordedAt)
+    return rows.map(hydratePing)
+  }
+
+  /**
+   * Latest ping per active/paused shift в scope (org для owner, all для
+   * superadmin). Использует ROW_NUMBER() window function для "last per group".
+   * Anti-N+1: сразу JOIN'ит crane/operator/site для DTO-ready результата.
+   */
+  async listLatestActiveLocations(params: {
+    organizationId?: string
+    siteId?: string
+  }): Promise<LatestActiveLocationRow[]> {
+    const conds: SQL[] = [inArray(shifts.status, LIVE_STATUSES)]
+    if (params.organizationId) conds.push(eq(shifts.organizationId, params.organizationId))
+    if (params.siteId) conds.push(eq(shifts.siteId, params.siteId))
+
+    const rows = await this.database.db
+      .select({
+        shift: shifts,
+        ping: shiftLocationPings,
+        crane: cranes,
+        site: sites,
+        profile: craneProfiles,
+        rn: sql<number>`ROW_NUMBER() OVER (PARTITION BY ${shifts.id} ORDER BY ${shiftLocationPings.recordedAt} DESC)`.as(
+          'rn',
+        ),
+      })
+      .from(shifts)
+      .innerJoin(shiftLocationPings, eq(shiftLocationPings.shiftId, shifts.id))
+      .innerJoin(cranes, eq(shifts.craneId, cranes.id))
+      .innerJoin(sites, eq(shifts.siteId, sites.id))
+      .innerJoin(craneProfiles, eq(shifts.craneProfileId, craneProfiles.id))
+      .where(and(...conds))
+
+    // Drizzle не умеет WHERE rn=1 на уровне построения — post-filter.
+    // Scale acceptable: N active shifts × avg pings per shift; на MVP
+    // никогда не больше ~100 × ~500.
+    return rows
+      .filter((r) => Number(r.rn) === 1)
+      .map((r) => ({
+        shift: hydrate(r.shift),
+        ping: hydratePing(r.ping),
+        crane: {
+          id: r.crane.id,
+          model: r.crane.model,
+          inventoryNumber: r.crane.inventoryNumber,
+          type: r.crane.type as CraneType,
+          capacityTon: Number(r.crane.capacityTon),
+        },
+        site: { id: r.site.id, name: r.site.name, address: r.site.address },
+        operator: {
+          id: r.profile.id,
+          firstName: r.profile.firstName,
+          lastName: r.profile.lastName,
+          patronymic: r.profile.patronymic,
+        },
+      }))
   }
 
   async end(

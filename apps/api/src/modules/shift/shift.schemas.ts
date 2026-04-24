@@ -44,4 +44,49 @@ export const listOwnerShiftsQuerySchema = z.object({
 })
 export type ListOwnerShiftsQuery = z.infer<typeof listOwnerShiftsQuerySchema>
 
+// ---------- M5: GPS tracking (ADR 0007) ----------
+
+/**
+ * Single location ping. `insideGeofence` nullable — client computes locally,
+ * но если site coords недоступны (edge case) → null. Server не перерассчитывает
+ * (trust client) — geofence — advisory UX anyway.
+ */
+export const locationPingSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  accuracyMeters: z.number().nonnegative().nullable(),
+  recordedAt: z.string().datetime({ offset: true }),
+  insideGeofence: z.boolean().nullable(),
+})
+export type LocationPingInput = z.infer<typeof locationPingSchema>
+
+/**
+ * Batch ingest body. Max 100 pings per request — cap задан DoS-защитой и
+ * memory concerns (одна смена 8ч × 60s = 480 pings; 100 batch = 5 round trips
+ * для full sync). Min 1 — empty array → 422.
+ */
+export const ingestPingsSchema = z.object({
+  pings: z.array(locationPingSchema).min(1).max(100),
+})
+export type IngestPingsInput = z.infer<typeof ingestPingsSchema>
+
+/**
+ * GET /shifts/:id/path?sampleRate=N — downsample для визуализации маршрута.
+ * Default 1 = все pings; N>1 = каждый N-ый (округление вниз). Max 20 — больше
+ * не имеет смысла (500 pings / 20 = 25 points, уже loss of detail).
+ */
+export const shiftPathQuerySchema = z.object({
+  sampleRate: z.coerce.number().int().min(1).max(20).default(1),
+})
+export type ShiftPathQuery = z.infer<typeof shiftPathQuerySchema>
+
+/**
+ * GET /shifts/owner/locations-latest?siteId=... — опциональный фильтр по site.
+ * Scope всегда ctx.organizationId (или all для superadmin).
+ */
+export const ownerLocationsLatestQuerySchema = z.object({
+  siteId: z.string().uuid().optional(),
+})
+export type OwnerLocationsLatestQuery = z.infer<typeof ownerLocationsLatestQuerySchema>
+
 export { shiftStatusSchema }

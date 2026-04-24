@@ -81,3 +81,64 @@ export interface StartShiftPayload {
 export interface EndShiftPayload {
   notes?: string
 }
+
+/**
+ * Location ping — single GPS record (M5, ADR 0007). Отправляется mobile
+ * клиентом batch'ами в `POST /api/v1/shifts/:id/pings`. Persistence shape
+ * (server response) идентичен ingestion shape (client body).
+ *
+ * insideGeofence — client-computed: Haversine distance ping→site.coords с
+ * accuracy tolerance (effective radius = site.radius + ping.accuracy). Null
+ * когда client не смог рассчитать (site coords недоступны).
+ */
+export interface LocationPing {
+  latitude: number
+  longitude: number
+  accuracyMeters: number | null
+  recordedAt: string
+  insideGeofence: boolean | null
+}
+
+export interface IngestPingsPayload {
+  pings: LocationPing[]
+}
+
+export interface IngestPingsRejection {
+  index: number
+  reason: string
+}
+
+export interface IngestPingsResponse {
+  accepted: number
+  rejected: IngestPingsRejection[]
+}
+
+/**
+ * Last-known location per active shift — источник данных для owner map
+ * (rule #29). Hydrated с nested crane/operator/site summaries и
+ * `minutesSinceLastPing` (computed server-side для stale-detection на клиенте).
+ */
+export interface ActiveShiftLocation {
+  shiftId: string
+  craneId: string
+  operatorId: string
+  siteId: string
+  latitude: number
+  longitude: number
+  accuracyMeters: number | null
+  recordedAt: string
+  insideGeofence: boolean | null
+  minutesSinceLastPing: number
+  crane: ShiftCraneSummary
+  operator: ShiftOperatorSummary
+  site: ShiftSiteSummary
+}
+
+/**
+ * Shift path — polyline для визуализации маршрута смены. `sampleRate` query
+ * param на endpoint'е downsample'ит (каждый N-ый ping) для больших историй.
+ */
+export interface ShiftPath {
+  shiftId: string
+  pings: LocationPing[]
+}
