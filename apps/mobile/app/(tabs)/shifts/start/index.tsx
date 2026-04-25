@@ -2,70 +2,40 @@ import { CraneSelectionCard } from '@/components/shifts/crane-selection-card'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { SafeArea } from '@/components/ui/safe-area'
-import { isApiError } from '@/lib/api/errors'
-import { useAvailableCranes, useStartShift } from '@/lib/hooks/use-shifts'
-import { startTracking, stopTracking } from '@/lib/tracking/lifecycle'
-import { PermissionDeniedError, showPermissionAlert } from '@/lib/tracking/permissions'
+import { useAvailableCranes } from '@/lib/hooks/use-shifts'
 import { colors, font, spacing } from '@/theme/tokens'
 import { typography } from '@/theme/typography'
-import type { AvailableCrane, ShiftWithRelations } from '@jumix/shared'
+import type { AvailableCrane } from '@jumix/shared'
 import { router } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native'
+import { FlatList, StyleSheet, Text, View } from 'react-native'
 
 /**
- * Crane selection modal. Group'ируется по organization если у operator'а
- * несколько memberships.
+ * Step 1: crane selection. После выбора → push к checklist screen с
+ * craneId + type (для conditional harness item).
  *
- * Flow: list → select → confirm button → POST /shifts/start → router.back().
- * On success, index screen fetch'ит fresh /my/active.
+ * Старая начальная M4 версия submit'ила сразу — теперь wrap в nested
+ * flow с pre-shift checklist (M6, ADR 0008).
  */
-export default function StartShiftScreen() {
+export default function CraneSelectionScreen() {
   const query = useAvailableCranes()
-  const startShift = useStartShift()
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const grouped = useMemo(() => groupByOrg(query.data?.items ?? []), [query.data])
 
   const handleSubmit = () => {
     if (!selectedId) return
-    startShift.mutate(
-      { craneId: selectedId },
-      {
-        onSuccess: async (shift: ShiftWithRelations) => {
-          // M5-b: запустить GPS tracking после успешного start. Если
-          // permission denied — shift остаётся активным, но без GPS
-          // (tracking можно включить позже через Settings). Советуем
-          // user'у через Alert.
-          try {
-            await startTracking({
-              shiftId: shift.id,
-              site: {
-                id: shift.site.id,
-                latitude: shift.site.latitude,
-                longitude: shift.site.longitude,
-                geofenceRadiusM: shift.site.geofenceRadiusM,
-              },
-            })
-            router.back()
-          } catch (err) {
-            if (err instanceof PermissionDeniedError) {
-              // Cleanup — context cache был set'нут, но tracking не пошёл.
-              await stopTracking()
-              showPermissionAlert(err.kind)
-            } else {
-              // Unknown — логируем в бэкграунде, возвращаем user.
-              console.warn('startTracking failed', err)
-            }
-            router.back()
-          }
-        },
-        onError: (err) => {
-          const msg = isApiError(err) ? err.message : 'Попробуйте ещё раз'
-          Alert.alert('Не удалось начать смену', msg)
-        },
+    const items = query.data?.items ?? []
+    const crane = items.find((c) => c.id === selectedId)
+    if (!crane) return
+    router.push({
+      pathname: '/(tabs)/shifts/start/checklist',
+      params: {
+        craneId: crane.id,
+        craneType: crane.type,
+        craneModel: crane.model,
       },
-    )
+    })
   }
 
   if (query.isLoading) {
@@ -136,14 +106,8 @@ export default function StartShiftScreen() {
           contentContainerStyle={styles.listContent}
         />
         <View style={styles.footer}>
-          <Button
-            variant="primary"
-            onPress={handleSubmit}
-            disabled={!selectedId || startShift.isPending}
-            loading={startShift.isPending}
-            fullWidth
-          >
-            Начать смену
+          <Button variant="primary" onPress={handleSubmit} disabled={!selectedId} fullWidth>
+            Дальше
           </Button>
         </View>
       </View>

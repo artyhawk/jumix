@@ -119,8 +119,19 @@ describe('useStartShift', () => {
     // Pre-seed active cache → после старта invalidate должен reset'нуть.
     client.setQueryData(MY_ACTIVE_SHIFT_KEY, null)
     const { result } = renderHook(() => useStartShift(), { wrapper })
-    await result.current.mutateAsync({ craneId: 'c-1' })
-    expect(api.startShift).toHaveBeenCalledWith({ craneId: 'c-1' })
+    const checklist = {
+      items: {
+        helmet: { checked: true, photoKey: null, notes: null },
+        vest: { checked: true, photoKey: null, notes: null },
+        boots: { checked: true, photoKey: null, notes: null },
+        gloves: { checked: true, photoKey: null, notes: null },
+        harness: { checked: true, photoKey: null, notes: null },
+        first_aid_kit: { checked: true, photoKey: null, notes: null },
+        crane_integrity: { checked: true, photoKey: null, notes: null },
+      },
+    }
+    await result.current.mutateAsync({ craneId: 'c-1', checklist })
+    expect(api.startShift).toHaveBeenCalledWith({ craneId: 'c-1', checklist })
   })
 })
 

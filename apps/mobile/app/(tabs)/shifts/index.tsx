@@ -146,9 +146,14 @@ export default function ShiftsIndexScreen() {
           </View>
         )}
 
-        <Button variant="ghost" onPress={() => router.push('/(tabs)/shifts/history')} fullWidth>
-          История смен
-        </Button>
+        <View style={styles.linkGroup}>
+          <Button variant="ghost" onPress={() => router.push('/(tabs)/shifts/history')} fullWidth>
+            История смен
+          </Button>
+          <Button variant="ghost" onPress={() => router.push('/(tabs)/shifts/incidents')} fullWidth>
+            Происшествия и неисправности
+          </Button>
+        </View>
       </ScrollView>
     </SafeArea>
   )
@@ -180,6 +185,9 @@ const styles = StyleSheet.create({
   },
   reasons: {
     gap: 4,
+  },
+  linkGroup: {
+    gap: spacing.xs,
   },
   reasonItem: {
     color: colors.textSecondary,

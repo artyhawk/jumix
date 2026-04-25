@@ -16,9 +16,10 @@ export default function ShiftsLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="start" options={{ title: 'Начать смену', presentation: 'modal' }} />
+      <Stack.Screen name="start" options={{ headerShown: false, presentation: 'modal' }} />
       <Stack.Screen name="history" options={{ title: 'История смен' }} />
       <Stack.Screen name="[id]" options={{ title: 'Смена' }} />
+      <Stack.Screen name="incidents" options={{ headerShown: false }} />
     </Stack>
   )
 }
