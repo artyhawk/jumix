@@ -39,10 +39,31 @@ vi.mock('@/components/map/sites-layer', () => ({
 vi.mock('@/components/map/cranes-layer', () => ({
   CranesLayer: () => null,
 }))
+vi.mock('@/components/map/live-cranes-layer', () => ({
+  LiveCranesLayer: () => null,
+}))
+vi.mock('@/components/map/shift-path-layer', () => ({
+  ShiftPathLayer: () => null,
+}))
+vi.mock('@/lib/api/shifts', () => ({
+  getShift: vi.fn(),
+  getShiftPath: vi.fn().mockResolvedValue({ shiftId: '', pings: [] }),
+  listLatestLocations: vi.fn().mockResolvedValue({ items: [] }),
+  listOwnerShifts: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),
+  listMyShifts: vi.fn(),
+  getMyActiveShift: vi.fn(),
+  getAvailableCranes: vi.fn(),
+  startShift: vi.fn(),
+  pauseShift: vi.fn(),
+  resumeShift: vi.fn(),
+  endShift: vi.fn(),
+}))
 
 const replace = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace, push: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/dashboard',
 }))
 
 const authUser: {

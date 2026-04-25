@@ -711,9 +711,25 @@ Stack: Redis pub/sub + `fastify-websocket`, channel per-organization, emit on in
 
 Mobile queue с большим количеством pending pings (>100) = proxy для длительного offline period. Backlog: persistent warning banner «N pings не отправлены. Проверьте подключение» до успешного flush. Current UX: silent queue.
 
-### Owner map — shift path polyline overlay
+### WebSocket real-time positions (M5 upgrade)
 
-Site drawer сейчас показывает «активные смены на объекте» как list. Map upgrade: при click на shift row — render polyline path этой смены поверх map (использует `GET /shifts/:id/path`). Visual audit trail: «где кран двигался за смену». Requires MapLibre LineLayer + time-scrubber control. Gate: после M5-c web slice ship'а.
+M5-c polling 30s для `useLatestLocations` adequate на MVP scale (5-50 concurrent shifts). Upgrade path — Redis pub/sub + fastify-websocket channel per-organization, `shiftService.ingestPings` emits position deltas, web subscribes в OwnerSitesMap. Trigger: `>500 concurrent shifts` OR «мгновенный geofence exit indicator» business ask.
+
+### Map path replay / scrubber
+
+ShiftDrawer показывает static polyline. Upgrade: time-scrubber (slider) — drag position → highlight ping на линии + popup с metadata (accuracy, inside/outside, timestamp). Requires animated marker + controlled state. Post-MVP.
+
+### Live positions animation
+
+Live-marker смещения между polls (30s интервал) — resha без анимации = «телепорт». Upgrade: interpolate marker position через framer-motion между старыми/новыми coords (ease-out 2s). UX polish, не блокирует.
+
+### Cluster markers (>20 live на site)
+
+LiveCranesLayer рендерит по маркеру на shift. При >20 activeShifts на одном site координаты совпадают — overlay-hell. Upgrade: Supercluster integration (`supercluster` npm) с zoom-dependent aggregation. Trigger: первый большой ЖК >20 одновременно работающих кранов.
+
+### Shift drawer — configurable sampleRate UI
+
+MVP: hardcoded `sampleRate=1` (все pings). Post-MVP: для длинных смен (>500 pings) авто-downsample + checkbox «Полный маршрут» который переключает на sampleRate=1 (всё, медленнее). Не блокирующий фактор — PostGIS + партиционирование решат performance раньше.
 
 ### Location analytics
 

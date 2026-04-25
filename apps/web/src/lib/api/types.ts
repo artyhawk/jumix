@@ -8,30 +8,38 @@
  */
 
 import type {
+  ActiveShiftLocation,
   ApprovalStatus,
   AvailableCrane,
   CraneProfile,
   EndShiftPayload,
   LicenseStatus,
+  LocationPing,
   MeStatusMembership,
   MeStatusResponse,
   OperatorHireStatus,
   Shift,
+  ShiftPath,
+  ShiftSiteRef,
   ShiftStatus,
   ShiftWithRelations,
   StartShiftPayload,
 } from '@jumix/shared'
 
 export type {
+  ActiveShiftLocation,
   ApprovalStatus,
   AvailableCrane,
   CraneProfile,
   EndShiftPayload,
   LicenseStatus,
+  LocationPing,
   MeStatusMembership,
   MeStatusResponse,
   OperatorHireStatus,
   Shift,
+  ShiftPath,
+  ShiftSiteRef,
   ShiftStatus,
   ShiftWithRelations,
   StartShiftPayload,

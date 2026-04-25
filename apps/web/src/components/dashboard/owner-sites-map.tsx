@@ -2,12 +2,14 @@
 
 import { BaseMap } from '@/components/map/base-map'
 import { CranesLayer } from '@/components/map/cranes-layer'
+import { LiveCranesLayer } from '@/components/map/live-cranes-layer'
 import { DEFAULT_CENTER } from '@/components/map/map-style'
 import { SitesLayer } from '@/components/map/sites-layer'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { Crane, Site } from '@/lib/api/types'
+import type { ActiveShiftLocation, Crane, Site } from '@/lib/api/types'
 import { useCranes } from '@/lib/hooks/use-cranes'
+import { useLatestLocations, useOwnerShifts } from '@/lib/hooks/use-shifts'
 import { useSites } from '@/lib/hooks/use-sites'
 import { ArrowRight, MapPin } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
@@ -16,19 +18,32 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
 /**
- * Left dashboard pane для owner'а — карта активных объектов организации +
- * назначенные на них approved-краны (layer поверх). Клик по site → `/sites?open=<id>`;
- * клик по cranes-маркеру → `/my-cranes?open=<id>`. Центрируется на первом
- * site'е если есть, иначе дефолт (Астана).
+ * Left dashboard pane для owner'а — карта активных объектов + live-позиции
+ * кранов на активных сменах (M5-c) поверх static-cranes фоллбэка.
+ *
+ * Merge-логика: для кранов, у которых сейчас идёт смена, показываем live
+ * marker по GPS-координатам (LiveCranesLayer). Для approved+active кранов
+ * без активной смены — старый static-маркер на site (CranesLayer). Так мы
+ * избегаем двойных маркеров и сохраняем visibility для парка вне смен.
+ *
+ * Click → site (sites page), crane (my-cranes), live-crane → shift drawer.
  */
 export function OwnerSitesMap() {
   const router = useRouter()
   const sitesQuery = useSites({ status: 'active', limit: 50 })
   const cranesQuery = useCranes({ approvalStatus: 'approved', status: 'active', limit: 100 })
+  const liveQuery = useLatestLocations({})
   const [map, setMap] = useState<MapLibreMap | null>(null)
 
   const sites = sitesQuery.data?.items ?? []
   const cranes = cranesQuery.data?.items ?? []
+  const liveLocations = liveQuery.data?.items ?? []
+
+  // Exclude cranes that have a live shift — их показывает LiveCranesLayer.
+  const staticCranes = useMemo(() => {
+    const liveCraneIds = new Set(liveLocations.map((l) => l.craneId))
+    return cranes.filter((c) => !liveCraneIds.has(c.id))
+  }, [cranes, liveLocations])
 
   const initialCenter = useMemo<[number, number]>(() => {
     const first = sites[0]
@@ -39,9 +54,11 @@ export function OwnerSitesMap() {
   const handleSiteClick = (site: Site) => {
     router.push(`/sites?open=${site.id}`)
   }
-
   const handleCraneClick = (crane: Crane) => {
     router.push(`/my-cranes?open=${crane.id}`)
+  }
+  const handleLiveClick = (loc: ActiveShiftLocation) => {
+    router.push(`/sites?shift=${loc.shiftId}`)
   }
 
   return (
@@ -86,10 +103,65 @@ export function OwnerSitesMap() {
           <>
             <BaseMap initialCenter={initialCenter} onReady={setMap} className="absolute inset-0" />
             <SitesLayer map={map} sites={sites} onSiteClick={handleSiteClick} />
-            <CranesLayer map={map} sites={sites} cranes={cranes} onCraneClick={handleCraneClick} />
+            <CranesLayer
+              map={map}
+              sites={sites}
+              cranes={staticCranes}
+              onCraneClick={handleCraneClick}
+            />
+            <LiveCranesLayer
+              map={map}
+              locations={liveLocations}
+              onLocationClick={handleLiveClick}
+            />
           </>
         )}
+
+        <MapLegend liveCount={liveLocations.length} staticCount={staticCranes.length} />
       </div>
     </Card>
+  )
+}
+
+/**
+ * Небольшая legend в правом-нижнем углу — показывает что означают tone'ы.
+ * Только когда на карте есть live markers (иначе просто визуальный шум).
+ */
+function MapLegend({ liveCount, staticCount }: { liveCount: number; staticCount: number }) {
+  if (liveCount === 0) {
+    // Используем useOwnerShifts только чтобы понять, есть ли вообще active
+    // смены — иначе скрываем legend полностью чтобы не шуметь.
+    return <ActiveShiftsHint staticCount={staticCount} />
+  }
+  return (
+    <div className="absolute bottom-2 right-2 flex flex-col gap-1 rounded-md border border-border-subtle bg-layer-2/95 backdrop-blur px-2 py-1.5 text-[10px] text-text-secondary shadow-lg">
+      <div className="flex items-center gap-1.5">
+        <span className="inline-block size-2 rounded-full bg-success" aria-hidden />
+        <span>На объекте</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="inline-block size-2 rounded-full bg-danger" aria-hidden />
+        <span>Вне геозоны</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <span className="inline-block size-2 rounded-full bg-warning" aria-hidden />
+        <span>GPS утерян &gt; 10 мин</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Если live-смен нет но есть static cranes — простой hint в corner'е про то,
+ * что GPS активируется когда начнётся смена.
+ */
+function ActiveShiftsHint({ staticCount }: { staticCount: number }) {
+  const shiftsQuery = useOwnerShifts({ status: 'live', limit: 1 })
+  const hasActive = (shiftsQuery.data?.items.length ?? 0) > 0
+  if (hasActive || staticCount === 0) return null
+  return (
+    <div className="absolute bottom-2 right-2 rounded-md border border-border-subtle bg-layer-2/95 backdrop-blur px-2 py-1.5 text-[10px] text-text-tertiary shadow-lg">
+      Нет активных смен сейчас
+    </div>
   )
 }

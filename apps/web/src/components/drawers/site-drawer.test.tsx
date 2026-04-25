@@ -37,6 +37,19 @@ vi.mock('@/hooks/use-auth', () => ({
   }),
 }))
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/sites',
+}))
+
 import * as shiftsApi from '@/lib/api/shifts'
 import * as sitesApi from '@/lib/api/sites'
 import { SiteDrawer } from './site-drawer'

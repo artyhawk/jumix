@@ -18,8 +18,17 @@ import type { Site, SiteStatus } from '@/lib/api/types'
 import { formatRelativeTime } from '@/lib/format/time'
 import { useOwnerShifts } from '@/lib/hooks/use-shifts'
 import { useActivateSite, useArchiveSite, useCompleteSite, useSite } from '@/lib/hooks/use-sites'
-import { Archive, CheckCheck, Clock, MapPin, RotateCcw, ShieldAlert } from 'lucide-react'
-import { useState } from 'react'
+import {
+  Archive,
+  CheckCheck,
+  ChevronRight,
+  Clock,
+  MapPin,
+  RotateCcw,
+  ShieldAlert,
+} from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 
 interface Props {
@@ -224,6 +233,17 @@ function SiteDrawerBody({ site }: { site: Site }) {
 function SiteActiveShifts({ siteId }: { siteId: string }) {
   const { data, isPending, isError } = useOwnerShifts({ siteId, status: 'live', limit: 20 })
   const items = data?.items ?? []
+  const router = useRouter()
+  const params = useSearchParams()
+
+  const openShift = useCallback(
+    (shiftId: string) => {
+      const next = new URLSearchParams(params.toString())
+      next.set('shift', shiftId)
+      router.replace(`?${next.toString()}`, { scroll: false })
+    },
+    [params, router],
+  )
 
   return (
     <section className="flex flex-col gap-3">
@@ -240,26 +260,37 @@ function SiteActiveShifts({ siteId }: { siteId: string }) {
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((shift) => (
-            <li
-              key={shift.id}
-              className="flex flex-col gap-1 rounded-md border border-layer-3 bg-layer-2 p-3 text-sm"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="font-medium text-text-primary">
-                  {shift.operator.lastName} {shift.operator.firstName}
+            <li key={shift.id}>
+              <button
+                type="button"
+                onClick={() => openShift(shift.id)}
+                className="flex w-full flex-col gap-1 rounded-md border border-layer-3 bg-layer-2 p-3 text-left text-sm hover:border-brand-500/40 hover:bg-layer-3 transition-colors"
+                aria-label={`Открыть смену ${shift.operator.lastName} ${shift.operator.firstName}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-medium text-text-primary">
+                    {shift.operator.lastName} {shift.operator.firstName}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Badge variant={shift.status === 'paused' ? 'pending' : 'active'}>
+                      {shift.status === 'paused' ? 'Перерыв' : 'На смене'}
+                    </Badge>
+                    <ChevronRight
+                      className="size-3.5 text-text-tertiary"
+                      strokeWidth={1.5}
+                      aria-hidden
+                    />
+                  </div>
                 </div>
-                <Badge variant={shift.status === 'paused' ? 'pending' : 'active'}>
-                  {shift.status === 'paused' ? 'Перерыв' : 'На смене'}
-                </Badge>
-              </div>
-              <div className="text-text-tertiary">
-                {shift.crane.model}
-                {shift.crane.inventoryNumber ? ` · ${shift.crane.inventoryNumber}` : ''}
-              </div>
-              <div className="flex items-center gap-1 text-xs text-text-tertiary">
-                <Clock className="size-3" strokeWidth={1.5} aria-hidden />
-                <span>Начало: {formatRelativeTime(shift.startedAt)}</span>
-              </div>
+                <div className="text-text-tertiary">
+                  {shift.crane.model}
+                  {shift.crane.inventoryNumber ? ` · ${shift.crane.inventoryNumber}` : ''}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-text-tertiary">
+                  <Clock className="size-3" strokeWidth={1.5} aria-hidden />
+                  <span>Начало: {formatRelativeTime(shift.startedAt)}</span>
+                </div>
+              </button>
             </li>
           ))}
         </ul>

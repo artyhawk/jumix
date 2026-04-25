@@ -1,8 +1,10 @@
 import { apiFetch } from './client'
 import type {
+  ActiveShiftLocation,
   AvailableCrane,
   EndShiftPayload,
   Paginated,
+  ShiftPath,
   ShiftStatus,
   ShiftWithRelations,
   StartShiftPayload,
@@ -84,4 +86,35 @@ export function endShift(id: string, payload: EndShiftPayload = {}) {
     method: 'POST',
     body: payload,
   })
+}
+
+export interface ListLatestLocationsQuery {
+  siteId?: string
+}
+
+/**
+ * GET /api/v1/shifts/owner/locations-latest — last-known ping per active
+ * (включая paused) shift в scope'е вызывающего (owner: своя org, superadmin:
+ * все). Поле `minutesSinceLastPing` — computed server-side, используется
+ * web-клиентом для stale-indicator при > 10 минут.
+ */
+export function listLatestLocations(query: ListLatestLocationsQuery = {}) {
+  const params = new URLSearchParams()
+  if (query.siteId) params.set('siteId', query.siteId)
+  const qs = params.toString()
+  return apiFetch<{ items: ActiveShiftLocation[] }>(
+    `/api/v1/shifts/owner/locations-latest${qs ? `?${qs}` : ''}`,
+    { method: 'GET' },
+  )
+}
+
+/**
+ * GET /api/v1/shifts/:id/path — полилиния смены. `sampleRate=N` downsample'ит
+ * для длинных историй (каждый N-ый ping); default 1 = все пинги, max 20.
+ */
+export function getShiftPath(id: string, sampleRate = 1) {
+  const params = new URLSearchParams()
+  if (sampleRate !== 1) params.set('sampleRate', String(sampleRate))
+  const qs = params.toString()
+  return apiFetch<ShiftPath>(`/api/v1/shifts/${id}/path${qs ? `?${qs}` : ''}`, { method: 'GET' })
 }

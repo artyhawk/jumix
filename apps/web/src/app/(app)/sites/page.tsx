@@ -1,5 +1,6 @@
 'use client'
 
+import { ShiftDrawer } from '@/components/drawers/shift-drawer'
 import { SiteDrawer } from '@/components/drawers/site-drawer'
 import { PageHeader } from '@/components/layout/page-header'
 import { PageTransition } from '@/components/motion/page-transition'
@@ -47,6 +48,7 @@ export default function SitesPage() {
   const search = params.get('search') ?? ''
   const status = isSiteStatus(params.get('status')) ? (params.get('status') as SiteStatus) : null
   const openId = params.get('open')
+  const shiftId = params.get('shift')
   const createOpen = params.get('create') === 'true'
 
   useEffect(() => {
@@ -219,6 +221,12 @@ export default function SitesPage() {
         id={openId}
         onOpenChange={(next) => {
           if (!next) setParam('open', null)
+        }}
+      />
+      <ShiftDrawer
+        id={shiftId}
+        onOpenChange={(next) => {
+          if (!next) setParam('shift', null)
         }}
       />
       {canCreate ? (

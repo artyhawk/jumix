@@ -1,7 +1,14 @@
 'use client'
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
-import { type ListOwnerShiftsQuery, getShift, listOwnerShifts } from '../api/shifts'
+import {
+  type ListLatestLocationsQuery,
+  type ListOwnerShiftsQuery,
+  getShift,
+  getShiftPath,
+  listLatestLocations,
+  listOwnerShifts,
+} from '../api/shifts'
 import { qk } from '../query-keys'
 
 /**
@@ -42,5 +49,35 @@ export function useShiftDetail(id: string | undefined) {
       return getShift(id)
     },
     enabled: Boolean(id),
+  })
+}
+
+/**
+ * Latest-ping per active shift — источник данных owner map (M5-c).
+ * Polling 30s — real-time ощущение без WebSocket'а. Owner/superadmin only.
+ */
+export function useLatestLocations(query: ListLatestLocationsQuery = {}) {
+  return useQuery({
+    queryKey: qk.shiftsLatestLocations(query),
+    queryFn: () => listLatestLocations(query),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  })
+}
+
+/**
+ * Shift path (polyline). Путь immutable после `end`, но во время active
+ * может расти — staleTime 5 мин достаточно (owner обычно открывает drawer
+ * уже после факта, и частое обновление не нужно).
+ */
+export function useShiftPath(id: string | undefined, sampleRate = 1) {
+  return useQuery({
+    queryKey: id ? qk.shiftPath(id, sampleRate) : ['shifts', 'path', 'disabled'],
+    queryFn: () => {
+      if (!id) throw new Error('shift id is undefined')
+      return getShiftPath(id, sampleRate)
+    },
+    enabled: Boolean(id),
+    staleTime: 5 * 60_000,
   })
 }

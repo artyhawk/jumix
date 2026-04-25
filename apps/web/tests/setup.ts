@@ -38,3 +38,13 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     disconnect() {}
   } as unknown as typeof ResizeObserver
 }
+
+// URL.createObjectURL — jsdom не реализует, но maplibre-gl вызывает его
+// на module-load для Worker'а. Мы всё равно мокаем карту в тестах, но
+// сам import пакета должен пройти без throw.
+if (typeof globalThis.URL !== 'undefined' && !globalThis.URL.createObjectURL) {
+  globalThis.URL.createObjectURL = () => 'blob:mock'
+}
+if (typeof globalThis.URL !== 'undefined' && !globalThis.URL.revokeObjectURL) {
+  globalThis.URL.revokeObjectURL = () => {}
+}
