@@ -3,6 +3,7 @@ import {
   type DatabaseClient,
   craneProfiles,
   cranes,
+  incidents,
   organizationOperators,
   organizations,
   shifts,
@@ -63,6 +64,10 @@ export type OwnerDashboardStats = {
   pending: {
     cranes: number
     hires: number
+    /** open (submitted/acknowledged/escalated) incidents — для card на dashboard. */
+    incidents: number
+    /** есть ли среди open incidents хотя бы один с severity='critical' — driver для danger-highlight на card. */
+    criticalIncidents: number
   }
 }
 
@@ -172,52 +177,76 @@ export class DashboardService {
     const orgId = ctx.organizationId
     const db = this.database.db
 
-    const [activeSites, operatingCranes, activeMemberships, pendingCranes, pendingHires] =
-      await Promise.all([
-        db
-          .select({ value: count() })
-          .from(sites)
-          .where(and(eq(sites.organizationId, orgId), eq(sites.status, 'active'))),
-        // M4 semantic: «кранов в работе» — distinct crane_id с active|paused
-        // shift. Было: approved+active fleet size.
-        db
-          .select({ value: countDistinct(shifts.craneId) })
-          .from(shifts)
-          .where(
-            and(eq(shifts.organizationId, orgId), inArray(shifts.status, ['active', 'paused'])),
+    const [
+      activeSites,
+      operatingCranes,
+      activeMemberships,
+      pendingCranes,
+      pendingHires,
+      openIncidents,
+      criticalIncidents,
+    ] = await Promise.all([
+      db
+        .select({ value: count() })
+        .from(sites)
+        .where(and(eq(sites.organizationId, orgId), eq(sites.status, 'active'))),
+      // M4 semantic: «кранов в работе» — distinct crane_id с active|paused
+      // shift. Было: approved+active fleet size.
+      db
+        .select({ value: countDistinct(shifts.craneId) })
+        .from(shifts)
+        .where(and(eq(shifts.organizationId, orgId), inArray(shifts.status, ['active', 'paused']))),
+      db
+        .select({ value: count() })
+        .from(organizationOperators)
+        .where(
+          and(
+            eq(organizationOperators.organizationId, orgId),
+            eq(organizationOperators.approvalStatus, 'approved'),
+            eq(organizationOperators.status, 'active'),
+            isNull(organizationOperators.deletedAt),
           ),
-        db
-          .select({ value: count() })
-          .from(organizationOperators)
-          .where(
-            and(
-              eq(organizationOperators.organizationId, orgId),
-              eq(organizationOperators.approvalStatus, 'approved'),
-              eq(organizationOperators.status, 'active'),
-              isNull(organizationOperators.deletedAt),
-            ),
+        ),
+      db
+        .select({ value: count() })
+        .from(cranes)
+        .where(
+          and(
+            eq(cranes.organizationId, orgId),
+            eq(cranes.approvalStatus, 'pending'),
+            isNull(cranes.deletedAt),
           ),
-        db
-          .select({ value: count() })
-          .from(cranes)
-          .where(
-            and(
-              eq(cranes.organizationId, orgId),
-              eq(cranes.approvalStatus, 'pending'),
-              isNull(cranes.deletedAt),
-            ),
+        ),
+      db
+        .select({ value: count() })
+        .from(organizationOperators)
+        .where(
+          and(
+            eq(organizationOperators.organizationId, orgId),
+            eq(organizationOperators.approvalStatus, 'pending'),
+            isNull(organizationOperators.deletedAt),
           ),
-        db
-          .select({ value: count() })
-          .from(organizationOperators)
-          .where(
-            and(
-              eq(organizationOperators.organizationId, orgId),
-              eq(organizationOperators.approvalStatus, 'pending'),
-              isNull(organizationOperators.deletedAt),
-            ),
+        ),
+      db
+        .select({ value: count() })
+        .from(incidents)
+        .where(
+          and(
+            eq(incidents.organizationId, orgId),
+            inArray(incidents.status, ['submitted', 'acknowledged', 'escalated']),
           ),
-      ])
+        ),
+      db
+        .select({ value: count() })
+        .from(incidents)
+        .where(
+          and(
+            eq(incidents.organizationId, orgId),
+            inArray(incidents.status, ['submitted', 'acknowledged', 'escalated']),
+            eq(incidents.severity, 'critical'),
+          ),
+        ),
+    ])
 
     return {
       active: {
@@ -228,6 +257,8 @@ export class DashboardService {
       pending: {
         cranes: firstCount(pendingCranes),
         hires: firstCount(pendingHires),
+        incidents: firstCount(openIncidents),
+        criticalIncidents: firstCount(criticalIncidents),
       },
     }
   }

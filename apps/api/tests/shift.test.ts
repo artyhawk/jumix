@@ -1,8 +1,23 @@
 import { auditLog, craneProfiles, organizationOperators, shifts } from '@jumix/db'
+import { CHECKLIST_ITEMS, type ChecklistItemKey } from '@jumix/shared'
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { type TestAppHandle, buildTestApp } from './helpers/build-test-app'
 import { createOrganization, createUser, signTokenFor } from './helpers/fixtures'
+
+/**
+ * Default valid checklist для tower crane (включает harness — required).
+ * Mobile/crawler/overhead tests могут опускать harness, helper строит
+ * complete set всё равно (harness check не required для не-tower).
+ */
+function makeChecklist(opts: { skip?: ChecklistItemKey[] } = {}) {
+  const skip = new Set(opts.skip ?? [])
+  const items: Record<string, { checked: boolean; photoKey: null; notes: null }> = {}
+  for (const key of CHECKLIST_ITEMS) {
+    items[key] = { checked: !skip.has(key), photoKey: null, notes: null }
+  }
+  return { items }
+}
 
 /**
  * Integration-тесты shifts-модуля (M4, ADR 0006).
@@ -240,7 +255,7 @@ describe('POST /api/v1/shifts/start — happy path', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     expect(res.statusCode).toBe(201)
     const body = res.json()
@@ -277,7 +292,7 @@ describe('POST /api/v1/shifts/start — canWork gate', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     expect(res.statusCode).toBe(422)
     expect(res.json().error.code).toBe('CANNOT_START_SHIFT')
@@ -295,7 +310,7 @@ describe('POST /api/v1/shifts/start — canWork gate', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     expect(res.statusCode).toBe(422)
   })
@@ -312,7 +327,7 @@ describe('POST /api/v1/shifts/start — canWork gate', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     expect(res.statusCode).toBe(422)
   })
@@ -329,7 +344,7 @@ describe('POST /api/v1/shifts/start — canWork gate', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     expect(res.statusCode).toBe(422)
     expect(res.json().error.code).toBe('CANNOT_START_SHIFT')
@@ -350,7 +365,7 @@ describe('POST /api/v1/shifts/start — canWork gate', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     expect(res.statusCode).toBe(422)
   })
@@ -365,7 +380,7 @@ describe('POST /api/v1/shifts/start — crane eligibility', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: craneB.id },
+      payload: { craneId: craneB.id, checklist: makeChecklist() },
     })
     expect(res.statusCode).toBe(404)
     expect(res.json().error.code).toBe('CRANE_NOT_FOUND')
@@ -378,7 +393,7 @@ describe('POST /api/v1/shifts/start — crane eligibility', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     expect(res.statusCode).toBe(404)
   })
@@ -398,7 +413,7 @@ describe('POST /api/v1/shifts/start — crane eligibility', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: pendingCraneId },
+      payload: { craneId: pendingCraneId, checklist: makeChecklist() },
     })
     expect(res.statusCode).toBe(404)
   })
@@ -413,7 +428,7 @@ describe('POST /api/v1/shifts/start — crane eligibility', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op1.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     expect(r1.statusCode).toBe(201)
     // op2 пытается тот же кран
@@ -421,7 +436,7 @@ describe('POST /api/v1/shifts/start — crane eligibility', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op2.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     expect(r2.statusCode).toBe(409)
     expect(r2.json().error.code).toBe('CRANE_ALREADY_IN_SHIFT')
@@ -440,7 +455,7 @@ describe('POST /api/v1/shifts/start — duplicate guard', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane1.id },
+      payload: { craneId: crane1.id, checklist: makeChecklist() },
     })
     expect(r1.statusCode).toBe(201)
 
@@ -448,7 +463,7 @@ describe('POST /api/v1/shifts/start — duplicate guard', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane2.id },
+      payload: { craneId: crane2.id, checklist: makeChecklist() },
     })
     expect(r2.statusCode).toBe(409)
     expect(r2.json().error.code).toBe('SHIFT_ALREADY_ACTIVE')
@@ -461,7 +476,7 @@ describe('Shift state machine: pause / resume / end', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId },
+      payload: { craneId, checklist: makeChecklist() },
     })
     if (res.statusCode !== 201) throw new Error(`start failed ${res.statusCode} ${res.body}`)
     return res.json().id
@@ -627,7 +642,7 @@ describe('Shift authz & scoping', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId },
+      payload: { craneId, checklist: makeChecklist() },
     })
     if (res.statusCode !== 201) throw new Error(`start ${res.statusCode} ${res.body}`)
     return res.json().id
@@ -726,7 +741,7 @@ describe('GET /api/v1/shifts/my/active', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     const res = await handle.app.inject({
       method: 'GET',
@@ -799,7 +814,7 @@ describe('GET /api/v1/shifts/available-cranes', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op1.token}` },
-      payload: { craneId: crane.id },
+      payload: { craneId: crane.id, checklist: makeChecklist() },
     })
     const res = await handle.app.inject({
       method: 'GET',
@@ -829,7 +844,7 @@ describe('GET /api/v1/shifts/owner — list for org', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${opA.token}` },
-      payload: { craneId: craneA.id },
+      payload: { craneId: craneA.id, checklist: makeChecklist() },
     })
 
     const siteB = await createSite(ownerBToken, 'Site-ListB')
@@ -839,7 +854,7 @@ describe('GET /api/v1/shifts/owner — list for org', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${opB.token}` },
-      payload: { craneId: craneB.id },
+      payload: { craneId: craneB.id, checklist: makeChecklist() },
     })
 
     const resA = await handle.app.inject({
@@ -873,13 +888,13 @@ describe('GET /api/v1/shifts/owner — list for org', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${opX.token}` },
-      payload: { craneId: craneX.id },
+      payload: { craneId: craneX.id, checklist: makeChecklist() },
     })
     await handle.app.inject({
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${opY.token}` },
-      payload: { craneId: craneY.id },
+      payload: { craneId: craneY.id, checklist: makeChecklist() },
     })
 
     const res = await handle.app.inject({
@@ -914,7 +929,7 @@ describe('GET /api/v1/shifts/my — history', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane1.id },
+      payload: { craneId: crane1.id, checklist: makeChecklist() },
     })
     await handle.app.inject({
       method: 'POST',
@@ -925,7 +940,7 @@ describe('GET /api/v1/shifts/my — history', () => {
       method: 'POST',
       url: '/api/v1/shifts/start',
       headers: { authorization: `Bearer ${op.token}` },
-      payload: { craneId: crane2.id },
+      payload: { craneId: crane2.id, checklist: makeChecklist() },
     })
     await handle.app.inject({
       method: 'POST',

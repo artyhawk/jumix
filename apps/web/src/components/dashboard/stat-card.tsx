@@ -18,6 +18,7 @@ export function StatCard({
   value,
   href,
   accent,
+  highlight,
   loading,
 }: {
   icon: LucideIcon
@@ -25,22 +26,37 @@ export function StatCard({
   value: number
   href?: string
   accent?: 'brand' | 'subtle'
+  /**
+   * Semantic highlight для критичных счётчиков (M6 incidents с
+   * severity='critical' → danger). Border + icon tone; value остаётся
+   * primary text для читаемости.
+   */
+  highlight?: 'danger' | null
   loading?: boolean
 }) {
   const body = (
     <Card
       variant={href ? 'interactive' : 'default'}
-      className={cn('h-full flex flex-col gap-3', accent === 'brand' && 'border-brand-500/40')}
+      className={cn(
+        'h-full flex flex-col gap-3',
+        accent === 'brand' && 'border-brand-500/40',
+        highlight === 'danger' && 'border-danger/40 bg-danger/5',
+      )}
     >
       <div className="flex items-center gap-2">
         <span
           className={cn(
             'inline-flex items-center justify-center size-9 rounded-md border border-border-subtle bg-layer-3',
             accent === 'brand' && 'border-brand-500/30 bg-brand-500/10',
+            highlight === 'danger' && 'border-danger/30 bg-danger/10',
           )}
         >
           <Icon
-            className={cn('size-5 text-text-secondary', accent === 'brand' && 'text-brand-500')}
+            className={cn(
+              'size-5 text-text-secondary',
+              accent === 'brand' && 'text-brand-500',
+              highlight === 'danger' && 'text-danger',
+            )}
             strokeWidth={1.5}
             aria-hidden
           />

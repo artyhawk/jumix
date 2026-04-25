@@ -1,6 +1,7 @@
 import type { UserRole } from '@/lib/api/types'
 import { IconCrane } from '@tabler/icons-react'
 import {
+  AlertTriangle,
   Building2,
   HardHat,
   IdCard,
@@ -151,6 +152,15 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
     group: 'navigation',
     roles: ['owner'],
     href: '/my-operators',
+  },
+  {
+    id: 'nav.incidents',
+    label: 'Происшествия',
+    keywords: ['incidents', 'incident', 'sluchaevy', 'инциденты', 'неисправности', 'безопасность'],
+    icon: AlertTriangle,
+    group: 'navigation',
+    roles: ['owner', 'superadmin'],
+    href: '/incidents',
   },
 
   // ---- Actions — superadmin ----

@@ -395,6 +395,8 @@ describe('GET /api/v1/dashboard/owner-stats — authorization', () => {
       pending: {
         cranes: expect.any(Number),
         hires: expect.any(Number),
+        incidents: expect.any(Number),
+        criticalIncidents: expect.any(Number),
       },
     })
   })

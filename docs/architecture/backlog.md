@@ -867,3 +867,46 @@ Tab bar сейчас emoji (👤🪪🏗️). Real SVG icons — `lucide-react-n
 6. **Image thumbnails** для аватаров (3 размера через worker).
 7. **Server-side encryption (SSE-C / SSE-KMS)** — требует key management.
 8. **Strict content-length enforcement** для simple PUT через `presignedPostPolicy` — актуально при появлении DoS-сценариев с большими uploads.
+
+---
+
+## Safety compliance (from M6-a)
+
+### Per-org custom checklist templates
+Сейчас items hardcoded в `@jumix/shared/api/checklist`. Backlog: `org_checklist_templates` table с per-org item set + override-points в shift.start. Trigger: первый заказчик с особыми требованиями (ночные смены, особые материалы).
+
+### Owner re-classify severity endpoint
+Operator self-assigns severity при submit. Backlog: `PATCH /incidents/:id/severity` (owner-only, audit `incident.severity_change`). Сейчас owner может escalate как indirect signal — но это разные семантики.
+
+### Incident assignment workflow
+Сейчас incidents видны всем owner'ам org. Backlog: `assigned_to_user_id` колонка + endpoint `POST /:id/assign` (owner). Email/push на assigned. Useful когда в org > 5 owner'ов.
+
+### Incident comments thread
+Многошаговое resolution (owner ⇄ operator clarification). Backlog: `incident_comments` table + UI thread в drawer.
+
+### Photo annotation
+Operator может draw arrow/circle на photo чтобы выделить проблему. Mobile-side react-native-skia или canvas overlay. Post-MVP UX polish.
+
+### Voice notes на incidents
+Mobile recording → AssemblyAI/Whisper transcription → автозаполнение description. Полезно когда оператор в перчатках, не может typing.
+
+### Multi-language checklist items
+Сейчас RU only. Backlog: KZ/EN labels (storage в shared с lang-key map). Trigger: expansion за пределы РК или KZ-only клиенты.
+
+### Incident export
+CSV/PDF download от owner queue + filters для regulatory reporting (МЧС РК, Госгортехнадзор). Backlog: `GET /incidents/export?format=csv|pdf&from=...&to=...`.
+
+### Recurring incident detection
+Аналитика: «у крана INV-005 за месяц 4 incidents типа crane_malfunction — отозвать на ТО?». Backlog: aggregation pipeline + dashboard widget.
+
+### Periodic safety reminders push
+M7 push: за 5 минут до start-shift mobile shows reminder «Не забудьте проверить СИЗ». Опциональный per-org config.
+
+### Incident-shift linkage analytics
+Frequency by crane / by site / by operator. Backlog dashboard widget когда наберётся >100 incidents/мес. для нормальной статистики.
+
+### Pending photo storage cleanup
+`pending/{userId}/{uuid}/...` keys для never-claimed uploads (operator передумал submit, закрыл app). Backlog cron job: TTL 24h, batch delete не-claim'нутых через day. MVP не критично — storage cap с запасом, < 100 dangling/мес. ожидается.
+
+### Mobile safety flow (M6-b — следующий коммит)
+Nested `(tabs)/shifts/start/{crane,checklist}` route + `(tabs)/shifts/incidents/{index,new,[id]}`. ChecklistScreen с long-press photo+notes per item; CreateIncidentForm с up to 5 photos через three-phase upload + GPS auto-attach. Active shift screen — CTA «Сообщить о происшествии».

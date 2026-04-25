@@ -10,7 +10,7 @@ import { formatRuLongDate } from '@/lib/format/date'
 import { pluralRu } from '@/lib/format/plural'
 import { useOwnerDashboardStats } from '@/lib/hooks/use-dashboard'
 import { IconCrane } from '@tabler/icons-react'
-import { type IdCard, MapPin, UsersRound, Wallet } from 'lucide-react'
+import { AlertTriangle, MapPin, UsersRound } from 'lucide-react'
 import { useMemo } from 'react'
 
 const SITES_FORMS = ['объект', 'объекта', 'объектов'] as const
@@ -30,6 +30,8 @@ export function OwnerDashboard() {
   const activeSitesCount = stats.data?.active.sites ?? 0
   const activeCranesCount = stats.data?.active.cranes ?? 0
   const activeOperatorsCount = stats.data?.active.memberships ?? 0
+  const pendingIncidentsCount = stats.data?.pending.incidents ?? 0
+  const hasCriticalIncidents = (stats.data?.pending.criticalIncidents ?? 0) > 0
   const sitesLabel = `${activeSitesCount} ${pluralRu(activeSitesCount, SITES_FORMS)} активно`
 
   return (
@@ -72,7 +74,14 @@ export function OwnerDashboard() {
           />
         </StaggerItem>
         <StaggerItem>
-          <StatCardPlaceholder icon={Wallet} label="Расходы за месяц" />
+          <StatCard
+            icon={AlertTriangle}
+            label="Происшествия"
+            value={pendingIncidentsCount}
+            loading={stats.isLoading}
+            href="/incidents"
+            highlight={hasCriticalIncidents ? 'danger' : null}
+          />
         </StaggerItem>
       </StaggerList>
 
@@ -81,32 +90,5 @@ export function OwnerDashboard() {
         <RecentSitesList />
       </div>
     </PageTransition>
-  )
-}
-
-/**
- * Dashed-card для метрик, которые будут доступны в следующих фазах. Тот же
- * layout что StatCard, но value заменён на `—` + подпись "Скоро".
- */
-function StatCardPlaceholder({
-  icon: Icon,
-  label,
-}: {
-  icon: typeof IdCard
-  label: string
-}) {
-  return (
-    <div className="h-full rounded-[12px] border border-dashed border-border-subtle bg-layer-2/50 p-4 md:p-5 flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center justify-center size-9 rounded-md border border-border-subtle bg-layer-3">
-          <Icon className="size-5 text-text-tertiary" strokeWidth={1.5} aria-hidden />
-        </span>
-        <span className="text-sm font-medium text-text-tertiary">{label}</span>
-      </div>
-      <div className="mt-auto flex items-baseline gap-2">
-        <span className="text-[32px] leading-[40px] font-semibold text-text-tertiary">—</span>
-        <span className="text-xs text-text-tertiary">Скоро</span>
-      </div>
-    </div>
   )
 }

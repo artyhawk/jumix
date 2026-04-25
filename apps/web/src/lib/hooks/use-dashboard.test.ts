@@ -22,7 +22,7 @@ const sampleStats: DashboardStats = {
 
 const sampleOwnerStats: OwnerDashboardStats = {
   active: { sites: 4, cranes: 7, memberships: 12 },
-  pending: { cranes: 2, hires: 1 },
+  pending: { cranes: 2, hires: 1, incidents: 0, criticalIncidents: 0 },
 }
 
 beforeEach(() => {

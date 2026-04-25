@@ -7,6 +7,12 @@
 
 export type ShiftStatus = 'active' | 'paused' | 'ended'
 
+/**
+ * Тип крана. Стабилен через shared чтобы checklist'и + другие модули могли
+ * impart conditional logic (ADR 0008 — harness required только для tower).
+ */
+export type CraneType = 'tower' | 'mobile' | 'crawler' | 'overhead'
+
 export interface Shift {
   id: string
   craneId: string
@@ -28,7 +34,7 @@ export interface ShiftCraneSummary {
   id: string
   model: string
   inventoryNumber: string | null
-  type: 'tower' | 'mobile' | 'crawler' | 'overhead'
+  type: CraneType
   capacityTon: number
 }
 
@@ -87,15 +93,22 @@ export interface AvailableCrane {
   id: string
   model: string
   inventoryNumber: string | null
-  type: 'tower' | 'mobile' | 'crawler' | 'overhead'
+  type: CraneType
   capacityTon: number
   site: ShiftSiteRef
   organization: ShiftOrganizationSummary
 }
 
+/**
+ * Pre-shift checklist (M6, ADR 0008) — обязательная проверка СИЗ перед
+ * каждой start. Items предопределены, conditional по crane.type.
+ * Атомарно создаётся вместе с shift'ом — если items некорректные, shift
+ * не создаётся (422 CHECKLIST_INCOMPLETE).
+ */
 export interface StartShiftPayload {
   craneId: string
   notes?: string
+  checklist: import('./checklist').ChecklistSubmission
 }
 
 export interface EndShiftPayload {

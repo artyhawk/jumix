@@ -51,6 +51,15 @@ export const qk = {
   me: ['me'] as const,
   meStatus: ['me', 'status'] as const,
 
+  incidents: ['incidents'] as const,
+  incidentsOwner: (query: import('./api/incidents').ListOwnerIncidentsQuery) =>
+    ['incidents', 'owner', query] as const,
+  incidentsOwnerInfinite: (
+    query: Omit<import('./api/incidents').ListOwnerIncidentsQuery, 'cursor'>,
+  ) => ['incidents', 'owner-infinite', query] as const,
+  incidentsMy: ['incidents', 'my'] as const,
+  incidentDetail: (id: string) => ['incidents', 'detail', id] as const,
+
   shifts: ['shifts'] as const,
   shiftsOwner: (query: ListOwnerShiftsQuery) => ['shifts', 'owner', query] as const,
   shiftsOwnerInfinite: (query: Omit<ListOwnerShiftsQuery, 'cursor'>) =>

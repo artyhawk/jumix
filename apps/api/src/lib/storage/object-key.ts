@@ -133,3 +133,34 @@ export function extractOrgIdFromKey(key: string): string | null {
   const match = /^orgs\/([0-9a-f-]{36})\//i.exec(key)
   return match ? (match[1] ?? null) : null
 }
+
+/**
+ * Pending photo upload prefix (M6, ADR 0008). Photos для incident'ов и
+ * checklist-items загружаются ДО создания parent-сущности (operator делает
+ * фото сразу, parent record создаётся при submit). Используем pending-area
+ * scoped по userId — service на confirm проверяет prefix-match (чужой
+ * pending-key не примет).
+ *
+ *   pending/{userId}/{uuid}/{filename}
+ *
+ * Backlog: storage cleanup background-job для never-claimed pending uploads
+ * (TTL ~24h).
+ */
+export function buildPendingPhotoKey(params: {
+  userId: string
+  uniqueId: string
+  filename: string
+}): string {
+  assertUuid(params.userId, 'userId')
+  assertUuid(params.uniqueId, 'uniqueId')
+  return `pending/${params.userId}/${params.uniqueId}/${sanitizeFilename(params.filename)}`
+}
+
+/**
+ * Проверка что pending-key принадлежит конкретному user'у. Защищает от
+ * cross-user injection: pending/{otherUser}/... не пройдёт.
+ */
+export function isPendingKeyForUser(key: string, userId: string): boolean {
+  if (!UUID_RE.test(userId)) return false
+  return key.startsWith(`pending/${userId}/`)
+}

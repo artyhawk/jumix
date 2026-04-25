@@ -1,3 +1,4 @@
+import { CHECKLIST_ITEMS } from '@jumix/shared'
 import { z } from 'zod'
 
 /**
@@ -7,9 +8,30 @@ import { z } from 'zod'
 const notesSchema = z.string().trim().min(1).max(2000)
 const shiftStatusSchema = z.enum(['active', 'paused', 'ended'])
 
+/**
+ * Pre-shift checklist item (M6, ADR 0008). photoKey — pending-prefix
+ * scoped по reporter_user_id; backend validates ownership на confirm
+ * (атомарно с insert checklist row). notes — optional 200 chars.
+ */
+const checklistItemSchema = z.object({
+  checked: z.boolean(),
+  photoKey: z.string().max(500).nullable().default(null),
+  notes: z.string().trim().max(200).nullable().default(null),
+})
+
+const checklistItemsSchema = z
+  .record(z.enum(CHECKLIST_ITEMS), checklistItemSchema)
+  .refine((items) => Object.keys(items).length > 0, 'checklist items must not be empty')
+
+const checklistSubmissionSchema = z.object({
+  items: checklistItemsSchema,
+  generalNotes: z.string().trim().max(500).nullable().optional(),
+})
+
 export const startShiftSchema = z.object({
   craneId: z.string().uuid(),
   notes: notesSchema.optional(),
+  checklist: checklistSubmissionSchema,
 })
 export type StartShiftInput = z.infer<typeof startShiftSchema>
 

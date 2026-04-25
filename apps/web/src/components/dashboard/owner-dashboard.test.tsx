@@ -77,7 +77,7 @@ function makeSite(overrides: Partial<Site> = {}): Site {
 function makeStats(overrides: Partial<OwnerDashboardStats> = {}): OwnerDashboardStats {
   return {
     active: { sites: 0, cranes: 0, memberships: 0 },
-    pending: { cranes: 0, hires: 0 },
+    pending: { cranes: 0, hires: 0, incidents: 0, criticalIncidents: 0 },
     ...overrides,
   }
 }
@@ -147,13 +147,30 @@ describe('OwnerDashboard', () => {
     })
   })
 
-  it('renders a single placeholder card for upcoming finance metric', async () => {
+  it('renders Происшествия card linking to /incidents (M6)', async () => {
+    getOwnerStats.mockResolvedValue(
+      makeStats({ pending: { cranes: 0, hires: 0, incidents: 2, criticalIncidents: 0 } }),
+    )
     renderDash()
     await waitFor(() => {
-      expect(screen.getByText('Расходы за месяц')).toBeInTheDocument()
+      const card = screen.getByRole('link', { name: /Происшествия/ })
+      expect(card).toHaveAttribute('href', '/incidents')
     })
-    expect(screen.getAllByText('Скоро').length).toBe(1)
-    expect(screen.queryByText('Операторы на смене')).toBeNull()
+    // Wallet placeholder убран — нет "Скоро" подписи
+    expect(screen.queryByText('Скоро')).toBeNull()
+  })
+
+  it('Происшествия card highlights danger when criticalIncidents > 0', async () => {
+    getOwnerStats.mockResolvedValue(
+      makeStats({ pending: { cranes: 0, hires: 0, incidents: 7, criticalIncidents: 1 } }),
+    )
+    const { container } = renderDash()
+    // Дождаться когда query resolved (loading=false → counter показывает 7)
+    await waitFor(() => {
+      expect(screen.getByText('7')).toBeInTheDocument()
+    })
+    // Danger highlight applied
+    expect(container.outerHTML).toContain('border-danger')
   })
 
   it('renders OwnerSitesMap + RecentSitesList in 2-col grid', async () => {

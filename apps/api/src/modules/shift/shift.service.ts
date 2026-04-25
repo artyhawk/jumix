@@ -9,9 +9,11 @@ import {
   cranes,
   organizationOperators,
 } from '@jumix/db'
+import { type CraneType, findUncheckedRequiredItems } from '@jumix/shared'
 import { and, eq, isNull } from 'drizzle-orm'
 import type { FastifyBaseLogger } from 'fastify'
 import { AppError } from '../../lib/errors'
+import { isPendingKeyForUser } from '../../lib/storage/object-key'
 import type { CraneProfileService } from '../crane-profile/crane-profile.service'
 import { shiftPolicy } from './shift.policy'
 import {
@@ -197,6 +199,34 @@ export class ShiftService {
       throw craneNotFound()
     }
 
+    // Pre-shift checklist (M6, ADR 0008) — обязательная проверка СИЗ.
+    // Conditional требования по crane.type (tower → harness, остальные — без).
+    // Если есть unchecked required items → 422 CHECKLIST_INCOMPLETE.
+    const checklist = input.checklist
+    const missing = findUncheckedRequiredItems(eligibleCrane.crane.type as CraneType, {
+      items: checklist.items as Record<
+        string,
+        { checked: boolean; photoKey: string | null; notes: string | null }
+      >,
+    })
+    if (missing.length > 0) {
+      throw unprocessable('CHECKLIST_INCOMPLETE', 'Не все пункты проверки СИЗ отмечены', {
+        missing,
+      })
+    }
+
+    // Photo keys (если в checklist приложили) — должны принадлежать самому
+    // operator'у (cross-user injection prevention). Проверяем prefix-match.
+    for (const [key, item] of Object.entries(checklist.items)) {
+      if (item.photoKey && !isPendingKeyForUser(item.photoKey, ctx.userId)) {
+        throw new AppError({
+          statusCode: 400,
+          code: 'CHECKLIST_PHOTO_KEY_NOT_OWNED',
+          message: `Photo key for item ${key} does not belong to current user`,
+        })
+      }
+    }
+
     // Duplicate active shift — пользователь уже «на смене». Service-level +
     // DB partial UNIQUE страхует race (ловим 23505 ниже).
     const repo = this.repoFor(ctx)
@@ -230,6 +260,13 @@ export class ShiftService {
             siteId: eligibleCrane.crane.siteId,
             organizationId: eligibleCrane.crane.organizationId,
           },
+        },
+        {
+          items: checklist.items as Record<
+            string,
+            { checked: boolean; photoKey: string | null; notes: string | null }
+          >,
+          generalNotes: checklist.generalNotes ?? null,
         },
       )
 

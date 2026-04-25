@@ -194,11 +194,23 @@ async function createEmployedOperator(options: {
 }
 
 async function startShift(op: OperatorFixture, craneId: string): Promise<string> {
+  const items: Record<string, { checked: boolean; photoKey: null; notes: null }> = {}
+  for (const key of [
+    'helmet',
+    'vest',
+    'boots',
+    'gloves',
+    'harness',
+    'first_aid_kit',
+    'crane_integrity',
+  ]) {
+    items[key] = { checked: true, photoKey: null, notes: null }
+  }
   const res = await handle.app.inject({
     method: 'POST',
     url: '/api/v1/shifts/start',
     headers: { authorization: `Bearer ${op.token}` },
-    payload: { craneId },
+    payload: { craneId, checklist: { items } },
   })
   if (res.statusCode !== 201) throw new Error(`start: ${res.statusCode} ${res.body}`)
   return res.json().id

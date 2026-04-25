@@ -67,6 +67,22 @@ export {
   shiftLocationPings,
   type ShiftLocationPing,
   type NewShiftLocationPing,
+  preShiftChecklists,
+  type PreShiftChecklist,
+  type NewPreShiftChecklist,
+  type ChecklistItemRow,
+  incidents,
+  INCIDENT_TYPES,
+  INCIDENT_SEVERITIES,
+  INCIDENT_STATUSES,
+  type Incident,
+  type IncidentType,
+  type IncidentSeverity,
+  type IncidentStatus,
+  type NewIncident,
+  incidentPhotos,
+  type IncidentPhoto,
+  type NewIncidentPhoto,
 } from './schema/index'
 
 export { createDatabase, type DatabaseClient, type CreateDatabaseOptions } from './client'

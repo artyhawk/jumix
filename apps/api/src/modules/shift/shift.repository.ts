@@ -1,5 +1,6 @@
 import type { AuthContext, UserRole } from '@jumix/auth'
 import {
+  type ChecklistItemRow,
   type Crane,
   type CraneApprovalStatus,
   type CraneStatus,
@@ -15,6 +16,7 @@ import {
   cranes,
   organizationOperators,
   organizations,
+  preShiftChecklists,
   shiftLocationPings,
   shifts,
   sites,
@@ -121,6 +123,11 @@ export type ShiftCreateInput = {
   organizationId: string
   siteId: string
   notes: string | null
+}
+
+export type ChecklistInsert = {
+  items: Record<string, ChecklistItemRow>
+  generalNotes: string | null
 }
 
 export type ListMyParams = {
@@ -429,7 +436,20 @@ export class ShiftRepository {
     return rows.length
   }
 
-  async create(input: ShiftCreateInput, audit: AuditMeta): Promise<Shift> {
+  /**
+   * Atomic shift start (M6, ADR 0008): создаёт shift + pre_shift_checklist
+   * + audit `shift.start` + audit `checklist.submit` в одной транзакции.
+   * Если что-то падает — full rollback (no orphan shift, no orphan checklist).
+   *
+   * checklist=null допустим только в backward-compat тестах (postgres-js
+   * раннее B2d). Production code всегда передаёт checklist (валидация на
+   * service-слое).
+   */
+  async create(
+    input: ShiftCreateInput,
+    audit: AuditMeta,
+    checklist: ChecklistInsert,
+  ): Promise<Shift> {
     return this.database.db.transaction(async (tx) => {
       const inserted = await tx
         .insert(shifts)
@@ -447,6 +467,12 @@ export class ShiftRepository {
       const row = inserted[0]
       if (!row) throw new Error('shift insert returned no rows')
 
+      await tx.insert(preShiftChecklists).values({
+        shiftId: row.id,
+        items: checklist.items,
+        generalNotes: checklist.generalNotes,
+      })
+
       await tx.insert(auditLog).values({
         actorUserId: audit.actorUserId,
         actorRole: audit.actorRole,
@@ -455,6 +481,20 @@ export class ShiftRepository {
         targetId: row.id,
         organizationId: row.organizationId,
         metadata: audit.metadata,
+        ipAddress: audit.ipAddress,
+      })
+
+      await tx.insert(auditLog).values({
+        actorUserId: audit.actorUserId,
+        actorRole: audit.actorRole,
+        action: 'checklist.submit',
+        targetType: 'shift',
+        targetId: row.id,
+        organizationId: row.organizationId,
+        metadata: {
+          itemKeys: Object.keys(checklist.items),
+          itemCount: Object.keys(checklist.items).length,
+        },
         ipAddress: audit.ipAddress,
       })
 
