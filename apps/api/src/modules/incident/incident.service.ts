@@ -125,10 +125,14 @@ export class IncidentService {
       }
     }
 
-    // HEAD каждого фото — confirm что upload действительно произошёл и
-    // content-type соответствует. Невалидные → reject (operator повторит upload).
-    for (const key of input.photoKeys) {
-      const head = await this.storage.headObject(key)
+    // HEAD каждого фото параллельно — до 5 round-trips → одна ms-latency
+    // вместо последовательной суммы. Validation per-key (existence + content-type
+    // + size); первый failed key → throw + safeDelete для invalid uploads.
+    // Невалидные → operator повторит upload.
+    const heads = await Promise.all(
+      input.photoKeys.map((key) => this.storage.headObject(key).then((head) => ({ key, head }))),
+    )
+    for (const { key, head } of heads) {
       if (!head) {
         throw badRequest('PHOTO_NOT_UPLOADED', `Photo ${key} was not uploaded`)
       }
@@ -233,12 +237,19 @@ export class IncidentService {
     }
 
     const repo = this.repoFor(ctx)
-    const reporterName = profileRow
+    // Resolve reporter name с многоступенчатым fallback'ом:
+    //   1) crane_profile {lastName + firstName + patronymic} — primary
+    //   2) users.name — fallback если профиля нет ИЛИ все name-fields пустые
+    //      (e.g., legacy/edge data corruption)
+    //   3) phone — last-resort, чтобы не записать пустой reporter_name
+    //      (DB-level NOT NULL принимает empty string, но owner queue показал бы blank row)
+    const fromProfile = profileRow
       ? [profileRow.lastName, profileRow.firstName, profileRow.patronymic]
           .filter(Boolean)
           .join(' ')
           .trim()
-      : userRow.name
+      : ''
+    const reporterName = fromProfile || userRow.name?.trim() || userRow.phone
 
     let created: Incident
     try {

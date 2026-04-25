@@ -9,18 +9,25 @@ interface Props {
   hasPhoto: boolean
   hasNotes: boolean
   onToggle: () => void
-  onLongPress: () => void
+  /**
+   * Long-press handler. Если undefined — gesture не привязан, что
+   * правильно когда photo+notes flow ещё не реализован (M6-b minimal):
+   * не учим operator'а гесту, который покажет «coming later».
+   * Полный flow — backlog «Mobile safety photo+notes per checklist item».
+   */
+  onLongPress?: () => void
 }
 
 /**
  * Single row в pre-shift checklist screen (M6, ADR 0008). Tap — toggle
- * checked state. Long-press — opens action sheet с photo/notes options
- * (handled на screen level).
+ * checked state. Long-press (когда handler задан) — opens action sheet
+ * с photo/notes options.
  *
  * Visual state:
  *   - unchecked: grey border, empty checkbox
  *   - checked: success-tinted border + filled green checkmark
- * Photo/notes attachments — small icon indicators в правом углу.
+ * Photo/notes attachments — small icon indicators в правом углу
+ * (рендерятся based on data, независимо от long-press handler).
  *
  * Touch target ≥ 44dp (touchTarget.min). Whole row pressable, не только
  * checkbox — UX baseline для one-handed-with-gloves use.
@@ -38,7 +45,7 @@ export function ChecklistItemRow({
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
       accessibilityLabel={`${CHECKLIST_ITEM_LABELS[itemKey]}${checked ? ', проверено' : ''}`}
-      accessibilityHint="Долгое нажатие — добавить фото или заметку"
+      accessibilityHint={onLongPress ? 'Долгое нажатие — добавить фото или заметку' : undefined}
       onPress={onToggle}
       onLongPress={onLongPress}
       style={[styles.container, checked && styles.containerChecked]}

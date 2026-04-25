@@ -118,4 +118,17 @@ describe('ChecklistItemRow', () => {
     )
     expect(queryByText('✓')).toBeNull()
   })
+
+  it('renders без onLongPress prop (M6-b minimal — long-press flow в backlog)', () => {
+    const { getByText } = render(
+      <ChecklistItemRow
+        itemKey="helmet"
+        checked={false}
+        hasPhoto={false}
+        hasNotes={false}
+        onToggle={() => {}}
+      />,
+    )
+    expect(getByText('Каска')).toBeTruthy()
+  })
 })

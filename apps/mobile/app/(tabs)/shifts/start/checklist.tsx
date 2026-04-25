@@ -72,14 +72,9 @@ export default function ChecklistScreen() {
     }))
   }
 
-  const handleLongPress = (key: ChecklistItemKey) => {
-    // M6-b minimal: action sheet placeholder. Full photo/notes flow в backlog.
-    Alert.alert(
-      'Дополнительно',
-      'Фото и заметки для пунктов проверки будут добавлены в следующей версии. Сейчас просто отметьте «✓».',
-    )
-    void key
-  }
+  // Long-press handler НЕ привязан в M6-b — photo+notes per-item flow
+  // в backlog. Пробрасывать undefined в ChecklistItemRow → gesture
+  // отсутствует, operator не учится бесполезному жесту.
 
   const handleSubmit = () => {
     if (!allRequiredChecked) return
@@ -144,7 +139,6 @@ export default function ChecklistScreen() {
                 hasPhoto={items[key].photoKey !== null}
                 hasNotes={items[key].notes !== null}
                 onToggle={() => handleToggle(key)}
-                onLongPress={() => handleLongPress(key)}
               />
             ))}
           </View>

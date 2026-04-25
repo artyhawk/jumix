@@ -1,3 +1,4 @@
+import type { CraneType } from '@jumix/shared'
 import type { FastifyInstance, FastifyPluginAsync } from 'fastify'
 import type { IncidentWithRelations } from './incident.repository'
 import {
@@ -124,7 +125,7 @@ type IncidentPublicDTO = {
     id: string
     model: string
     inventoryNumber: string | null
-    type: string
+    type: CraneType
   } | null
   createdAt: string
   updatedAt: string

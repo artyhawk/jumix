@@ -140,7 +140,8 @@ export class IncidentRepository {
         .limit(1)
     )[0]
     if (!row) return null
-    return this.hydrateWithRelations(row)
+    const [hydrated] = await this.hydrateMany([row])
+    return hydrated ?? null
   }
 
   /** Без scope-check — для service-слоя при mutation после policy check. */
@@ -149,71 +150,101 @@ export class IncidentRepository {
       await this.database.db.select().from(incidents).where(eq(incidents.id, id)).limit(1)
     )[0]
     if (!row) return null
-    return this.hydrateWithRelations(row)
+    const [hydrated] = await this.hydrateMany([row])
+    return hydrated ?? null
   }
 
-  private async hydrateWithRelations(row: IncidentRow): Promise<IncidentWithRelations> {
-    const incident = hydrateIncident(row)
-    const photoRows = await this.database.db
+  /**
+   * Bulk-hydrate N incidents с relations + photos за фиксированное число
+   * запросов (4 — photos + shifts + sites + cranes), независимо от N. Это
+   * избавляет от N×3 fan-out для list endpoints (owner queue 20 incidents
+   * = 4 queries вместо 60+). Single-row пути (`findInScope`/`findAnyById`)
+   * также проходят через эту функцию — overhead на пустые `inArray()` нет
+   * (early-return когда соответствующий nullable id не set ни у одного row).
+   */
+  private async hydrateMany(rows: IncidentRow[]): Promise<IncidentWithRelations[]> {
+    if (rows.length === 0) return []
+
+    const incidentIds = rows.map((r) => r.id)
+    const shiftIds = unique(rows.map((r) => r.shiftId))
+    const siteIds = unique(rows.map((r) => r.siteId))
+    const craneIds = unique(rows.map((r) => r.craneId))
+
+    const photoRowsAll = await this.database.db
       .select()
       .from(incidentPhotos)
-      .where(eq(incidentPhotos.incidentId, incident.id))
+      .where(inArray(incidentPhotos.incidentId, incidentIds))
       .orderBy(incidentPhotos.uploadedAt)
-    const photos = photoRows.map(hydratePhoto)
 
-    const relations: IncidentRelations = { shift: null, site: null, crane: null }
+    const shiftRows =
+      shiftIds.length > 0
+        ? await this.database.db
+            .select({
+              id: shifts.id,
+              startedAt: shifts.startedAt,
+              endedAt: shifts.endedAt,
+            })
+            .from(shifts)
+            .where(inArray(shifts.id, shiftIds))
+        : []
 
-    if (incident.shiftId) {
-      const shiftRow = (
-        await this.database.db
-          .select({ id: shifts.id, startedAt: shifts.startedAt, endedAt: shifts.endedAt })
-          .from(shifts)
-          .where(eq(shifts.id, incident.shiftId))
-          .limit(1)
-      )[0]
-      if (shiftRow) {
-        relations.shift = {
-          id: shiftRow.id,
-          startedAt: shiftRow.startedAt,
-          endedAt: shiftRow.endedAt,
+    const siteRows =
+      siteIds.length > 0
+        ? await this.database.db
+            .select({ id: sites.id, name: sites.name, address: sites.address })
+            .from(sites)
+            .where(inArray(sites.id, siteIds))
+        : []
+
+    const craneRows =
+      craneIds.length > 0
+        ? await this.database.db
+            .select({
+              id: cranes.id,
+              model: cranes.model,
+              inventoryNumber: cranes.inventoryNumber,
+              type: cranes.type,
+            })
+            .from(cranes)
+            .where(inArray(cranes.id, craneIds))
+        : []
+
+    // Build index maps для O(1) lookup per incident.
+    const photosByIncident = new Map<string, IncidentPhoto[]>()
+    for (const p of photoRowsAll) {
+      const list = photosByIncident.get(p.incidentId) ?? []
+      list.push(hydratePhoto(p))
+      photosByIncident.set(p.incidentId, list)
+    }
+    const shiftById = new Map(shiftRows.map((s) => [s.id, s]))
+    const siteById = new Map(siteRows.map((s) => [s.id, s]))
+    const craneById = new Map(craneRows.map((c) => [c.id, c]))
+
+    return rows.map((row) => {
+      const incident = hydrateIncident(row)
+      const photos = photosByIncident.get(incident.id) ?? []
+      const relations: IncidentRelations = { shift: null, site: null, crane: null }
+      if (incident.shiftId) {
+        const s = shiftById.get(incident.shiftId)
+        if (s) relations.shift = { id: s.id, startedAt: s.startedAt, endedAt: s.endedAt }
+      }
+      if (incident.siteId) {
+        const s = siteById.get(incident.siteId)
+        if (s) relations.site = { id: s.id, name: s.name, address: s.address }
+      }
+      if (incident.craneId) {
+        const c = craneById.get(incident.craneId)
+        if (c) {
+          relations.crane = {
+            id: c.id,
+            model: c.model,
+            inventoryNumber: c.inventoryNumber,
+            type: c.type as CraneType,
+          }
         }
       }
-    }
-    if (incident.siteId) {
-      const siteRow = (
-        await this.database.db
-          .select({ id: sites.id, name: sites.name, address: sites.address })
-          .from(sites)
-          .where(eq(sites.id, incident.siteId))
-          .limit(1)
-      )[0]
-      if (siteRow) {
-        relations.site = { id: siteRow.id, name: siteRow.name, address: siteRow.address }
-      }
-    }
-    if (incident.craneId) {
-      const craneRow = (
-        await this.database.db
-          .select({
-            id: cranes.id,
-            model: cranes.model,
-            inventoryNumber: cranes.inventoryNumber,
-            type: cranes.type,
-          })
-          .from(cranes)
-          .where(eq(cranes.id, incident.craneId))
-          .limit(1)
-      )[0]
-      if (craneRow) {
-        relations.crane = {
-          id: craneRow.id,
-          model: craneRow.model,
-          inventoryNumber: craneRow.inventoryNumber,
-          type: craneRow.type as CraneType,
-        }
-      }
-    }
-    return { incident, photos, relations }
+      return { incident, photos, relations }
+    })
   }
 
   async listMy(
@@ -234,8 +265,7 @@ export class IncidentRepository {
     const page = hasMore ? rows.slice(0, params.limit) : rows
     const nextCursor = hasMore ? (page.at(-1)?.id ?? null) : null
 
-    const hydrated: IncidentWithRelations[] = []
-    for (const r of page) hydrated.push(await this.hydrateWithRelations(r))
+    const hydrated = await this.hydrateMany(page)
     return { rows: hydrated, nextCursor }
   }
 
@@ -264,8 +294,7 @@ export class IncidentRepository {
     const page = hasMore ? rows.slice(0, params.limit) : rows
     const nextCursor = hasMore ? (page.at(-1)?.id ?? null) : null
 
-    const hydrated: IncidentWithRelations[] = []
-    for (const r of page) hydrated.push(await this.hydrateWithRelations(r))
+    const hydrated = await this.hydrateMany(page)
     return { rows: hydrated, nextCursor }
   }
 
@@ -466,4 +495,17 @@ export class IncidentRepository {
       return hydrateIncident(row)
     })
   }
+}
+
+/** Distinct non-null values, preserves first-seen order. */
+function unique<T extends string>(values: Array<T | null>): T[] {
+  const seen = new Set<T>()
+  const out: T[] = []
+  for (const v of values) {
+    if (v === null) continue
+    if (seen.has(v)) continue
+    seen.add(v)
+    out.push(v)
+  }
+  return out
 }
