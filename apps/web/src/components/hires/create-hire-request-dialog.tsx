@@ -27,7 +27,7 @@ interface Props {
  *   Step 2 — summary + license warning + hiredAt + submit.
  *
  * License warning (missing / expired) — informational, submit не блокируется
- * (rule #22 pragmatic invariant — реальный work-gate на canWork).
+ * (см. ARCHITECTURE.md §B3-UI-3c — реальный work-gate на canWork, CLAUDE.md rule #15).
  */
 export function CreateHireRequestDialog({ open, onOpenChange }: Props) {
   const [step, setStep] = useState<1 | 2>(1)

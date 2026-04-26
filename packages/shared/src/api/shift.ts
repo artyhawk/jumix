@@ -148,7 +148,7 @@ export interface IngestPingsResponse {
 
 /**
  * Last-known location per active shift — источник данных для owner map
- * (rule #29). Hydrated с nested crane/operator/site summaries и
+ * (ARCHITECTURE.md §M5-a). Hydrated с nested crane/operator/site summaries и
  * `minutesSinceLastPing` (computed server-side для stale-detection на клиенте).
  */
 export interface ActiveShiftLocation {

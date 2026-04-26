@@ -214,7 +214,7 @@ info для UX, не legal record).
 
 ## References
 
-- CLAUDE.md rule #32 (will be added after M6-a commit)
+- ARCHITECTURE.md §M6-a (full implementation summary) + §M6-b (mobile slice)
 - packages/db/migrations/0012_safety_compliance.sql
 - packages/shared/src/api/checklist.ts (REQUIRED_ITEMS_BY_CRANE_TYPE)
 - packages/shared/src/api/incident.ts (status workflow types)
