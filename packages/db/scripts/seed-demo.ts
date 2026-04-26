@@ -195,9 +195,10 @@ async function main() {
           name: 'Нурлан Садыков',
           status: 'active',
         },
-        // operators — identity-only (organizationId: null per ADR 0003)
+        // operators — identity-only (organizationId: null per ADR 0003).
+        // Phones: +7705xxxxxxx (KZ Beeline range), 11 digits after +7 (constraint: +7[0-9]{10}).
         ...Array.from({ length: 15 }, (_, i) => ({
-          phone: `+77${String(500_000_000 + i).padStart(10, '0')}`,
+          phone: `+7705${String(1_000_000 + i).padStart(7, '0')}`,
           passwordHash,
           role: 'operator' as const,
           organizationId: null,
@@ -310,13 +311,16 @@ async function main() {
             ['Иванов', 'Сериков', 'Касымов', 'Мухамеджанов', 'Кайыров', 'Абдулин'][i % 6] ??
             'Смагулов',
           patronymic: i % 3 === 0 ? 'Амирович' : null,
-          iin: generateIin(880_101_300_000 + i * 37),
+          iin: generateIin(88_010_100_000 + i * 37),
           approvalStatus: i < 8 ? 'approved' : i < 10 ? 'pending' : 'rejected',
           approvedByUserId: i < 8 ? superadmin.id : null,
           approvedAt: i < 8 ? new Date(Date.now() - (i + 1) * 86400_000) : null,
           rejectedByUserId: i >= 10 ? superadmin.id : null,
           rejectedAt: i >= 10 ? new Date(Date.now() - (i - 9) * 86400_000) : null,
           rejectionReason: i >= 10 ? 'Удостоверение просрочено на момент подачи' : null,
+          // license: keep license_key + expires_at consistent (constraint:
+          // both NULL or both set). Approved operators get fake key + future date.
+          licenseKey: i < 8 ? `crane-profiles/seed-${i}/license/v1/license.pdf` : null,
           licenseExpiresAt: i < 8 ? new Date(Date.now() + (200 + i * 30) * 86400_000) : null,
           licenseVersion: i < 8 ? 1 : 0,
         })),

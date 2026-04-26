@@ -85,6 +85,13 @@
       "when": 1778300000000,
       "tag": "0011_shift_location_pings",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1778400000000,
+      "tag": "0012_safety_compliance",
+      "breakpoints": true
     }
   ]
 }

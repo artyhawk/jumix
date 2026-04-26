@@ -5,10 +5,10 @@ import {
   listMyIncidents,
   requestIncidentPhotoUploadUrl,
 } from '@/lib/api/incidents'
+import { toast } from '@/lib/toast'
 import { uploadFileWithProgress } from '@/lib/upload'
 import type { CreateIncidentPayload, Incident, IncidentSeverity, IncidentType } from '@jumix/shared'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import * as Burnt from 'burnt'
 import { useState } from 'react'
 
 /**
@@ -165,12 +165,12 @@ export function useCreateIncident() {
       return createIncident(payload)
     },
     onSuccess: () => {
-      Burnt.toast({ title: 'Сообщение отправлено', preset: 'done' })
+      toast({ title: 'Сообщение отправлено', preset: 'done' })
       void qc.invalidateQueries({ queryKey: INCIDENTS_ROOT })
       setProgress(INITIAL_PROGRESS)
     },
     onError: (err: unknown) => {
-      Burnt.toast({
+      toast({
         title: 'Не удалось отправить',
         message: resolveErrorMessage(err),
         preset: 'error',

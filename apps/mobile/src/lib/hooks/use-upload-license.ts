@@ -1,8 +1,8 @@
 import { ApiError } from '@/lib/api/errors'
 import { type LicenseContentType, confirmLicense, requestLicenseUploadUrl } from '@/lib/api/license'
+import { toast } from '@/lib/toast'
 import { uploadFileWithProgress } from '@/lib/upload'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import * as Burnt from 'burnt'
 import { useState } from 'react'
 import { ME_STATUS_QUERY_KEY } from './use-me'
 
@@ -67,12 +67,12 @@ export function useUploadLicense() {
       })
     },
     onSuccess: () => {
-      Burnt.toast({ title: 'Удостоверение загружено', preset: 'done' })
+      toast({ title: 'Удостоверение загружено', preset: 'done' })
       void qc.invalidateQueries({ queryKey: ME_STATUS_QUERY_KEY })
       setProgress(0)
     },
     onError: (err: unknown) => {
-      Burnt.toast({
+      toast({
         title: 'Ошибка загрузки',
         message: resolveErrorMessage(err),
         preset: 'error',

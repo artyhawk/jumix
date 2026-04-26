@@ -49,7 +49,10 @@ export default function VerifyOtpScreen() {
     try {
       const result = await verifySmsCode({ phone, code: fullCode })
       await login({ access: result.accessToken, refresh: result.refreshToken }, result.user)
-      // Redirect в /(tabs)/me handled авт. через (auth)/_layout когда user появится.
+      // Explicit navigation: (auth)/_layout.tsx тоже redirect'ит когда `user`
+      // set, но Expo Router не всегда сразу применяет layout-level Redirect
+      // из async-flow внутри текущего screen'а. Явный router.replace надёжнее.
+      router.replace('/(tabs)/me')
     } catch (err) {
       setError(resolveError(err))
       // Clear код чтобы пользователь мог повторить

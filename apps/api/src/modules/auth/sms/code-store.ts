@@ -101,9 +101,11 @@ export class RedisSmsCodeStore implements SmsCodeStore {
       codeHash: hashSmsCode(phone, code),
       expiresAt: Date.now() + ttlSeconds * 1000,
     })
-    // Redis client без готовых set-ex биндингов в RedisLikeClient — используем eval
+    // Redis client без готовых set-ex биндингов в RedisLikeClient — используем eval.
+    // ARGV[2] — TTL string. (Был ARGV[3] — bug, скрипт padал с "arguments must
+    // be strings or integers" на real Redis потому что ARGV[3] = nil.)
     await this.redis.eval(
-      'redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[3]); redis.call("DEL", KEYS[2]); return 1',
+      'redis.call("SET", KEYS[1], ARGV[1], "EX", ARGV[2]); redis.call("DEL", KEYS[2]); return 1',
       2,
       key,
       attemptsKey,
