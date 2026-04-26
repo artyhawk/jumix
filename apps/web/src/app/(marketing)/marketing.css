@@ -1,0 +1,135 @@
+/**
+ * Marketing-only стили (B3-LANDING). Тёплые dark surfaces, premium easings,
+ * radial-glow утилиты для hero. Эти CSS-переменные scoped на body[data-marketing="true"]
+ * — admin cabinet их не использует и его design-tokens (globals.css) не затрагиваются.
+ */
+
+[data-marketing="true"] {
+  --m-bg: #07070a;
+  --m-surface: #0e0e12;
+  --m-surface-elevated: #14141a;
+  --m-border: #1d1d24;
+  --m-border-strong: #2a2a33;
+
+  --m-fg: #fafafa;
+  --m-fg-secondary: #a1a1aa;
+  --m-fg-tertiary: #71717a;
+
+  --m-brand: #f97b10;
+  --m-brand-hover: #fa8b2e;
+  --m-brand-glow: rgba(249, 123, 16, 0.18);
+  --m-brand-glow-strong: rgba(249, 123, 16, 0.32);
+
+  --m-success: #22c55e;
+  --m-info: #3b82f6;
+
+  --m-ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
+  --m-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  background: var(--m-bg);
+  color: var(--m-fg);
+}
+
+[data-marketing="true"] .m-radial-hero {
+  background: radial-gradient(900px circle at 50% -10%, var(--m-brand-glow) 0%, transparent 55%),
+    radial-gradient(600px circle at 90% 10%, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+}
+
+[data-marketing="true"] .m-grid-bg {
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+[data-marketing="true"] .m-card {
+  background: var(--m-surface);
+  border: 1px solid var(--m-border);
+  border-radius: 16px;
+  transition: border-color 280ms var(--m-ease-premium), background-color 280ms var(--m-ease-premium),
+    transform 280ms var(--m-ease-premium);
+}
+
+[data-marketing="true"] .m-card:hover {
+  border-color: var(--m-border-strong);
+  background: var(--m-surface-elevated);
+  transform: translateY(-2px);
+}
+
+[data-marketing="true"] .m-card-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+[data-marketing="true"] .m-card-glow::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(140deg, transparent 30%, var(--m-brand-glow) 60%, transparent 90%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 280ms var(--m-ease-premium);
+  pointer-events: none;
+}
+
+[data-marketing="true"] .m-card-glow:hover::before {
+  opacity: 1;
+}
+
+[data-marketing="true"] .m-cta-glow {
+  box-shadow: 0 0 0 0 var(--m-brand-glow);
+  transition: box-shadow 320ms var(--m-ease-premium), transform 220ms var(--m-ease-spring);
+}
+
+[data-marketing="true"] .m-cta-glow:hover {
+  box-shadow: 0 12px 48px -8px var(--m-brand-glow-strong);
+  transform: translateY(-1px);
+}
+
+[data-marketing="true"] .m-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--m-border-strong), transparent);
+}
+
+[data-marketing="true"] .m-text-balance {
+  text-wrap: balance;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-marketing="true"] *,
+  [data-marketing="true"] *::before,
+  [data-marketing="true"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes m-pulse-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+  }
+}
+
+[data-marketing="true"] .m-pulse-dot {
+  animation: m-pulse-dot 1.8s var(--m-ease-premium) infinite;
+}
+
+@keyframes m-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}

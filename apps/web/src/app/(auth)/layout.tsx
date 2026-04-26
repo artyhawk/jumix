@@ -5,19 +5,21 @@ import { useRouter } from 'next/navigation'
 import { type ReactNode, useEffect } from 'react'
 
 /**
- * Auth-group layout. Если пользователь уже залогинен — редирект на /.
- * Ждём hydration из localStorage перед принятием решения (иначе SSR/CSR mismatch).
+ * Auth-group layout. Если пользователь уже залогинен — редирект в его кабинет
+ * (operator → /me, остальные → /dashboard). `/` теперь публичный marketing
+ * landing (B3-LANDING), поэтому редирект сразу в кабинет, а не на root.
  */
 export default function AuthLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const hydrated = useAuthStore((s) => s.hydrated)
   const isAuthed = useAuthStore(selectIsAuthenticated)
+  const user = useAuthStore((s) => s.user)
 
   useEffect(() => {
-    if (hydrated && isAuthed) {
-      router.replace('/')
+    if (hydrated && isAuthed && user) {
+      router.replace(user.role === 'operator' ? '/me' : '/dashboard')
     }
-  }, [hydrated, isAuthed, router])
+  }, [hydrated, isAuthed, user, router])
 
   return (
     <div className="relative min-h-dvh bg-layer-0 text-text-primary flex flex-col">

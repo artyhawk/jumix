@@ -39,6 +39,22 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   } as unknown as typeof ResizeObserver
 }
 
+// IntersectionObserver — jsdom не реализует, но framer-motion `useInView`
+// (marketing landing scroll-triggered анимации) требует его.
+if (typeof globalThis.IntersectionObserver === 'undefined') {
+  globalThis.IntersectionObserver = class {
+    root = null
+    rootMargin = ''
+    thresholds = []
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return []
+    }
+  } as unknown as typeof IntersectionObserver
+}
+
 // URL.createObjectURL — jsdom не реализует, но maplibre-gl вызывает его
 // на module-load для Worker'а. Мы всё равно мокаем карту в тестах, но
 // сам import пакета должен пройти без throw.

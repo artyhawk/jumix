@@ -34,3 +34,12 @@ function lookup(dict: Record<string, unknown>, key: string): unknown {
   }
   return cur
 }
+
+/**
+ * Typed accessor для не-строковых значений в словаре (массивы, объекты).
+ * Используется marketing landing'ом (B3-LANDING) для items секций. Fallback — `[]`.
+ */
+export function tList<T>(key: string, locale: Locale = 'ru'): T[] {
+  const value = lookup(dictionaries[locale], key) ?? lookup(dictionaries.ru, key)
+  return Array.isArray(value) ? (value as T[]) : []
+}

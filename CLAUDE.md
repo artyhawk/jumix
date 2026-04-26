@@ -204,6 +204,9 @@ Bug-репорты · мелкие правки · мониторинг.
 
 > Краткие summary последних завершённых вертикалей. Полная детализация — [ARCHITECTURE.md](ARCHITECTURE.md).
 
+### B3-LANDING — Public marketing landing (April 2026)
+Native Next.js public landing на `/` (заменяет Tilda template). Cabinet остаётся через `/login` (subdomain routing — deploy-vertical). Отдельный route group `(marketing)` parallel к `(app)`, отдельный visual language (deeper dark `#07070a`, generous spacing, premium scroll-driven animations через `framer-motion` `useInView`/parallax). Sections: hero (staggered fade-up + dashboard mockup с mouse parallax) / pain-points / for-companies / for-operators (phone mockup с тикающим таймером) / how-it-works (3 SVG illustrations) / why-jumix / final-cta. WhatsApp primary CTA (`wa.me/77022244428` с urlencoded text "Здравствуйте, интересует Jumix") — общий `whatsappLink()` helper в `whatsapp.ts` (не client-only, чтобы server components могли import). SVG mockups inline (НЕ screenshots). i18n — переиспользуем существующий `t()` helper (lib/i18n.ts), новый `tList<T>()` для массивов; `messages/ru.json` с namespace `marketing`; **next-intl НЕ используется** (rule #16 preserved). SEO: `sitemap.ts` + `robots.ts` (allow public, disallow `/login`/`/dashboard`/etc.) + Organization+WebSite JSON-LD. Privacy/Terms — boilerplate с TODO для legal review (требуется перед M8 store submission). `(auth)/layout.tsx` redirect role-aware (operator → `/me`, остальные → `/dashboard`) — раньше шёл на `/`, теперь это marketing. `(app)/page.tsx` удалён — root URL теперь marketing. IntersectionObserver mock добавлен в `tests/setup.ts` для framer-motion `useInView`. Tests +30. Subdomain routing (jumix.kz vs app.jumix.kz) — отдельный deploy-mini-vertical, NOT в этом коммите. → [ARCHITECTURE.md#b3-landing](ARCHITECTURE.md#b3-landing-public-marketing-landing)
+
 ### M6 — Safety compliance (April 2026)
 Pre-shift checklist (embedded в startShift atomic transaction; required items per crane.type из `@jumix/shared`; hard-rule no skip) + incident reporting (operator submits с photos + GPS auto-attach из M5 SQLite queue; severity self-assignment; state machine submitted→acknowledged→resolved/escalated). Owner `/incidents` page + dashboard danger-highlight card. Three-phase photo upload mirrors license M3. Schema migration 0012, ADR 0008. Backend (M6-a) + mobile (M6-b). → [ARCHITECTURE.md#m6-a](ARCHITECTURE.md#m6-a-safety-compliance--backend--web), [ARCHITECTURE.md#m6-b](ARCHITECTURE.md#m6-b-safety-compliance--mobile)
 
@@ -243,6 +246,7 @@ Operator landing: canWork + identity + license + memberships summary. **Shared t
 - B3-UI-3c — owner hires + operators management → [ARCHITECTURE.md#b3-ui-3c](ARCHITECTURE.md#b3-ui-3c-owner-hires)
 - B3-UI-4 — operator web cabinet → [ARCHITECTURE.md#b3-ui-4](ARCHITECTURE.md#b3-ui-4-operator-web-cabinet)
 - B3-UI-5 — polish + deploy infrastructure (3 slices) → [ARCHITECTURE.md#b3-ui-5](ARCHITECTURE.md#b3-ui-5-deploy-infrastructure--polish)
+- B3-LANDING — public marketing landing → [ARCHITECTURE.md#b3-landing](ARCHITECTURE.md#b3-landing-public-marketing-landing)
 
 ### Mobile MVP (Этап 2)
 - M1 — Expo foundation + auth → [ARCHITECTURE.md#m1](ARCHITECTURE.md#m1-mobile-foundation)
