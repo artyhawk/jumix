@@ -12,6 +12,10 @@ WORKDIR /app
 # Копируем только манифесты чтобы кэшировать installed deps при изменениях
 # кода без pnpm install.
 FROM base AS deps
+# Build tools нужны для native модулей: argon2 (prod runtime), ssh2 transitive
+# из testcontainers (devDep). Установлены только в deps stage — runtime
+# stage их не наследует (multi-stage cleanup).
+RUN apk add --no-cache python3 make g++ libc6-compat
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/auth/package.json packages/auth/package.json

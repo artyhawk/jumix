@@ -10,6 +10,9 @@ WORKDIR /app
 
 # ---------- deps: install all + transpile shared pkgs через tsc ----------
 FROM base AS deps
+# Build tools нужны для transitive native deps (argon2, ssh2) — pnpm install
+# с frozen-lockfile видит весь lockfile workspace'а. Не наследуется в runtime.
+RUN apk add --no-cache python3 make g++ libc6-compat
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
