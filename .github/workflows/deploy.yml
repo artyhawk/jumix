@@ -95,7 +95,6 @@ jobs:
     name: SSH deploy to VPS
     runs-on: ubuntu-latest
     needs: [guard, build-images]
-    environment: production
     steps:
       - uses: actions/checkout@v4
         with:
