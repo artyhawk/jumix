@@ -5,9 +5,15 @@ import { Logo } from '@/components/layout/logo'
 import { t } from '@/lib/i18n'
 import { motion } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 
-export default function VerifyPage() {
+/**
+ * Next.js 15: useSearchParams() требует Suspense boundary при static
+ * prerender — иначе page.tsx не может быть statically generated и build
+ * падает. Оборачиваем содержимое в <Suspense> чтобы prerender'у было
+ * за чем "ждать", в runtime ничего не меняется.
+ */
+function VerifyContent() {
   const params = useSearchParams()
   const router = useRouter()
   const phone = params.get('phone') ?? ''
@@ -40,5 +46,13 @@ export default function VerifyPage() {
         <OtpForm phone={phone} />
       </div>
     </motion.div>
+  )
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyContent />
+    </Suspense>
   )
 }
