@@ -60,7 +60,7 @@ services:
     # перехода на UBI 9 base (~late 2024) требует x86-64-v2 → "Fatal glibc
     # error: CPU does not support x86-64-v2". Этот тэг — стабильный релиз
     # до breaking change. Бамп тэга — после миграции на VPS с современным CPU.
-    image: minio/minio:RELEASE.2024-08-29T01-40-52Z
+    image: minio/minio:RELEASE.2023-09-30T07-02-29Z
     container_name: jumix-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
