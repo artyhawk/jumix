@@ -23,6 +23,8 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules /app/node_modules
+COPY --from=deps /app/apps/web/node_modules /app/apps/web/node_modules
+COPY --from=deps /app/packages /app/packages
 COPY . .
 RUN pnpm --filter @jumix/web build
 
