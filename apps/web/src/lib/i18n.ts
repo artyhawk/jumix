@@ -1,11 +1,13 @@
+import enMessages from '@/messages/en.json'
 import kzMessages from '@/messages/kz.json'
 import ruMessages from '@/messages/ru.json'
 
-export type Locale = 'ru' | 'kz'
+export type Locale = 'ru' | 'kz' | 'en'
 
 const dictionaries: Record<Locale, Record<string, unknown>> = {
   ru: ruMessages as Record<string, unknown>,
   kz: kzMessages as Record<string, unknown>,
+  en: enMessages as Record<string, unknown>,
 }
 
 /**

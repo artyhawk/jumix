@@ -23,10 +23,7 @@ describe('Header', () => {
       'href',
       '#for-companies',
     )
-    expect(screen.getByRole('link', { name: 'Крановщикам' })).toHaveAttribute(
-      'href',
-      '#for-operators',
-    )
+    expect(screen.getByRole('link', { name: 'Крановым' })).toHaveAttribute('href', '#for-operators')
     expect(screen.getByRole('link', { name: 'Как это работает' })).toHaveAttribute(
       'href',
       '#how-it-works',

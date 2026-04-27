@@ -61,3 +61,22 @@ export type {
   RequestPhotoUploadUrlPayload,
   RequestPhotoUploadUrlResponse,
 } from './api/incident'
+export {
+  SURVEY_AUDIENCES,
+  SURVEY_LOCALES,
+  SURVEY_AUDIENCE_LABELS,
+  SURVEY_LOCALE_LABELS,
+} from './api/survey'
+export type {
+  SurveyAudience,
+  SurveyLocale,
+  Survey,
+  SurveyQuestion,
+  SurveyWithQuestions,
+  SubmitSurveyResponsePayload,
+  SubmitSurveyResponseResult,
+  SurveyListItem,
+  SurveyResponseListItem,
+  SurveyResponseAnswer,
+  SurveyResponseDetail,
+} from './api/survey'

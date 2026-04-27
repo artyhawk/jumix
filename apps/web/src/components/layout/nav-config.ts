@@ -2,6 +2,7 @@ import type { UserRole } from '@/lib/api/types'
 import { IconCrane } from '@tabler/icons-react'
 import {
   Building2,
+  ClipboardList,
   HardHat,
   IdCard,
   LayoutDashboard,
@@ -42,6 +43,7 @@ export const navItemsByRole: Record<UserRole, NavItem[]> = {
     },
     { labelKey: 'nav.craneProfiles', href: '/crane-profiles', icon: HardHat, section: 'people' },
     { labelKey: 'nav.operators', href: '/organization-operators', icon: Users, section: 'people' },
+    { labelKey: 'nav.surveys', href: '/surveys', icon: ClipboardList, section: 'management' },
   ],
   owner: [
     { labelKey: 'nav.dashboard', href: '/dashboard', icon: LayoutDashboard, section: 'operations' },

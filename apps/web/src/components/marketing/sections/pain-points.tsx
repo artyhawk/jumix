@@ -1,9 +1,11 @@
+'use client'
+
 import { AnimatedSection } from '@/components/marketing/animated-section'
 import { FeatureCard } from '@/components/marketing/feature-card'
 import { SectionContainer } from '@/components/marketing/section-container'
 import { SectionHeading } from '@/components/marketing/section-heading'
 import { StaggerItem, StaggeredChildren } from '@/components/marketing/staggered-children'
-import { t, tList } from '@/lib/i18n'
+import { useT, useTList } from '@/lib/marketing-locale'
 import { AlertTriangle, Calculator, Clock4, FileSpreadsheet } from 'lucide-react'
 
 const ICONS = [
@@ -19,7 +21,9 @@ interface PainItem {
 }
 
 export function PainPointsSection() {
-  const safeItems = tList<PainItem>('marketing.painPoints.items')
+  const t = useT()
+  const tList = useTList<PainItem>()
+  const safeItems = tList('marketing.painPoints.items')
 
   return (
     <SectionContainer id="pain-points">

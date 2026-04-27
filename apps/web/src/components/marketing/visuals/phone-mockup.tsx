@@ -38,7 +38,7 @@ export function PhoneMockup({ className }: { className?: string }) {
     <div
       className={cn('relative isolate', className)}
       role="img"
-      aria-label="Демонстрация мобильного приложения Jumix для крановщика — экран активной смены с таймером"
+      aria-label="Демонстрация мобильного приложения Jumix для кранового — экран активной смены с таймером"
     >
       {/* Glow */}
       <div

@@ -1,9 +1,12 @@
-import { t } from '@/lib/i18n'
+'use client'
+
+import { useT } from '@/lib/marketing-locale'
 import Image from 'next/image'
 import Link from 'next/link'
 import { whatsappLink } from './whatsapp'
 
 export function Footer() {
+  const t = useT()
   return (
     <footer className="border-t border-[var(--m-border)] bg-[var(--m-bg)]">
       <div className="mx-auto max-w-7xl px-5 md:px-8 py-14 md:py-20">
@@ -42,7 +45,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href={whatsappLink()}
+                  href={whatsappLink(t('marketing.whatsappMessage'))}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[var(--m-fg-secondary)] hover:text-[var(--m-fg)] transition-colors"

@@ -1,10 +1,13 @@
+'use client'
+
 import { AnimatedSection } from '@/components/marketing/animated-section'
 import { LoginLink } from '@/components/marketing/login-link'
 import { SectionContainer } from '@/components/marketing/section-container'
 import { WhatsAppButton } from '@/components/marketing/whatsapp-button'
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 
 export function FinalCtaSection() {
+  const t = useT()
   return (
     <SectionContainer id="final-cta" className="relative">
       <AnimatedSection>

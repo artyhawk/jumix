@@ -60,6 +60,18 @@ export const qk = {
   incidentsMy: ['incidents', 'my'] as const,
   incidentDetail: (id: string) => ['incidents', 'detail', id] as const,
 
+  surveys: ['surveys'] as const,
+  surveysList: ['surveys', 'list'] as const,
+  surveyDetail: (slug: string) => ['surveys', 'detail', slug] as const,
+  surveyResponses: (slug: string, query: import('./api/surveys').ListSurveyResponsesQuery) =>
+    ['surveys', slug, 'responses', query] as const,
+  surveyResponsesInfinite: (
+    slug: string,
+    query: Omit<import('./api/surveys').ListSurveyResponsesQuery, 'cursor'>,
+  ) => ['surveys', slug, 'responses-infinite', query] as const,
+  surveyResponseDetail: (slug: string, id: string) =>
+    ['surveys', slug, 'response-detail', id] as const,
+
   shifts: ['shifts'] as const,
   shiftsOwner: (query: ListOwnerShiftsQuery) => ['shifts', 'owner', query] as const,
   shiftsOwnerInfinite: (query: Omit<ListOwnerShiftsQuery, 'cursor'>) =>

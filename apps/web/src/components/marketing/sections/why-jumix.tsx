@@ -1,8 +1,10 @@
+'use client'
+
 import { AnimatedSection } from '@/components/marketing/animated-section'
 import { SectionContainer } from '@/components/marketing/section-container'
 import { SectionHeading } from '@/components/marketing/section-heading'
 import { StaggerItem, StaggeredChildren } from '@/components/marketing/staggered-children'
-import { t, tList } from '@/lib/i18n'
+import { useT, useTList } from '@/lib/marketing-locale'
 import { Eye, Gauge, Network, ShieldCheck, Sparkles } from 'lucide-react'
 
 const ICONS = [
@@ -19,7 +21,9 @@ interface Item {
 }
 
 export function WhyJumixSection() {
-  const items = tList<Item>('marketing.whyJumix.items')
+  const t = useT()
+  const tList = useTList<Item>()
+  const items = tList('marketing.whyJumix.items')
   const [primary, ...rest] = items
 
   return (

@@ -3,12 +3,13 @@
 import { LoginLink } from '@/components/marketing/login-link'
 import { DashboardMockup } from '@/components/marketing/visuals/dashboard-mockup'
 import { WhatsAppButton } from '@/components/marketing/whatsapp-button'
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { motion, useReducedMotion } from 'framer-motion'
 
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const
 
 export function HeroSection() {
+  const t = useT()
   const reduceMotion = useReducedMotion()
 
   const fadeUp = (delay: number) =>

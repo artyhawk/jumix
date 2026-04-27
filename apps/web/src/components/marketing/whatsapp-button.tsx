@@ -1,6 +1,6 @@
 'use client'
 
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { cn } from '@/lib/utils'
 import type { ReactNode } from 'react'
 import { whatsappLink } from './whatsapp'
@@ -40,9 +40,11 @@ export function WhatsAppButton({
   className?: string
   showIcon?: boolean
 }) {
+  const t = useT()
+  const resolvedMessage = message ?? t('marketing.whatsappMessage')
   return (
     <a
-      href={whatsappLink(message)}
+      href={whatsappLink(resolvedMessage)}
       target="_blank"
       rel="noopener noreferrer"
       className={cn(base, variants[variant], sizes[size], className)}

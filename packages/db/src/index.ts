@@ -83,6 +83,19 @@ export {
   incidentPhotos,
   type IncidentPhoto,
   type NewIncidentPhoto,
+  surveys,
+  SURVEY_AUDIENCES,
+  SURVEY_LOCALES,
+  type Survey,
+  type SurveyAudience,
+  type SurveyLocale,
+  type NewSurvey,
+  surveyQuestions,
+  type SurveyQuestion,
+  type NewSurveyQuestion,
+  surveyResponses,
+  type SurveyResponse,
+  type NewSurveyResponse,
 } from './schema/index'
 
 export { createDatabase, type DatabaseClient, type CreateDatabaseOptions } from './client'

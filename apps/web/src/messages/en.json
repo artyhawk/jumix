@@ -1,0 +1,235 @@
+{
+  "marketing": {
+    "metadata": {
+      "title": "Jumix — Digital platform for crane services",
+      "description": "Manage cranes, sites and operators in a single system. Shift geolocation, automated payroll, marketplace for crane operators — built for construction companies in Kazakhstan.",
+      "ogImageAlt": "Jumix — digital platform for crane services",
+      "privacyTitle": "Privacy Policy — Jumix",
+      "privacyDescription": "Personal data processing policy for users of the Jumix platform.",
+      "termsTitle": "Terms of Service — Jumix",
+      "termsDescription": "Terms of use of the Jumix platform for construction companies and crane operators."
+    },
+    "nav": {
+      "features": "Features",
+      "operators": "For operators",
+      "howItWorks": "How it works",
+      "login": "Sign in",
+      "contact": "Contact us"
+    },
+    "hero": {
+      "tagline": "Digital platform for crane services",
+      "title": "Manage cranes, sites and operators in a single system",
+      "subtitle": "No spreadsheets, no paperwork. A transparent digital ecosystem for construction companies and crane operators across Kazakhstan.",
+      "ctaPrimary": "Message us on WhatsApp",
+      "ctaSecondary": "Sign in",
+      "trustLine": "Shift geolocation · Automated payroll · Operator marketplace"
+    },
+    "painPoints": {
+      "overline": "Sound familiar?",
+      "title": "What's holding your business back",
+      "subtitle": "Four problems that slow construction companies and crane operators down every day.",
+      "items": [
+        {
+          "title": "Chaos in shift management",
+          "description": "Excel sheets, phone calls, lost data on crane and operator activity."
+        },
+        {
+          "title": "Disputes about hours worked",
+          "description": "There's no reliable way to verify who was on site and how many hours they worked."
+        },
+        {
+          "title": "Slow replacements",
+          "description": "An operator doesn't show up — the site is idle, and finding a replacement through contacts takes hours."
+        },
+        {
+          "title": "Opaque payroll",
+          "description": "Manual salary calculations with errors, conflicts between owners and operators."
+        }
+      ]
+    },
+    "forCompanies": {
+      "overline": "For companies",
+      "title": "Jumix for construction companies",
+      "subtitle": "Control, savings and transparency at every stage of the work.",
+      "items": [
+        {
+          "title": "Full control of sites and equipment",
+          "description": "Manage all cranes, sites and crane operators from a single dashboard."
+        },
+        {
+          "title": "Geolocation and shift control",
+          "description": "See who's actually on site, when the shift started and how many hours have been worked."
+        },
+        {
+          "title": "Automated payroll",
+          "description": "Timesheets, payouts, overtime — calculated automatically without errors."
+        },
+        {
+          "title": "Fast staff replacement",
+          "description": "Operator didn't show up? Find a replacement in minutes through the built-in marketplace."
+        },
+        {
+          "title": "Rating system",
+          "description": "Work only with verified specialists who have a strong reputation."
+        },
+        {
+          "title": "Analytics and reports",
+          "description": "Understand the real costs and efficiency of every site."
+        }
+      ],
+      "outcome": "Lower costs, less manual work, and full control over your processes."
+    },
+    "forOperators": {
+      "overline": "For operators",
+      "title": "Jumix for crane operators",
+      "subtitle": "More work, transparent income, fair shift tracking.",
+      "items": [
+        {
+          "title": "Simple mobile app",
+          "description": "Start and end your shift with a single tap."
+        },
+        {
+          "title": "Transparent earnings",
+          "description": "Always see how much you've earned and which shifts it's for."
+        },
+        {
+          "title": "Work confirmed without disputes",
+          "description": "Geolocation records your presence on site."
+        },
+        {
+          "title": "Access to new jobs",
+          "description": "List yourself in the marketplace and receive offers from companies."
+        },
+        {
+          "title": "Personal rating",
+          "description": "The higher your rating — the more orders and the higher your income."
+        },
+        {
+          "title": "Feedback and safety",
+          "description": "Report equipment issues directly through the app."
+        }
+      ],
+      "outcome": "Steady employment, fair pay and growing income."
+    },
+    "howItWorks": {
+      "overline": "Process",
+      "title": "How it works",
+      "subtitle": "Three steps from sign-up to fully automated shift tracking.",
+      "steps": [
+        {
+          "label": "01",
+          "title": "Sign up",
+          "description": "The company creates an account and invites crane operators. Operators sign up through the mobile app."
+        },
+        {
+          "label": "02",
+          "title": "Assign sites",
+          "description": "The company adds sites with geofence boundaries. Operators get access to start working."
+        },
+        {
+          "label": "03",
+          "title": "Digital shift tracking",
+          "description": "Every shift is recorded automatically. Geolocation confirms presence, hours are calculated without errors."
+        }
+      ]
+    },
+    "whyJumix": {
+      "overline": "Why Jumix",
+      "title": "The platform that's building a new industry",
+      "subtitle": "Five reasons why companies and crane operators choose Jumix.",
+      "items": [
+        {
+          "title": "Fully digital workflow",
+          "description": "No Excel, no paperwork, no lost data. Everything in one system."
+        },
+        {
+          "title": "Transparency for everyone",
+          "description": "Companies see actual hours worked. Operators see fair payouts. Disputes are eliminated."
+        },
+        {
+          "title": "2–3× faster operations",
+          "description": "Finding replacements, calculating payroll, tracking shifts — what used to take hours now takes minutes."
+        },
+        {
+          "title": "Fewer errors",
+          "description": "Automation removes the human factor from critical calculations."
+        },
+        {
+          "title": "Single industry platform",
+          "description": "We're building a marketplace where companies find reliable specialists and crane operators get steady work."
+        }
+      ]
+    },
+    "finalCta": {
+      "overline": "Ready to start?",
+      "title": "Roll out Jumix at your company",
+      "subtitle": "Message us on WhatsApp — we'll walk you through the platform, give you a demo and help you onboard.",
+      "ctaWhatsApp": "Message on WhatsApp",
+      "ctaLogin": "Already registered? Sign in",
+      "phoneNote": "Or call: +7 702 224 44 28"
+    },
+    "footer": {
+      "tagline": "Digital platform for crane services in Kazakhstan",
+      "navTitle": "Platform",
+      "navFeatures": "Features",
+      "navHowItWorks": "How it works",
+      "navLogin": "Sign in",
+      "contactsTitle": "Contacts",
+      "phone": "+7 702 224 44 28",
+      "phoneHref": "tel:+77022244428",
+      "whatsapp": "WhatsApp",
+      "email": "info@jumix.kz",
+      "city": "Shymkent, Kazakhstan",
+      "legalTitle": "Documents",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "copyright": "© 2026 Jumix.kz · All rights reserved"
+    },
+    "whatsappMessage": "Hello, I'm interested in Jumix",
+    "privacy": {
+      "title": "Privacy Policy",
+      "lastUpdated": "Effective from 17 April 2026",
+      "intro": "Jumix LLP (hereinafter — the \"Operator\") processes personal data of users of the Jumix platform (jumix.kz, app.jumix.kz, mobile application) in accordance with the Law of the Republic of Kazakhstan \"On Personal Data and its Protection\".",
+      "sectionsTitle": "Policy contents",
+      "section1Title": "1. What data we collect",
+      "section1Body": "We collect: first and last name, IIN (individual identification number), phone number, driver/crane operator license details, photos of licenses, geolocation data during work shifts, photos and descriptions of incidents. For companies — legal entity details, BIN (business identification number), and contact details of authorized persons.",
+      "section2Title": "2. Purposes of processing",
+      "section2Body": "User identification, verification of crane operators' professional qualifications, recording of work shifts, payroll calculation, ensuring safety on sites, resolving disputes between parties, and complying with legal requirements.",
+      "section3Title": "3. Disclosure to third parties",
+      "section3Body": "We do not disclose personal data to third parties, except: (a) to the crane operator's employer company — data on professional qualifications and shifts worked; (b) to authorized state authorities upon request; (c) to technical contractors (hosting, SMS provider) — to the extent necessary to provide services, under non-disclosure agreements.",
+      "section4Title": "4. Retention periods",
+      "section4Body": "Data is retained for the duration of the account and for 5 years after deletion for accounting and tax purposes. Geolocation records are retained for 12 months and then anonymized.",
+      "section5Title": "5. User rights",
+      "section5Body": "You have the right to: receive information about the processing of your data, request its modification or deletion, and withdraw consent to processing. Send requests to info@jumix.kz.",
+      "section6Title": "6. Security",
+      "section6Body": "We apply technical and organizational protection measures: encryption in transit (TLS), storing passwords as hashes, restricting access to data on a least-privilege basis, and regular backups.",
+      "section7Title": "7. Policy changes",
+      "section7Body": "The Operator may amend this Policy. The current version is published at jumix.kz/privacy. Material changes are additionally communicated to users.",
+      "contactTitle": "Contacts for inquiries",
+      "contactBody": "Jumix LLP, info@jumix.kz, +7 702 224 44 28.",
+      "legalNotice": "This document requires legal review before public launch of the platform."
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "lastUpdated": "Effective from 17 April 2026",
+      "intro": "These Terms govern the use of the Jumix platform (hereinafter — the \"Platform\"), operated by Jumix LLP (hereinafter — the \"Operator\"). By registering on the Platform, you confirm your agreement with these terms.",
+      "section1Title": "1. Subject of the agreement",
+      "section1Body": "The Operator provides Users with access to the Platform for managing crane equipment, work shifts, labor accounting and interaction between construction companies and crane operators.",
+      "section2Title": "2. User rights and obligations",
+      "section2Body": "The User undertakes to provide accurate data, not to share the account with third parties, not to use the Platform for purposes contrary to the legislation of the Republic of Kazakhstan, and not to attempt to bypass the Platform's technical restrictions.",
+      "section3Title": "3. Operator rights and obligations",
+      "section3Body": "The Operator undertakes to ensure the Platform's operability, protection of personal data, and timely notification of changes. The Operator may restrict the User's access in case of violation of these Terms.",
+      "section4Title": "4. Intellectual property",
+      "section4Body": "All rights to the Platform, its source code, design, content and trademarks belong to the Operator. The User is granted a limited non-exclusive license to use the Platform within the available functionality.",
+      "section5Title": "5. Liability",
+      "section5Body": "The Operator is not liable for User actions on the Platform, for the quality of services provided by third parties through the Platform, or for damages caused by the User's violation of these Terms. Settlements between companies and crane operators are the direct responsibility of the parties.",
+      "section6Title": "6. Amendment and termination",
+      "section6Body": "The Operator may unilaterally amend the Terms with notice to Users. The User may terminate the Terms at any time by deleting their account. The Operator may terminate the Terms in case of systematic violation of its provisions.",
+      "section7Title": "7. Applicable law",
+      "section7Body": "These Terms are governed by the laws of the Republic of Kazakhstan. Disputes are resolved in the manner established by law, at the location of the Operator.",
+      "contactTitle": "Operator contacts",
+      "contactBody": "Jumix LLP, info@jumix.kz, +7 702 224 44 28, Shymkent.",
+      "legalNotice": "This document requires legal review before public launch of the platform."
+    }
+  }
+}

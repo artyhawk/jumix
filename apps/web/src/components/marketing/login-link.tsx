@@ -1,4 +1,6 @@
-import { t } from '@/lib/i18n'
+'use client'
+
+import { useT } from '@/lib/marketing-locale'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -33,6 +35,7 @@ export function LoginLink({
   label?: string
   className?: string
 }) {
+  const t = useT()
   return (
     <Link
       href="/login"

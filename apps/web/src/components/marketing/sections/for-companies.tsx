@@ -1,9 +1,11 @@
+'use client'
+
 import { AnimatedSection } from '@/components/marketing/animated-section'
 import { FeatureCard } from '@/components/marketing/feature-card'
 import { SectionContainer } from '@/components/marketing/section-container'
 import { SectionHeading } from '@/components/marketing/section-heading'
 import { StaggerItem, StaggeredChildren } from '@/components/marketing/staggered-children'
-import { t, tList } from '@/lib/i18n'
+import { useT, useTList } from '@/lib/marketing-locale'
 import { BarChart3, Calculator, LayoutDashboard, MapPin, Star, Zap } from 'lucide-react'
 
 const ICONS = [
@@ -21,7 +23,9 @@ interface Item {
 }
 
 export function ForCompaniesSection() {
-  const items = tList<Item>('marketing.forCompanies.items')
+  const t = useT()
+  const tList = useTList<Item>()
+  const items = tList('marketing.forCompanies.items')
 
   return (
     <SectionContainer id="for-companies" className="relative">

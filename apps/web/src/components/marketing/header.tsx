@@ -1,10 +1,11 @@
 'use client'
 
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { LocaleSwitcher } from './locale-switcher'
 import { LoginLink } from './login-link'
 import { WhatsAppButton } from './whatsapp-button'
 
@@ -15,6 +16,7 @@ const NAV_LINKS = [
 ]
 
 export function Header() {
+  const t = useT()
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -66,7 +68,8 @@ export function Header() {
             ))}
           </nav>
 
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <LocaleSwitcher />
             <LoginLink variant="ghost" size="md" className="hidden sm:inline-flex" />
             <WhatsAppButton variant="primary" size="md">
               {t('marketing.nav.contact')}

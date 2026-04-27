@@ -910,3 +910,43 @@ Frequency by crane / by site / by operator. Backlog dashboard widget когда 
 
 ### Mobile safety flow (M6-b — следующий коммит)
 Nested `(tabs)/shifts/start/{crane,checklist}` route + `(tabs)/shifts/incidents/{index,new,[id]}`. ChecklistScreen с long-press photo+notes per item; CreateIncidentForm с up to 5 photos через three-phase upload + GPS auto-attach. Active shift screen — CTA «Сообщить о происшествии».
+
+---
+
+## Customer development surveys (from B3-SURVEY)
+
+### Email notifications на superadmin при new response
+Instant lead alerts. Backend hook on insert `survey_responses` → email через SMTP/SES → owner inbox с link к `/surveys/[slug]/responses?open=<id>`. Trigger: после первой публичной реклам campaign.
+
+### CSV export survey responses
+Analytics convenience — superadmin frizz csv от admin UI с filters. `GET /admin/surveys/:slug/responses.csv?...` returns text/csv с denormalized columns (one column per question position). MVP пропустили чтобы не добавлять complexity.
+
+### localStorage backup answers
+Public form refresh resilience. На каждый answer/contact change → save в `localStorage[survey-{slug}-draft]`; mount restore + prompt «Продолжить заполнение?». MVP — без этого (KISS), respondents редко refresh длинные формы.
+
+### CAPTCHA integration
+hCaptcha / Cloudflare Turnstile если spam становится actual problem (rate-limit + honeypot bypass'ятся sophisticated bots). Добавить `<Captcha>` component перед submit + backend verify token. Trigger: > 10% honeypot_filled или явные DDoS waves.
+
+### Analytics dashboard
+Response counts по survey + locale + day-cohort, conversion rate intro→submit (потребует instrumentation per-stage), drop-off per question (потребует partial-save endpoint или client-side tracking). Aggregation pipeline в admin /surveys overview.
+
+### Custom survey builder UI
+Admin может создавать new surveys без code change. Form-builder с drag-drop questions, group editor, locale-variant management. MVP — hardcoded в seed, justified для 4 фиксированных templates на старте.
+
+### A/B testing вопросов
+Alternative formulations (`question_text_v2` колонка, randomly assigned per response). Statistical significance после ≥100 responses per variant. Backlog когда B3-SURVEY будет в production достаточно долго для metric collection.
+
+### Translation workflow для kk/en survey content
+Kazakh content уже seeded но NOT yet exposed на kk landing (B3-LANDING ru-only currently). Когда kk-landing translation готов — locale switch в landing automatically routes к kk surveys (CTAs already wired через `useLocale()`). EN surveys — после market expansion.
+
+### Survey response reply
+Superadmin отвечает респонденту через email прямо из drawer'а. `POST /admin/surveys/:slug/responses/:id/reply {subject, body}` → SMTP send + audit log. После lead-followup pipeline.
+
+### Date range picker UI
+`/surveys/[slug]` filter bar — date-range picker для `from`/`to` query params. Backend уже supports (zod schema). MVP without (search достаточен), backlog для analytics-heavy use.
+
+### Per-question analytics view
+Admin клик на survey → tab «По вопросам» → grid с aggregated responses per question (text-cloud для open answers, histograms для numeric если они появятся). Polish step после CSV export.
+
+### Re-classify response severity / categorization
+Admin может tag response (`hot lead` / `cold` / `interview booked`) — backlog для CRM-lite features. Сейчас admin читает и копирует контакт вручную.

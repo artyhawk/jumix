@@ -18,6 +18,7 @@ import organizationPlugin from './modules/organization/organization.plugin'
 import registrationPlugin from './modules/registration/registration.plugin'
 import shiftPlugin from './modules/shift/shift.plugin'
 import sitePlugin from './modules/site/site.plugin'
+import surveyPlugin from './modules/survey/survey.plugin'
 import authenticatePlugin from './plugins/authenticate'
 import bullmqPlugin from './plugins/bullmq'
 import { registerErrorHandler } from './plugins/error-handler'
@@ -89,6 +90,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   await app.register(checklistPlugin)
   await app.register(dashboardPlugin)
   await app.register(auditPlugin)
+  await app.register(surveyPlugin)
 
   return app
 }

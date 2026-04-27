@@ -1,9 +1,11 @@
+'use client'
+
 import { AnimatedSection } from '@/components/marketing/animated-section'
 import { SectionContainer } from '@/components/marketing/section-container'
 import { SectionHeading } from '@/components/marketing/section-heading'
 import { StaggerItem, StaggeredChildren } from '@/components/marketing/staggered-children'
 import { StepIllustration } from '@/components/marketing/visuals/step-illustration'
-import { t, tList } from '@/lib/i18n'
+import { useT, useTList } from '@/lib/marketing-locale'
 
 interface Step {
   label: string
@@ -12,7 +14,9 @@ interface Step {
 }
 
 export function HowItWorksSection() {
-  const steps = tList<Step>('marketing.howItWorks.steps').slice(0, 3)
+  const t = useT()
+  const tList = useTList<Step>()
+  const steps = tList('marketing.howItWorks.steps').slice(0, 3)
 
   return (
     <SectionContainer id="how-it-works">

@@ -1,9 +1,11 @@
+'use client'
+
 import { AnimatedSection } from '@/components/marketing/animated-section'
 import { SectionContainer } from '@/components/marketing/section-container'
 import { SectionHeading } from '@/components/marketing/section-heading'
 import { StaggerItem, StaggeredChildren } from '@/components/marketing/staggered-children'
 import { PhoneMockup } from '@/components/marketing/visuals/phone-mockup'
-import { t, tList } from '@/lib/i18n'
+import { useT, useTList } from '@/lib/marketing-locale'
 
 interface Item {
   title: string
@@ -11,7 +13,9 @@ interface Item {
 }
 
 export function ForOperatorsSection() {
-  const items = tList<Item>('marketing.forOperators.items')
+  const t = useT()
+  const tList = useTList<Item>()
+  const items = tList('marketing.forOperators.items')
 
   return (
     <SectionContainer id="for-operators" className="relative bg-[var(--m-surface)]/40">

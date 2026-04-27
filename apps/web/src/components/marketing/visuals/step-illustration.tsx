@@ -43,7 +43,7 @@ function Registration() {
       role="img"
       aria-label="Ноутбук и телефон, соединённые пунктирной линией"
     >
-      <title>Регистрация компании и крановщиков</title>
+      <title>Регистрация компании и крановых</title>
       <defs>
         <linearGradient id="reg-grad" x1="0" x2="1" y1="0" y2="1">
           <stop offset="0%" stopColor="rgba(249,123,16,0.18)" />
