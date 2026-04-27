@@ -82,6 +82,10 @@ services:
         max-file: "5"
 
   api:
+    # На VPS используется pre-built image из GHCR (CI собирает + пушит).
+    # Tag фиксируется через ${IMAGE_TAG:-latest} — workflow подставляет git sha.
+    # Локально без `pull` подтянется через build: блок ниже.
+    image: ${API_IMAGE:-ghcr.io/artyhawk/jumix-api:latest}
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
@@ -121,6 +125,7 @@ services:
         max-file: "5"
 
   web:
+    image: ${WEB_IMAGE:-ghcr.io/artyhawk/jumix-web:latest}
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile

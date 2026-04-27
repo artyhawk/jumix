@@ -1,0 +1,76 @@
+name: EAS Build (mobile)
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Target platform"
+        type: choice
+        required: true
+        default: all
+        options: [all, ios, android]
+      profile:
+        description: "EAS profile"
+        type: choice
+        required: true
+        default: preview
+        options: [development, preview, production]
+      submit:
+        description: "Submit к store после build (только для production)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: eas-${{ github.event.inputs.platform }}-${{ github.event.inputs.profile }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9.15.0"
+
+jobs:
+  build:
+    name: EAS build (${{ inputs.platform }} / ${{ inputs.profile }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install monorepo deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: EAS build
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas build \
+            --platform ${{ inputs.platform }} \
+            --profile ${{ inputs.profile }} \
+            --non-interactive \
+            --no-wait
+
+      - name: EAS submit (если submit=true И profile=production)
+        if: ${{ inputs.submit == true && inputs.profile == 'production' }}
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas submit \
+            --platform ${{ inputs.platform }} \
+            --latest \
+            --non-interactive

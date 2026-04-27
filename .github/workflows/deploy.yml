@@ -1,0 +1,155 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_migrations:
+        description: "Skip running DB migrations"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9.15.0"
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: ${{ github.repository_owner }}
+  API_IMAGE_NAME: jumix-api
+  WEB_IMAGE_NAME: jumix-web
+
+jobs:
+  # Auto-skip если CI failed (workflow_run не учитывает conclusion в фильтре).
+  guard:
+    name: Guard
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+      sha_short: ${{ steps.meta.outputs.sha_short }}
+    steps:
+      - id: meta
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha || github.sha }}"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "sha_short=${SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+  build-images:
+    name: Build & push images
+    runs-on: ubuntu-latest
+    needs: guard
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - service: api
+            image: jumix-api
+            dockerfile: apps/api/Dockerfile
+          - service: web
+            image: jumix-web
+            dockerfile: apps/web/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.guard.outputs.sha }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.image }}
+          tags: |
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build & push ${{ matrix.service }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+  deploy:
+    name: SSH deploy to VPS
+    runs-on: ubuntu-latest
+    needs: [guard, build-images]
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.guard.outputs.sha }}
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_HOST_KEY }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Sync deploy artefacts
+        # Только compose-файл + nginx config + helper scripts. Source code не нужен — образы уже в GHCR.
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "mkdir -p ${{ secrets.DEPLOY_PATH }}/infra/docker ${{ secrets.DEPLOY_PATH }}/infra/nginx ${{ secrets.DEPLOY_PATH }}/infra/scripts"
+          rsync -az --delete -e "ssh -i ~/.ssh/id_ed25519" \
+            infra/docker/docker-compose.prod.yml \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/infra/docker/
+          rsync -az --delete -e "ssh -i ~/.ssh/id_ed25519" \
+            infra/nginx/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/infra/nginx/
+          rsync -az -e "ssh -i ~/.ssh/id_ed25519" \
+            infra/scripts/deploy.sh \
+            infra/scripts/backup-db.sh \
+            infra/scripts/restore-db.sh \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/infra/scripts/
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "chmod +x ${{ secrets.DEPLOY_PATH }}/infra/scripts/*.sh"
+
+      - name: Pull images & restart stack
+        env:
+          API_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.API_IMAGE_NAME }}:sha-${{ needs.guard.outputs.sha_short }}
+          WEB_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.WEB_IMAGE_NAME }}:sha-${{ needs.guard.outputs.sha_short }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd ${{ secrets.DEPLOY_PATH }} && \
+             API_IMAGE='${API_IMAGE}' WEB_IMAGE='${WEB_IMAGE}' \
+             GHCR_USER='${{ github.actor }}' GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}' \
+             SKIP_MIGRATIONS='${{ inputs.skip_migrations }}' \
+             ./infra/scripts/deploy.sh"
+
+      - name: Smoke test /health
+        run: |
+          for i in 1 2 3 4 5; do
+            if ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+                 "curl -fsS http://127.0.0.1/health > /dev/null"; then
+              echo "✓ /health passed (attempt $i)"
+              exit 0
+            fi
+            echo "waiting for /health… (attempt $i)"
+            sleep 6
+          done
+          echo "✗ /health failed after 5 attempts"
+          exit 1
