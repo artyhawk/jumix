@@ -19,7 +19,7 @@
     "docker:dev:up": "docker compose -f infra/docker/docker-compose.dev.yml up -d",
     "docker:dev:down": "docker compose -f infra/docker/docker-compose.dev.yml down",
     "docker:dev:logs": "docker compose -f infra/docker/docker-compose.dev.yml logs -f",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install || true"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
