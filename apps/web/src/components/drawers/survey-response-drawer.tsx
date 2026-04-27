@@ -149,9 +149,7 @@ export function SurveyResponseDrawer({ slug, id, onOpenChange }: Props) {
                 <dl className="text-xs text-text-tertiary space-y-1">
                   <div>
                     <span>Отправлено: </span>
-                    <span className="text-text-secondary">
-                      {formatRuDate(detail.submittedAt, 'datetime')}
-                    </span>
+                    <span className="text-text-secondary">{formatRuDate(detail.submittedAt)}</span>
                   </div>
                   {detail.ipAddress ? (
                     <div>
