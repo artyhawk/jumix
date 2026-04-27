@@ -111,10 +111,16 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-/run/secrets/jwt_private.pem}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_public.pem}
       SMS_GATEWAY_URL: ${SMS_GATEWAY_URL}
       SMS_GATEWAY_KEY: ${SMS_GATEWAY_KEY}
       SENTRY_DSN: ${SENTRY_DSN:-}
       TZ: Asia/Almaty
+    volumes:
+      # RSA keypair для JWT signing — generated один раз через openssl
+      # на VPS, mounted read-only. Read-only защищает от случайной перезаписи.
+      - /var/lib/jumix/secrets:/run/secrets:ro
     depends_on:
       postgres:
         condition: service_healthy
