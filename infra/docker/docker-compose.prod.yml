@@ -157,17 +157,26 @@ services:
         max-size: "20m"
         max-file: "5"
 
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: jumix-nginx
+  caddy:
+    # Caddy auto-handles Let's Encrypt TLS (HTTP-01 challenge на :80,
+    # HTTPS на :443). Запрашивает сертификаты при первом запуске для
+    # каждого `name { }` блока в Caddyfile. caddy_data named volume
+    # хранит ACME state + private keys — НЕ удалять (rate-limit 5/week).
+    image: caddy:2.8-alpine
+    container_name: jumix-caddy
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3
     volumes:
-      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      # pmtiles host-mounted: оператор скачивает kz.pmtiles с protomaps.com
-      # и кладёт в /var/lib/jumix/tiles/ (см. README).
-      - /var/lib/jumix/tiles:/var/lib/jumix/tiles:ro
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      # pmtiles host-mounted (B3-UI-5b) — оператор кладёт kz.pmtiles в
+      # /var/lib/jumix/tiles, Caddy сервит через jumix.kz/tiles/* +
+      # tiles.jumix.kz subdomain.
+      - /var/lib/jumix/tiles:/srv/tiles:ro
     depends_on:
       - api
       - web
@@ -176,3 +185,7 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+
+volumes:
+  caddy_data:
+  caddy_config:

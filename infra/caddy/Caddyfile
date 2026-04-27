@@ -1,0 +1,121 @@
+# Jumix reverse proxy с auto-HTTPS via Let's Encrypt (B3-DEPLOY).
+#
+# Caddy сам получает + обновляет TLS-сертификаты при условии что A-records
+# домена указывают на этот VPS (HTTP-01 ACME challenge).
+#
+# DNS требования:
+#   jumix.kz, app.jumix.kz, api.jumix.kz, www.jumix.kz, tiles.jumix.kz
+#   → A 185.91.126.126
+#
+# Серты + ACME-state хранятся в named volume `caddy_data` — НЕ удалять
+# (потеря = принудительная переотдача сертов; Let's Encrypt rate-limit
+# 5 success / 5 fail per registered domain per week).
+
+{
+	# ACME contact для Let's Encrypt notifications об expiry / revocation.
+	email info@jumix.kz
+
+	# Включить Zstd encoding по умолчанию для всех reverse_proxy.
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+# Главный домен — landing + cabinet + api/storage proxies.
+# Next.js разруливает /login, /dashboard, /me, /survey/[slug] etc внутри.
+jumix.kz, www.jumix.kz, app.jumix.kz {
+	encode gzip zstd
+
+	# Security headers (HSTS только под TLS — Caddy сам отключает на HTTP).
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=15552000; includeSubDomains"
+		# Удаляем server header (information disclosure).
+		-Server
+	}
+
+	# /api/* → API container (Fastify уже использует /api/v1 prefix внутри)
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# Health passthrough (orchestrator probes / smoke tests)
+	handle /health {
+		reverse_proxy api:3000
+	}
+	handle /health/* {
+		reverse_proxy api:3000
+	}
+
+	# /storage/* → MinIO (presigned URLs из API уходят к клиенту с этим хостом)
+	# strip_prefix потому что MinIO ожидает прямой /bucket/key path.
+	handle /storage/* {
+		uri strip_prefix /storage
+		reverse_proxy minio:9000
+	}
+
+	# /tiles/* → static pmtiles файлы (host-mounted в /var/lib/jumix/tiles)
+	handle /tiles/* {
+		uri strip_prefix /tiles
+		root * /srv/tiles
+		file_server {
+			precompressed gzip
+		}
+		header {
+			Cache-Control "public, max-age=86400"
+			Access-Control-Allow-Origin *
+			Accept-Ranges bytes
+		}
+	}
+
+	# Robots.txt + sitemap.xml — генерит Next.js, fall through.
+	# Всё остальное → Next.js (landing + cabinet routes)
+	handle {
+		reverse_proxy web:3000
+	}
+
+	# Body size limit — license uploads до 10MB + margin.
+	request_body {
+		max_size 12MB
+	}
+}
+
+# Dedicated API subdomain — pure JSON, без Next.js fallback.
+# Удобно для mobile app + сторонних интеграций.
+api.jumix.kz {
+	encode gzip zstd
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=15552000; includeSubDomains"
+		-Server
+	}
+
+	# CORS для mobile / external clients (preflight уже в Fastify, но safety net).
+	@cors_preflight method OPTIONS
+	respond @cors_preflight 204
+
+	reverse_proxy api:3000
+
+	request_body {
+		max_size 12MB
+	}
+}
+
+# Tiles subdomain — будущий CDN-ready endpoint для maplibre.
+tiles.jumix.kz {
+	encode gzip
+	root * /srv/tiles
+	file_server {
+		precompressed gzip
+	}
+	header {
+		Cache-Control "public, max-age=86400, immutable"
+		Access-Control-Allow-Origin *
+		Accept-Ranges bytes
+		-Server
+	}
+}

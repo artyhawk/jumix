@@ -109,16 +109,16 @@ jobs:
           chmod 644 ~/.ssh/known_hosts
 
       - name: Sync deploy artefacts
-        # Только compose-файл + nginx config + helper scripts. Source code не нужен — образы уже в GHCR.
+        # Только compose-файл + caddy config + helper scripts. Source code не нужен — образы уже в GHCR.
         run: |
           ssh -i ~/.ssh/id_ed25519 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "mkdir -p ${{ secrets.DEPLOY_PATH }}/infra/docker ${{ secrets.DEPLOY_PATH }}/infra/nginx ${{ secrets.DEPLOY_PATH }}/infra/scripts"
+            "mkdir -p ${{ secrets.DEPLOY_PATH }}/infra/docker ${{ secrets.DEPLOY_PATH }}/infra/caddy ${{ secrets.DEPLOY_PATH }}/infra/scripts"
           rsync -az --delete -e "ssh -i ~/.ssh/id_ed25519" \
             infra/docker/docker-compose.prod.yml \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/infra/docker/
           rsync -az --delete -e "ssh -i ~/.ssh/id_ed25519" \
-            infra/nginx/ \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/infra/nginx/
+            infra/caddy/ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ secrets.DEPLOY_PATH }}/infra/caddy/
           rsync -az -e "ssh -i ~/.ssh/id_ed25519" \
             infra/scripts/deploy.sh \
             infra/scripts/backup-db.sh \
