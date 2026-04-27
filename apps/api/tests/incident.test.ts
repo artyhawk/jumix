@@ -102,9 +102,20 @@ function nextPhone(): string {
 // одного container'а (iin partial-unique active idx может конфликтовать
 // при rerunʼе если seq резетится).
 let iinSeq = 80_000 + (Math.floor(Date.now() / 1000) % 10000)
+const seenIins = new Set<string>()
 function nextIin(): string {
-  iinSeq += 1
-  return iinFor(iinSeq)
+  // iinFor() при checksum=10 инкрементит свой внутренний base но НЕ сообщает
+  // об этом наружу — соседние seeds могут вернуть один и тот же iin.
+  // Set-based dedup гарантирует уникальность даже когда алгоритм коллидирует.
+  for (let attempts = 0; attempts < 200; attempts += 1) {
+    iinSeq += 1
+    const candidate = iinFor(iinSeq)
+    if (!seenIins.has(candidate)) {
+      seenIins.add(candidate)
+      return candidate
+    }
+  }
+  throw new Error('nextIin: collision retries exhausted')
 }
 
 async function createSite(token: string, name: string): Promise<{ id: string }> {
