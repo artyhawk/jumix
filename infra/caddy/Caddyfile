@@ -105,6 +105,46 @@ api.jumix.kz {
 	}
 }
 
+# Прямой IP-доступ (HTTP only — Let's Encrypt не выдаёт серты для raw IP).
+# `http://` prefix отключает auto-HTTPS-redirect. Удобно пока DNS-кеш на dev-
+# машине пропагирует, или для smoke-теста после bootstrap'а нового VPS.
+http://185.91.126.126 {
+	encode gzip zstd
+
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+	handle /health {
+		reverse_proxy api:3000
+	}
+	handle /health/* {
+		reverse_proxy api:3000
+	}
+	handle /storage/* {
+		uri strip_prefix /storage
+		reverse_proxy minio:9000
+	}
+	handle /tiles/* {
+		uri strip_prefix /tiles
+		root * /srv/tiles
+		file_server {
+			precompressed gzip
+		}
+		header {
+			Cache-Control "public, max-age=86400"
+			Access-Control-Allow-Origin *
+			Accept-Ranges bytes
+		}
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+
+	request_body {
+		max_size 12MB
+	}
+}
+
 # Tiles subdomain — будущий CDN-ready endpoint для maplibre.
 tiles.jumix.kz {
 	encode gzip
