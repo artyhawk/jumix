@@ -79,7 +79,7 @@ export function organizationJsonLd() {
     address: {
       '@type': 'PostalAddress',
       addressCountry: 'KZ',
-      addressLocality: 'Шымкент',
+      addressLocality: 'Астана',
     },
     contactPoint: {
       '@type': 'ContactPoint',

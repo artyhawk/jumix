@@ -57,7 +57,7 @@ export function CreateHireRequestDialog({ open, onOpenChange }: Props) {
       handleClose(false)
     } catch (err) {
       if (isAppError(err) && err.code === 'OPERATOR_ALREADY_HIRED') {
-        toast.error('Этот крановщик уже работает в вашей компании')
+        toast.error('Этот крановой уже работает в вашей компании')
         return
       }
       const message = isAppError(err) ? err.message : 'Попробуйте ещё раз'
@@ -68,9 +68,9 @@ export function CreateHireRequestDialog({ open, onOpenChange }: Props) {
   return (
     <DialogRoot open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl">
-        <DialogTitle>Нанять крановщика</DialogTitle>
+        <DialogTitle>Нанять кранового</DialogTitle>
         <DialogDescription>
-          Найдите крановщика по ФИО или ИИН. Заявка отправится на одобрение платформе.
+          Найдите кранового по ФИО или ИИН. Заявка отправится на одобрение платформе.
         </DialogDescription>
 
         <StepIndicator current={step} />
@@ -130,7 +130,7 @@ function Step1Search({
           setDebounced(v)
         }}
         placeholder="ФИО или ИИН…"
-        ariaLabel="Поиск крановщика"
+        ariaLabel="Поиск кранового"
       />
 
       <div className="min-h-[240px]">
@@ -149,7 +149,7 @@ function Step1Search({
         ) : items.length === 0 ? (
           <EmptyHint
             icon={<Search className="size-8 text-text-tertiary" strokeWidth={1.5} aria-hidden />}
-            title="Крановщики не найдены"
+            title="Крановые не найдены"
             subtitle="Проверьте написание или попросите оператора зарегистрироваться"
           />
         ) : (
@@ -217,8 +217,8 @@ function Step2Confirm({
                 : 'Удостоверение просрочено'}
             </span>
             <span className="text-xs text-text-secondary">
-              Заявку можно подать, но крановщик не сможет выйти на смену, пока удостоверение не
-              будет обновлено.
+              Заявку можно подать, но крановой не сможет выйти на смену, пока удостоверение не будет
+              обновлено.
             </span>
           </div>
         </div>

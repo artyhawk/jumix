@@ -4,6 +4,7 @@ import { useT } from '@/lib/marketing-locale'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { LocaleSwitcher } from './locale-switcher'
 import { LoginLink } from './login-link'
@@ -17,6 +18,8 @@ const NAV_LINKS = [
 
 export function Header() {
   const t = useT()
+  const pathname = usePathname()
+  const isHome = pathname === '/'
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -56,17 +59,19 @@ export function Header() {
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8" aria-label="Главная навигация">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.key}
-                href={link.href}
-                className="text-sm text-[var(--m-fg-secondary)] hover:text-[var(--m-fg)] transition-colors"
-              >
-                {t(`marketing.nav.${link.key}`)}
-              </a>
-            ))}
-          </nav>
+          {isHome ? (
+            <nav className="hidden md:flex items-center gap-8" aria-label="Главная навигация">
+              {NAV_LINKS.map((link) => (
+                <a
+                  key={link.key}
+                  href={link.href}
+                  className="text-sm text-[var(--m-fg-secondary)] hover:text-[var(--m-fg)] transition-colors"
+                >
+                  {t(`marketing.nav.${link.key}`)}
+                </a>
+              ))}
+            </nav>
+          ) : null}
 
           <div className="flex items-center gap-1.5 md:gap-2">
             <LocaleSwitcher />

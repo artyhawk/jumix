@@ -148,9 +148,9 @@ describe('MyOperatorsPage', () => {
     list.mockResolvedValue({ items: [], nextCursor: null })
     renderPage()
     await waitFor(() =>
-      expect(screen.getByText('У вас пока нет нанятых крановщиков')).toBeInTheDocument(),
+      expect(screen.getByText('У вас пока нет нанятых крановых')).toBeInTheDocument(),
     )
-    const cta = screen.getByRole('button', { name: 'Нанять крановщика' })
+    const cta = screen.getByRole('button', { name: 'Нанять кранового' })
     await userEvent.click(cta)
     expect(push).toHaveBeenCalledWith('/hire-requests?create=true')
   })

@@ -58,7 +58,7 @@ describe('RecentActivity', () => {
     list.mockResolvedValueOnce(payload)
     renderIt()
     await waitFor(() => expect(screen.getByText('Создал организацию')).toBeInTheDocument())
-    expect(screen.getByText('Одобрил крановщика')).toBeInTheDocument()
+    expect(screen.getByText('Одобрил кранового')).toBeInTheDocument()
     expect(screen.getByText('ТОО «Альфа»')).toBeInTheDocument()
     expect(screen.getByText('Ербол')).toBeInTheDocument()
   })

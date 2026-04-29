@@ -66,7 +66,7 @@ export default function HireRequestsPage() {
             className="w-full md:w-auto"
           >
             <Plus className="size-4" strokeWidth={1.5} aria-hidden />
-            Нанять крановщика
+            Нанять кранового
           </Button>
         }
       />
@@ -79,10 +79,10 @@ export default function HireRequestsPage() {
         <EmptyState
           icon={UserPlus}
           title="Нет активных заявок"
-          description="Подайте первую заявку на найм — после одобрения платформой крановщик появится в команде."
+          description="Подайте первую заявку на найм — после одобрения платформой крановой появится в команде."
           action={
             <Button variant="primary" onClick={() => setParam('create', 'true')}>
-              Нанять крановщика
+              Нанять кранового
             </Button>
           }
         />

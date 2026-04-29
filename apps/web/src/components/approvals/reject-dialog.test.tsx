@@ -85,7 +85,7 @@ describe('RejectDialog', () => {
 
   it('renders title + entity label when open', () => {
     renderDialog()
-    expect(screen.getByText('Отклонить заявку крановщика?')).toBeInTheDocument()
+    expect(screen.getByText('Отклонить заявку кранового?')).toBeInTheDocument()
     expect(screen.getByText('Иванов Иван')).toBeInTheDocument()
   })
 

@@ -87,7 +87,7 @@ export default function MyOperatorsPage() {
   const columns: DataTableColumn<OrganizationOperator>[] = [
     {
       key: 'operator',
-      header: 'Крановщик',
+      header: 'Крановой',
       cell: (h) => {
         const cp = h.craneProfile
         const name = [cp.lastName, cp.firstName, cp.patronymic].filter(Boolean).join(' ')
@@ -138,7 +138,7 @@ export default function MyOperatorsPage() {
         subtitle={
           rows.length > 0
             ? `${rows.length} ${rows.length === 1 ? 'работник' : 'работников'}`
-            : 'Нет нанятых крановщиков'
+            : 'Нет нанятых крановых'
         }
       />
 
@@ -195,14 +195,14 @@ export default function MyOperatorsPage() {
             ) : (
               <EmptyState
                 icon={HardHat}
-                title="У вас пока нет нанятых крановщиков"
-                description="Подайте заявку на найм — после одобрения платформой крановщик появится в команде."
+                title="У вас пока нет нанятых крановых"
+                description="Подайте заявку на найм — после одобрения платформой крановой появится в команде."
                 action={
                   <Button
                     variant="primary"
                     onClick={() => router.push('/hire-requests?create=true')}
                   >
-                    Нанять крановщика
+                    Нанять кранового
                   </Button>
                 }
               />

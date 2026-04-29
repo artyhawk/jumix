@@ -159,7 +159,7 @@ describe('DashboardPage', () => {
     renderPage()
     await waitFor(() => {
       expect(
-        screen.getAllByRole('link', { name: /Организации|Крановщики|Краны|Активные найма/ }),
+        screen.getAllByRole('link', { name: /Организации|Крановые|Краны|Активные найма/ }),
       ).toHaveLength(4)
     })
     expect(screen.queryByText(/Новые регистрации \(7 дней\)/)).toBeNull()

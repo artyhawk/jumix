@@ -52,10 +52,7 @@ export default function ApprovalsPage() {
 
   return (
     <PageTransition>
-      <PageHeader
-        title="Заявки на рассмотрение"
-        subtitle="Одобрение крановщиков, наймов и кранов"
-      />
+      <PageHeader title="Заявки на рассмотрение" subtitle="Одобрение крановых, наймов и кранов" />
 
       <TabsPills
         value={activeTab}
@@ -63,7 +60,7 @@ export default function ApprovalsPage() {
         tabs={[
           {
             value: 'crane-profiles',
-            label: 'Крановщики',
+            label: 'Крановые',
             badge: pending?.craneProfiles,
           },
           { value: 'hires', label: 'Наймы', badge: pending?.organizationOperators },

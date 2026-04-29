@@ -158,7 +158,7 @@ describe('OrganizationOperatorDrawer', () => {
       />,
       { wrapper: Wrapper },
     )
-    const btn = await screen.findByRole('button', { name: /Открыть профиль крановщика/ })
+    const btn = await screen.findByRole('button', { name: /Открыть профиль кранового/ })
     await userEvent.click(btn)
     expect(onOpenCraneProfile).toHaveBeenCalledWith('cp-1')
   })

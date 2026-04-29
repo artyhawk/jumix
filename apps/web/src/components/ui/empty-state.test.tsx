@@ -10,12 +10,12 @@ describe('EmptyState', () => {
     render(
       <EmptyState
         icon={HardHat}
-        title="Пока нет крановщиков"
-        description="Добавьте первого крановщика"
+        title="Пока нет крановых"
+        description="Добавьте первого кранового"
       />,
     )
-    expect(screen.getByRole('heading', { name: 'Пока нет крановщиков' })).toBeInTheDocument()
-    expect(screen.getByText('Добавьте первого крановщика')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Пока нет крановых' })).toBeInTheDocument()
+    expect(screen.getByText('Добавьте первого кранового')).toBeInTheDocument()
   })
 
   it('renders action node and fires its handler', async () => {

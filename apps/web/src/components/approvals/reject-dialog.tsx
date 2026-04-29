@@ -21,7 +21,7 @@ interface Props {
 }
 
 const ENTITY_NOUN: Record<RejectEntity, string> = {
-  'crane-profile': 'крановщика',
+  'crane-profile': 'кранового',
   hire: 'найма',
   crane: 'крана',
 }

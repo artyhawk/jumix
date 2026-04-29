@@ -56,7 +56,7 @@ export function CraneProfileDrawer({ id, onOpenChange }: Props) {
     if (!profile) return
     try {
       await approve.mutateAsync(profile.id)
-      toast.success('Крановщик одобрен')
+      toast.success('Крановой одобрен')
     } catch (err) {
       const message = isAppError(err) ? err.message : 'Попробуйте ещё раз'
       toast.error('Не удалось одобрить', { description: message })
@@ -73,7 +73,7 @@ export function CraneProfileDrawer({ id, onOpenChange }: Props) {
                 ? [profile.lastName, profile.firstName, profile.patronymic]
                     .filter(Boolean)
                     .join(' ')
-                : 'Крановщик'}
+                : 'Крановой'}
             </DrawerTitle>
           </DrawerHeader>
           <DrawerBody>
@@ -195,7 +195,7 @@ function CraneProfileDrawerError() {
   return (
     <div className="flex flex-col items-center gap-3 py-10 text-center">
       <ShieldAlert className="size-8 text-danger" strokeWidth={1.5} aria-hidden />
-      <div className="text-sm text-text-secondary">Не удалось загрузить крановщика</div>
+      <div className="text-sm text-text-secondary">Не удалось загрузить кранового</div>
     </div>
   )
 }

@@ -81,7 +81,7 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
   },
   {
     id: 'nav.crane-profiles',
-    label: 'Крановщики',
+    label: 'Крановые',
     keywords: ['crane profiles', 'kranovschiki', 'operators'],
     icon: HardHat,
     group: 'navigation',
@@ -147,7 +147,7 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
   {
     id: 'nav.my-operators',
     label: 'Мои операторы',
-    keywords: ['operators', 'my team', 'moi operatory', 'крановщики', 'команда'],
+    keywords: ['operators', 'my team', 'moi operatory', 'крановые', 'команда'],
     icon: UsersRound,
     group: 'navigation',
     roles: ['owner'],
@@ -195,7 +195,7 @@ export const COMMAND_REGISTRY: CommandEntry[] = [
   },
   {
     id: 'action.create-hire-request',
-    label: 'Нанять крановщика',
+    label: 'Нанять кранового',
     keywords: ['hire', 'new hire', 'nanyat', 'найм', 'добавить'],
     icon: UserPlus,
     group: 'actions',

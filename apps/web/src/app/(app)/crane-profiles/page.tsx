@@ -144,7 +144,7 @@ export default function CraneProfilesPage() {
 
   return (
     <PageTransition>
-      <PageHeader title="Крановщики" subtitle="Глобальная база identity — ортогонально найму" />
+      <PageHeader title="Крановые" subtitle="Глобальная база identity — ортогонально найму" />
 
       <FilterBar
         search={
@@ -152,7 +152,7 @@ export default function CraneProfilesPage() {
             value={search}
             onDebouncedChange={(v) => setParam('search', v || null)}
             placeholder="ФИО или ИИН…"
-            ariaLabel="Поиск крановщиков"
+            ariaLabel="Поиск крановых"
           />
         }
       >
@@ -190,7 +190,7 @@ export default function CraneProfilesPage() {
           onLoadMore={() => fetchNextPage()}
           mobileTitle={(p) => [p.lastName, p.firstName, p.patronymic].filter(Boolean).join(' ')}
           mobileSubtitle={(p) => <span className="font-mono-numbers">{p.iin}</span>}
-          ariaLabel="Список крановщиков"
+          ariaLabel="Список крановых"
           empty={
             search || approval || license ? (
               <EmptyState
@@ -201,7 +201,7 @@ export default function CraneProfilesPage() {
             ) : (
               <EmptyState
                 icon={HardHat}
-                title="Крановщиков пока нет"
+                title="Крановых пока нет"
                 description="Новые профили появятся здесь после регистрации через мобильное приложение."
               />
             )

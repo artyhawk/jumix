@@ -121,7 +121,7 @@ describe('HireRequestsPage', () => {
   it('renders empty state + CTA when no pending hires', async () => {
     renderPage()
     await waitFor(() => expect(screen.getAllByText('Нет активных заявок').length).toBe(1))
-    const ctaButtons = screen.getAllByRole('button', { name: /Нанять крановщика/ })
+    const ctaButtons = screen.getAllByRole('button', { name: /Нанять кранового/ })
     expect(ctaButtons.length).toBeGreaterThan(0)
   })
 
@@ -141,9 +141,9 @@ describe('HireRequestsPage', () => {
     expect(replace).toHaveBeenCalledWith('/hire-requests?open=h-42', { scroll: false })
   })
 
-  it('Нанять крановщика button opens ?create=true', async () => {
+  it('Нанять кранового button opens ?create=true', async () => {
     renderPage()
-    const btns = screen.getAllByRole('button', { name: /Нанять крановщика/ })
+    const btns = screen.getAllByRole('button', { name: /Нанять кранового/ })
     await userEvent.click(btns[0]!)
     expect(replace).toHaveBeenCalledWith('/hire-requests?create=true', { scroll: false })
   })

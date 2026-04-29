@@ -34,7 +34,7 @@ describe('getActionIcon', () => {
 
 describe('formatActionLabel', () => {
   it('returns Russian label for known actions', () => {
-    expect(formatActionLabel({ action: 'crane_profile.approve' })).toBe('Одобрил крановщика')
+    expect(formatActionLabel({ action: 'crane_profile.approve' })).toBe('Одобрил кранового')
     expect(formatActionLabel({ action: 'organization.create' })).toBe('Создал организацию')
     expect(formatActionLabel({ action: 'license.warning_sent' })).toBe(
       'Напоминание об удостоверении',

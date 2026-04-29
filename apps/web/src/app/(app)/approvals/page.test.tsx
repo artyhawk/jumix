@@ -129,6 +129,6 @@ describe('ApprovalsPage', () => {
   it('shows empty-queue when list is empty', async () => {
     searchParams.get.mockReturnValue('crane-profiles')
     renderPage()
-    await waitFor(() => expect(screen.getByText('Нет заявок крановщиков')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Нет заявок крановых')).toBeInTheDocument())
   })
 })

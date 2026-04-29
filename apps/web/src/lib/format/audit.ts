@@ -93,13 +93,13 @@ export function getActionIcon(action: string): ActionIcon {
 }
 
 const ACTION_LABELS: Record<string, string> = {
-  'crane_profile.approve': 'Одобрил крановщика',
-  'crane_profile.reject': 'Отклонил крановщика',
-  'crane_profile.update': 'Обновил данные крановщика',
+  'crane_profile.approve': 'Одобрил кранового',
+  'crane_profile.reject': 'Отклонил кранового',
+  'crane_profile.update': 'Обновил данные кранового',
   'crane_profile.self_update': 'Обновил свои данные',
   'crane_profile.avatar.set': 'Изменил аватар',
   'crane_profile.avatar.clear': 'Убрал аватар',
-  'crane_profile.delete': 'Удалил крановщика',
+  'crane_profile.delete': 'Удалил кранового',
 
   'organization_operator.submit': 'Запросил найм',
   'organization_operator.approve': 'Одобрил найм',
@@ -107,7 +107,7 @@ const ACTION_LABELS: Record<string, string> = {
   'organization_operator.update': 'Обновил найм',
   'organization_operator.activate': 'Активировал найм',
   'organization_operator.block': 'Заблокировал найм',
-  'organization_operator.terminate': 'Уволил крановщика',
+  'organization_operator.terminate': 'Уволил кранового',
   'organization_operator.delete': 'Удалил найм',
 
   'crane.submit': 'Добавил кран',

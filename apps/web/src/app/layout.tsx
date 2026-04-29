@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     default: 'Jumix',
     template: '%s · Jumix',
   },
-  description: 'Jumix — платформа управления крановщиками',
+  description: 'Jumix — платформа управления крановыми',
   icons: {
     icon: '/brand/logo-mark.png',
   },

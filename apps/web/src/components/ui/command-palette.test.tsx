@@ -69,7 +69,7 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Обзор платформы')).toBeInTheDocument()
     expect(screen.getByText('Заявки на рассмотрение')).toBeInTheDocument()
     expect(screen.getByText('Организации')).toBeInTheDocument()
-    expect(screen.getByText('Крановщики')).toBeInTheDocument()
+    expect(screen.getByText('Крановые')).toBeInTheDocument()
     expect(screen.getByText('Краны')).toBeInTheDocument()
     expect(screen.getByText('Сотрудники')).toBeInTheDocument()
   })
@@ -99,7 +99,7 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Выйти')).toBeInTheDocument()
     // operator не видит superadmin/owner entries
     expect(screen.queryByText('Обзор платформы')).toBeNull()
-    expect(screen.queryByText('Нанять крановщика')).toBeNull()
+    expect(screen.queryByText('Нанять кранового')).toBeNull()
   })
 
   it('fuzzy search matches "одоб" to Заявки via keywords', async () => {

@@ -94,7 +94,7 @@ function ShiftDrawerBody({ shift }: { shift: ShiftWithRelations }) {
       <ShiftMapSection shift={shift} />
 
       <dl className="flex flex-col">
-        <DetailRow label="Крановщик">
+        <DetailRow label="Крановой">
           <Link
             href={`/crane-profiles?open=${shift.craneProfileId}`}
             className="inline-flex items-center gap-1 text-text-primary hover:text-brand-400 transition-colors"

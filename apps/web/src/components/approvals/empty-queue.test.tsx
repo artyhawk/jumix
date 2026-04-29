@@ -5,7 +5,7 @@ import { EmptyQueue } from './empty-queue'
 describe('EmptyQueue', () => {
   it('renders crane-profiles variant', () => {
     render(<EmptyQueue type="crane-profiles" />)
-    expect(screen.getByText('Нет заявок крановщиков')).toBeInTheDocument()
+    expect(screen.getByText('Нет заявок крановых')).toBeInTheDocument()
     expect(screen.getByText('Новые регистрации появятся здесь')).toBeInTheDocument()
   })
 

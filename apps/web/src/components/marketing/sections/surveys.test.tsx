@@ -12,7 +12,7 @@ describe('SurveysSection', () => {
   it('renders both CTA cards', () => {
     render(withLocale(<SurveysSection />))
     expect(screen.getByText(/Опрос для компаний/i)).toBeInTheDocument()
-    expect(screen.getByText(/Опрос для крановщиков/i)).toBeInTheDocument()
+    expect(screen.getByText(/Опрос для крановых/i)).toBeInTheDocument()
   })
 
   it('routes к ru-locale slugs by default', () => {

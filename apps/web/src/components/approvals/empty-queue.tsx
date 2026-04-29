@@ -4,7 +4,7 @@ type EmptyQueueType = 'crane-profiles' | 'hires' | 'cranes'
 
 const EMPTY_MESSAGES: Record<EmptyQueueType, { title: string; subtitle: string }> = {
   'crane-profiles': {
-    title: 'Нет заявок крановщиков',
+    title: 'Нет заявок крановых',
     subtitle: 'Новые регистрации появятся здесь',
   },
   hires: {

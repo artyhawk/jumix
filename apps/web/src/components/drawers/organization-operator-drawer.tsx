@@ -383,7 +383,7 @@ function OrganizationOperatorDrawerBody({
           onClick={() => onOpenCraneProfile(cp.id)}
           className="w-full justify-between md:w-auto md:justify-center"
         >
-          Открыть профиль крановщика
+          Открыть профиль кранового
           <ArrowRight className="size-4" strokeWidth={1.5} aria-hidden />
         </Button>
       ) : null}

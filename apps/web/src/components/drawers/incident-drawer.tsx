@@ -177,7 +177,7 @@ function IncidentDrawerBody({ incident }: { incident: IncidentWithRelations }) {
 
       {/* Reporter + relations */}
       <dl className="flex flex-col">
-        <DetailRow label="Крановщик">
+        <DetailRow label="Крановой">
           <span className="inline-flex items-center gap-1 text-text-primary">
             <UserCircle2 className="size-4" strokeWidth={1.5} aria-hidden />
             {incident.reporter.name}

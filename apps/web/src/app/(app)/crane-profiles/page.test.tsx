@@ -93,7 +93,7 @@ beforeEach(() => {
 describe('CraneProfilesPage', () => {
   it('renders heading and rows', async () => {
     renderPage()
-    expect(screen.getByRole('heading', { name: 'Крановщики' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Крановые' })).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getAllByText('Иванов Иван Петрович').length).toBeGreaterThan(0)
     })

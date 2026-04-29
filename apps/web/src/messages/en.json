@@ -168,6 +168,23 @@
       "ctaLogin": "Already registered? Sign in",
       "phoneNote": "Or call: +7 702 224 44 28"
     },
+    "surveys": {
+      "overline": "Help us improve",
+      "title": "Tell us about your work",
+      "subtitle": "We're researching the crane services market and rely on your experience. Your answers will help us build a truly useful tool.",
+      "forCompanies": {
+        "title": "Survey for companies",
+        "description": "For crane owners and construction company managers. Tell us how you currently manage cranes and crane operators.",
+        "duration": "10–15 minutes",
+        "cta": "Take the survey"
+      },
+      "forOperators": {
+        "title": "Survey for crane operators",
+        "description": "For crane operators. Tell us about your work, pay and documents. How it is today and how it could be better.",
+        "duration": "5–10 minutes",
+        "cta": "Take the survey"
+      }
+    },
     "footer": {
       "tagline": "Digital platform for crane services in Kazakhstan",
       "navTitle": "Platform",
@@ -179,7 +196,7 @@
       "phoneHref": "tel:+77022244428",
       "whatsapp": "WhatsApp",
       "email": "info@jumix.kz",
-      "city": "Shymkent, Kazakhstan",
+      "city": "Astana, Kazakhstan",
       "legalTitle": "Documents",
       "privacy": "Privacy Policy",
       "terms": "Terms of Service",
@@ -228,7 +245,7 @@
       "section7Title": "7. Applicable law",
       "section7Body": "These Terms are governed by the laws of the Republic of Kazakhstan. Disputes are resolved in the manner established by law, at the location of the Operator.",
       "contactTitle": "Operator contacts",
-      "contactBody": "Jumix LLP, info@jumix.kz, +7 702 224 44 28, Shymkent.",
+      "contactBody": "Jumix LLP, info@jumix.kz, +7 702 224 44 28, Astana.",
       "legalNotice": "This document requires legal review before public launch of the platform."
     }
   }

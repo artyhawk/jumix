@@ -125,7 +125,7 @@ export default function IncidentsPage() {
     },
     {
       key: 'reporter',
-      header: 'Крановщик',
+      header: 'Крановой',
       cell: (i) => i.reporter.name,
       width: '180px',
       muted: true,
@@ -156,7 +156,7 @@ export default function IncidentsPage() {
         title="Происшествия"
         subtitle={
           user.role === 'owner'
-            ? 'Сообщения от крановщиков о неисправностях, нарушениях ТБ и инцидентах'
+            ? 'Сообщения от крановых о неисправностях, нарушениях ТБ и инцидентах'
             : 'Все происшествия по платформе'
         }
       />
@@ -214,7 +214,7 @@ export default function IncidentsPage() {
               <EmptyState
                 icon={AlertTriangle}
                 title="Происшествий пока нет"
-                description="Когда крановщики начнут сообщать о неисправностях или инцидентах, они появятся здесь."
+                description="Когда крановые начнут сообщать о неисправностях или инцидентах, они появятся здесь."
               />
             )
           }

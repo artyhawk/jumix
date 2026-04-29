@@ -76,7 +76,7 @@ beforeEach(() => {
 describe('CreateHireRequestDialog', () => {
   it('renders step 1 with hint when query is too short', () => {
     renderDialog()
-    expect(screen.getByText('Нанять крановщика')).toBeInTheDocument()
+    expect(screen.getByText('Нанять кранового')).toBeInTheDocument()
     expect(screen.getByText('Введите минимум 2 символа')).toBeInTheDocument()
     // results UI hidden until 2+ chars даже если background-query fire'ит
     expect(screen.queryByText('900101300001')).not.toBeInTheDocument()
@@ -84,7 +84,7 @@ describe('CreateHireRequestDialog', () => {
 
   it('triggers search when user types 2+ chars (debounced)', async () => {
     renderDialog()
-    const searchInput = screen.getByLabelText('Поиск крановщика')
+    const searchInput = screen.getByLabelText('Поиск кранового')
     await userEvent.type(searchInput, 'Ив')
     await waitFor(
       () => {
@@ -98,7 +98,7 @@ describe('CreateHireRequestDialog', () => {
 
   it('renders profile results after search', async () => {
     renderDialog()
-    const searchInput = screen.getByLabelText('Поиск крановщика')
+    const searchInput = screen.getByLabelText('Поиск кранового')
     await userEvent.type(searchInput, 'Ив')
     await waitFor(() => expect(screen.getAllByText('Иванов Иван Петрович').length).toBe(1))
     expect(screen.getByText('900101300001')).toBeInTheDocument()
@@ -106,7 +106,7 @@ describe('CreateHireRequestDialog', () => {
 
   it('moves to step 2 on profile selection', async () => {
     renderDialog()
-    const searchInput = screen.getByLabelText('Поиск крановщика')
+    const searchInput = screen.getByLabelText('Поиск кранового')
     await userEvent.type(searchInput, 'Ив')
     await waitFor(() => expect(screen.getAllByText('Иванов Иван Петрович').length).toBe(1))
     const profileCard = screen.getByRole('button', { name: /Иванов Иван/ })
@@ -121,7 +121,7 @@ describe('CreateHireRequestDialog', () => {
       nextCursor: null,
     })
     renderDialog()
-    const searchInput = screen.getByLabelText('Поиск крановщика')
+    const searchInput = screen.getByLabelText('Поиск кранового')
     await userEvent.type(searchInput, 'Ив')
     await waitFor(() => expect(screen.getAllByText('Иванов Иван Петрович').length).toBe(1))
     await userEvent.click(screen.getByRole('button', { name: /Иванов Иван/ }))
@@ -134,7 +134,7 @@ describe('CreateHireRequestDialog', () => {
       nextCursor: null,
     })
     renderDialog()
-    const searchInput = screen.getByLabelText('Поиск крановщика')
+    const searchInput = screen.getByLabelText('Поиск кранового')
     await userEvent.type(searchInput, 'Ив')
     await waitFor(() => expect(screen.getAllByText('Иванов Иван Петрович').length).toBe(1))
     await userEvent.click(screen.getByRole('button', { name: /Иванов Иван/ }))
@@ -147,7 +147,7 @@ describe('CreateHireRequestDialog', () => {
       craneProfileId: 'cp-1',
     } as unknown as OrganizationOperator)
     renderDialog()
-    const searchInput = screen.getByLabelText('Поиск крановщика')
+    const searchInput = screen.getByLabelText('Поиск кранового')
     await userEvent.type(searchInput, 'Ив')
     await waitFor(() => expect(screen.getAllByText('Иванов Иван Петрович').length).toBe(1))
     await userEvent.click(screen.getByRole('button', { name: /Иванов Иван/ }))
@@ -163,26 +163,26 @@ describe('CreateHireRequestDialog', () => {
       new AppError({ code: 'OPERATOR_ALREADY_HIRED', message: 'Already hired', statusCode: 409 }),
     )
     renderDialog()
-    const searchInput = screen.getByLabelText('Поиск крановщика')
+    const searchInput = screen.getByLabelText('Поиск кранового')
     await userEvent.type(searchInput, 'Ив')
     await waitFor(() => expect(screen.getAllByText('Иванов Иван Петрович').length).toBe(1))
     await userEvent.click(screen.getByRole('button', { name: /Иванов Иван/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Создать заявку' }))
     await waitFor(() =>
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith(
-        'Этот крановщик уже работает в вашей компании',
+        'Этот крановой уже работает в вашей компании',
       ),
     )
   })
 
   it('Назад returns to step 1', async () => {
     renderDialog()
-    const searchInput = screen.getByLabelText('Поиск крановщика')
+    const searchInput = screen.getByLabelText('Поиск кранового')
     await userEvent.type(searchInput, 'Ив')
     await waitFor(() => expect(screen.getAllByText('Иванов Иван Петрович').length).toBe(1))
     await userEvent.click(screen.getByRole('button', { name: /Иванов Иван/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Назад' }))
-    expect(screen.getByLabelText('Поиск крановщика')).toBeInTheDocument()
+    expect(screen.getByLabelText('Поиск кранового')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Создать заявку' })).not.toBeInTheDocument()
   })
 })

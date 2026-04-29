@@ -189,14 +189,14 @@ export default function OrganizationOperatorsPage() {
 
   return (
     <PageTransition>
-      <PageHeader title="Назначения" subtitle="Наймы крановщиков к организациям (M:N)" />
+      <PageHeader title="Назначения" subtitle="Наймы крановых к организациям (M:N)" />
 
       <FilterBar
         search={
           <SearchInput
             value={search}
             onDebouncedChange={(v) => setParam('search', v || null)}
-            placeholder="ФИО или ИИН крановщика…"
+            placeholder="ФИО или ИИН кранового…"
             ariaLabel="Поиск назначений"
           />
         }
