@@ -90,6 +90,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,scope=${{ matrix.service }},mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.PUBLIC_API_URL || 'https://api.jumix.kz' }}
+            NEXT_PUBLIC_TILES_URL=${{ vars.PUBLIC_TILES_URL || '' }}
 
   deploy:
     name: SSH deploy to VPS

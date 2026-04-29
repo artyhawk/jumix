@@ -139,6 +139,9 @@ services:
     build:
       context: ../..
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+        NEXT_PUBLIC_TILES_URL: ${PUBLIC_TILES_URL:-}
     container_name: jumix-web
     restart: unless-stopped
     environment:

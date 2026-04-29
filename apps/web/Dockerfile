@@ -22,6 +22,14 @@ RUN pnpm install --frozen-lockfile
 # ---------- builder ----------
 FROM base AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# NEXT_PUBLIC_* инлайнятся в client bundle на этапе `next build` —
+# должны быть переданы как build-args, а не runtime env.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_TILES_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_TILES_URL=${NEXT_PUBLIC_TILES_URL}
+
 COPY --from=deps /app/node_modules /app/node_modules
 COPY --from=deps /app/apps/web/node_modules /app/apps/web/node_modules
 COPY --from=deps /app/packages /app/packages
