@@ -94,10 +94,6 @@ api.jumix.kz {
 		-Server
 	}
 
-	# CORS для mobile / external clients (preflight уже в Fastify, но safety net).
-	@cors_preflight method OPTIONS
-	respond @cors_preflight 204
-
 	reverse_proxy api:3000
 
 	request_body {

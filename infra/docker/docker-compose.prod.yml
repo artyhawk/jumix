@@ -116,6 +116,7 @@ services:
       SMS_GATEWAY_URL: ${SMS_GATEWAY_URL}
       SMS_GATEWAY_KEY: ${SMS_GATEWAY_KEY}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      CORS_ORIGINS: ${CORS_ORIGINS}
       TZ: Asia/Almaty
     volumes:
       # RSA keypair для JWT signing — generated один раз через openssl
