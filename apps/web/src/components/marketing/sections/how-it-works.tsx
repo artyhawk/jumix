@@ -36,7 +36,7 @@ export function HowItWorksSection() {
         />
 
         {steps.map((step, idx) => (
-          <StaggerItem key={step.label}>
+          <StaggerItem key={step.label} index={idx}>
             <article className="relative m-card p-6 md:p-7 h-full flex flex-col gap-5">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--m-brand)] font-semibold tabular-nums">

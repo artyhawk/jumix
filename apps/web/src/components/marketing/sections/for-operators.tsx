@@ -50,7 +50,7 @@ export function ForOperatorsSection() {
 
         <StaggeredChildren className="space-y-4">
           {items.map((item, idx) => (
-            <StaggerItem key={item.title}>
+            <StaggerItem key={item.title} index={idx}>
               <article className="m-card m-card-glow p-5 md:p-6 flex gap-4 items-start">
                 <span
                   aria-hidden

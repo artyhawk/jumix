@@ -39,7 +39,7 @@ export function ForCompaniesSection() {
 
       <StaggeredChildren className="mt-12 md:mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((item, idx) => (
-          <StaggerItem key={item.title}>
+          <StaggerItem key={item.title} index={idx}>
             <FeatureCard icon={ICONS[idx]} title={item.title} description={item.description} />
           </StaggerItem>
         ))}

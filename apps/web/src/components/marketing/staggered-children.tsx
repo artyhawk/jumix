@@ -6,19 +6,33 @@ import type { ReactNode } from 'react'
 const PREMIUM_EASE = [0.22, 1, 0.36, 1] as const
 
 /**
- * Sequential reveal of children с stagger. Каждый child fade-up с задержкой 80ms.
- * Использует grid/flex parent — gap управляется родителем.
+ * Wrapper для grid/flex с stagger-эффектом. Сам не анимируется — каждый
+ * `StaggerItem` слушает свой viewport независимо и применяет delay = index * stagger.
+ *
+ * Why: variant-inheritance через `whileInView` на parent + child variants пробрасывался
+ * нестабильно (оставлял card'ы opacity:0 в production). Direct prop-pattern совпадает
+ * с AnimatedSection и работает надёжно.
  */
 export function StaggeredChildren({
   children,
   className,
-  stagger = 0.08,
-  amount = 0.2,
 }: {
   children: ReactNode
   className?: string
+}) {
+  return <div className={className}>{children}</div>
+}
+
+export function StaggerItem({
+  children,
+  className,
+  index = 0,
+  stagger = 0.08,
+}: {
+  children: ReactNode
+  className?: string
+  index?: number
   stagger?: number
-  amount?: number
 }) {
   const reduceMotion = useReducedMotion()
 
@@ -29,37 +43,10 @@ export function StaggeredChildren({
   return (
     <motion.div
       className={className}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, amount }}
-      variants={{
-        hidden: {},
-        visible: { transition: { staggerChildren: stagger } },
-      }}
-    >
-      {children}
-    </motion.div>
-  )
-}
-
-export function StaggerItem({
-  children,
-  className,
-}: {
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <motion.div
-      className={className}
-      variants={{
-        hidden: { opacity: 0, y: 20 },
-        visible: {
-          opacity: 1,
-          y: 0,
-          transition: { duration: 0.6, ease: PREMIUM_EASE },
-        },
-      }}
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.6, ease: PREMIUM_EASE, delay: index * stagger }}
     >
       {children}
     </motion.div>

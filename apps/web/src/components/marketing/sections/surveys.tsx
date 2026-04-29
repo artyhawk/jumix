@@ -35,7 +35,7 @@ export function SurveysSection() {
       </AnimatedSection>
 
       <StaggeredChildren className="mt-12 md:mt-16 grid gap-5 md:gap-6 md:grid-cols-2">
-        <StaggerItem>
+        <StaggerItem index={0}>
           <SurveyCard
             icon={<Building2 className="size-6" aria-hidden />}
             title={t('marketing.surveys.forCompanies.title')}
@@ -45,7 +45,7 @@ export function SurveysSection() {
             href={`/survey/${b2bSlug}`}
           />
         </StaggerItem>
-        <StaggerItem>
+        <StaggerItem index={1}>
           <SurveyCard
             icon={<HardHat className="size-6" aria-hidden />}
             title={t('marketing.surveys.forOperators.title')}

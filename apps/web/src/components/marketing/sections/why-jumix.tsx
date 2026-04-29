@@ -38,7 +38,7 @@ export function WhyJumixSection() {
 
       <StaggeredChildren className="mt-12 md:mt-16 grid gap-4 md:grid-cols-6 auto-rows-fr">
         {primary ? (
-          <StaggerItem className="md:col-span-3 md:row-span-2">
+          <StaggerItem index={0} className="md:col-span-3 md:row-span-2">
             <article className="m-card m-card-glow p-7 md:p-9 h-full flex flex-col gap-5 relative overflow-hidden">
               <div
                 className="absolute -top-12 -right-12 size-48 rounded-full opacity-50 blur-3xl"
@@ -70,7 +70,7 @@ export function WhyJumixSection() {
         ) : null}
 
         {rest.map((item, idx) => (
-          <StaggerItem key={item.title} className="md:col-span-3">
+          <StaggerItem key={item.title} index={idx + 1} className="md:col-span-3">
             <article className="m-card m-card-glow p-6 md:p-7 h-full flex gap-4 items-start">
               <div
                 aria-hidden
