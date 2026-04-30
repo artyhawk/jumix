@@ -181,7 +181,7 @@ function Step({
       <span
         className={cn(
           'inline-flex size-6 items-center justify-center rounded-full text-xs font-medium border',
-          done && 'border-brand-500 bg-brand-500 text-white',
+          done && 'border-brand-500 bg-brand-500 text-brand-foreground',
           active && !done && 'border-brand-500 text-brand-500',
           !active && !done && 'border-border-default text-text-tertiary',
         )}

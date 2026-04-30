@@ -41,6 +41,12 @@
   --brand-800: #954604;
   --brand-900: #723603;
 
+  /* Foreground для text/icons НА brand-500 background (e.g. primary button
+     label). Same в обеих темах — near-black читается на оранжевом ~10:1
+     (WCAG AA pass для normal text), белый text-on-orange падает до ~3:1
+     (AA fail). Поэтому token не theme-aware. */
+  --brand-foreground: #0a0a0b;
+
   /* Semantic — light theme tones (slightly darker для contrast on white) */
   --success: #16a34a;
   --warning: #ca8a04;
@@ -88,6 +94,7 @@
   --brand-700: #bd5905;
   --brand-800: #954604;
   --brand-900: #723603;
+  --brand-foreground: #0a0a0b;
 
   --success: #10b981;
   --warning: #eab308;
@@ -134,6 +141,7 @@
   --color-brand-700: var(--brand-700);
   --color-brand-800: var(--brand-800);
   --color-brand-900: var(--brand-900);
+  --color-brand-foreground: var(--brand-foreground);
 
   --color-success: var(--success);
   --color-warning: var(--warning);

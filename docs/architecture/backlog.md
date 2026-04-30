@@ -950,3 +950,34 @@ Admin клик на survey → tab «По вопросам» → grid с aggrega
 
 ### Re-classify response severity / categorization
 Admin может tag response (`hot lead` / `cold` / `interview booked`) — backlog для CRM-lite features. Сейчас admin читает и копирует контакт вручную.
+
+---
+
+## Theme system (from B3-THEME)
+
+### M-THEME — Mobile (Expo) light theme support
+Mobile app (apps/mobile) сейчас dark-only — StyleSheet tokens hardcoded в `theme/tokens.ts`. Полноценный M-THEME требует: theme provider mirror'нутый из web (MMKV для persist вместо localStorage), `useColorScheme()` hook для system preference, audit ~50 mobile screens на hardcoded colors, RN navigation theme integration (light/dark stack/tab themes), MapLibre RN style switch, asset variants (splash screen / app icon если они dark-styled). Trigger: заказчик request OR App Store / Play reviewer flag «inconsistent visual» при M8 store submission.
+
+### Auto-switch theme by time of day
+Sunrise/sunset detection — light в день, dark вечером/ночью. Опция в preferences кроме explicit light/dark/system. Backend stores как `theme_mode = 'auto'` (extend enum), client computes resolved через geolocation + `suncalc` library. Trigger: user feedback после M-THEME launch.
+
+### Per-page theme override
+Specific routes могут force theme regardless of user preference (e.g. operator shift screen всегда dark для outdoor visibility). Implementation — page exports `themeOverride: 'dark' | 'light' | null`, root layout считывает + applies до hydrate. Need to coordinate с inline ThemeScript (server-rendered HTML page metadata).
+
+### Custom user color palettes
+Advanced personalization — user может pick brand color из 6 предустановленных palettes (orange default, blue, green, purple, pink, теmно-серый). Stored в `users.brand_palette` enum. UI — `/settings` page с swatches preview. Trigger: marketing wants product differentiation, not strictly needed.
+
+### High-contrast accessibility theme
+Третий вариант palette с увеличенным contrast'ом (>WCAG AAA). Mostly text/border colors maxed для людей со слабым зрением. Не запрос ТЗ, но государственные мониторинговые системы РК часто требуют. Implementation — добавить `.theme-high-contrast` CSS class + values, добавить опцию в toggle/preferences.
+
+### Print-specific stylesheet
+`@media print` rules для PDF-friendly export страниц (audit logs, organization detail, report views). Force light theme + remove animations + adjust shadows + print-only logos/branding. Useful когда client копит компании ozбытие отчёт.
+
+### ESLint rule warning on text-white under bg-brand-500
+Custom ESLint rule (через `tailwindcss/no-custom-classname` extension OR plain regex check) warning developer когда они пишут `text-white` с `bg-brand-500` — должны использовать `text-brand-foreground` для AA pass. Сейчас manual code review.
+
+### Visual regression testing для theme surfaces
+Playwright + screenshot diff для key surfaces (dashboard / sites map / drawer / landing hero) в обеих темах. Detect unintended drift при future refactors. Trigger: после first user-reported visual bug в production.
+
+### Server-driven theme (cookie + SSR)
+Migrate theme detection с client-side (inline ScriptScript reads localStorage) на server-side (cookie + middleware reads + applies class в server-rendered `<html>`). Eliminates FOUC более elegantly + decouples от client JS. Coupled с `Web cookie mode` (auth tokens на HttpOnly cookies) — оба requires middleware + переписать root layout под server component с динамическим class.
