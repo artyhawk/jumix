@@ -1,6 +1,7 @@
 'use client'
 
 import { BaseMap } from '@/components/map/base-map'
+import { useMapStyleEpoch } from '@/components/map/map-style'
 import { ShiftPathLayer } from '@/components/map/shift-path-layer'
 import { SitesLayer } from '@/components/map/sites-layer'
 import { Badge } from '@/components/ui/badge'
@@ -152,6 +153,7 @@ function ShiftDrawerBody({ shift }: { shift: ShiftWithRelations }) {
 function ShiftMapSection({ shift }: { shift: ShiftWithRelations }) {
   const path = useShiftPath(shift.id)
   const [map, setMap] = useState<MapLibreMap | null>(null)
+  const styleEpoch = useMapStyleEpoch(map)
 
   const site: Site = {
     id: shift.site.id,
@@ -192,8 +194,8 @@ function ShiftMapSection({ shift }: { shift: ShiftWithRelations }) {
           onReady={setMap}
           className="absolute inset-0"
         />
-        <SitesLayer map={map} sites={[site]} />
-        <ShiftPathLayer map={map} pings={pings} />
+        <SitesLayer map={map} sites={[site]} styleEpoch={styleEpoch} />
+        <ShiftPathLayer map={map} pings={pings} styleEpoch={styleEpoch} />
       </div>
     </section>
   )

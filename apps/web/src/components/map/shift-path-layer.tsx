@@ -1,6 +1,7 @@
 'use client'
 
 import type { LocationPing } from '@/lib/api/types'
+import { useTheme } from '@/lib/theme/theme-provider'
 import type { GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl'
 import { useEffect } from 'react'
 
@@ -9,6 +10,8 @@ export interface ShiftPathLayerProps {
   pings: LocationPing[]
   /** Unique id — в одном map instance может быть > 1 path (unlikely, но корректно). */
   id?: string
+  /** B3-THEME — counter из useMapStyleEpoch(map). Re-add layers после style swap. */
+  styleEpoch?: number
 }
 
 const DEFAULT_ID = 'shift-path'
@@ -26,13 +29,18 @@ const DEFAULT_ID = 'shift-path'
  * SitesLayer: init один раз, data updates через setData. Cleanup только при
  * unmount или смене map.
  */
-export function ShiftPathLayer({ map, pings, id = DEFAULT_ID }: ShiftPathLayerProps) {
+export function ShiftPathLayer({ map, pings, id = DEFAULT_ID, styleEpoch }: ShiftPathLayerProps) {
   const sourceId = `${id}-source`
   const lineLayerId = `${id}-line`
   const pointsSourceId = `${id}-endpoints-source`
   const pointsLayerId = `${id}-points`
+  const { theme } = useTheme()
+  // Stroke вокруг circle endpoint: dark theme → near-black для contrast на светлой
+  // brand-точке; light theme → white чтобы точка читалась на светлой подложке.
+  const circleStrokeColor = theme === 'dark' ? '#0A0A0A' : '#FFFFFF'
 
-  // Init layers + cleanup на unmount / смене map / смене id
+  // Init layers + cleanup на unmount / смене map / смене id / style-swap (epoch).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: styleEpoch — синтетический trigger для re-add layers после map.setStyle (B3-THEME-2)
   useEffect(() => {
     if (!map) return
 
@@ -67,9 +75,10 @@ export function ShiftPathLayer({ map, pings, id = DEFAULT_ID }: ShiftPathLayerPr
             '#10B981',
             'end',
             '#F97B10',
+            // middle: gray-400, читается на обеих темах
             '#9CA3AF',
           ],
-          'circle-stroke-color': '#0A0A0A',
+          'circle-stroke-color': circleStrokeColor,
           'circle-stroke-width': 2,
         },
       })
@@ -81,7 +90,7 @@ export function ShiftPathLayer({ map, pings, id = DEFAULT_ID }: ShiftPathLayerPr
       if (map.getSource(sourceId)) map.removeSource(sourceId)
       if (map.getSource(pointsSourceId)) map.removeSource(pointsSourceId)
     }
-  }, [map, sourceId, lineLayerId, pointsSourceId, pointsLayerId])
+  }, [map, sourceId, lineLayerId, pointsSourceId, pointsLayerId, styleEpoch, circleStrokeColor])
 
   // Update data на каждое изменение pings
   useEffect(() => {

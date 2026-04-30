@@ -3,7 +3,7 @@
 import { BaseMap } from '@/components/map/base-map'
 import { CranesLayer } from '@/components/map/cranes-layer'
 import { LiveCranesLayer } from '@/components/map/live-cranes-layer'
-import { DEFAULT_CENTER } from '@/components/map/map-style'
+import { DEFAULT_CENTER, useMapStyleEpoch } from '@/components/map/map-style'
 import { SitesLayer } from '@/components/map/sites-layer'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -34,6 +34,7 @@ export function OwnerSitesMap() {
   const cranesQuery = useCranes({ approvalStatus: 'approved', status: 'active', limit: 100 })
   const liveQuery = useLatestLocations({})
   const [map, setMap] = useState<MapLibreMap | null>(null)
+  const styleEpoch = useMapStyleEpoch(map)
 
   const sites = sitesQuery.data?.items ?? []
   const cranes = cranesQuery.data?.items ?? []
@@ -102,7 +103,12 @@ export function OwnerSitesMap() {
         ) : (
           <>
             <BaseMap initialCenter={initialCenter} onReady={setMap} className="absolute inset-0" />
-            <SitesLayer map={map} sites={sites} onSiteClick={handleSiteClick} />
+            <SitesLayer
+              map={map}
+              sites={sites}
+              onSiteClick={handleSiteClick}
+              styleEpoch={styleEpoch}
+            />
             <CranesLayer
               map={map}
               sites={sites}

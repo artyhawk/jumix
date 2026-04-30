@@ -26,7 +26,11 @@ export const Avatar = forwardRef<HTMLSpanElement, AvatarProps>(function Avatar(
   { src, name, userId, size = 'md', className, ...props },
   ref,
 ) {
-  const fallbackBg = userId ? colorFromId(userId) : '#3f3f46'
+  // Fallback bg когда userId нет — нейтральный gray-500 (#71717a). Контрастит
+  // и на светлой и на тёмной подложке, white text сверху читается. Hardcoded
+  // (не token), потому что цвет — детерминированный визуальный параметр компонента,
+  // не должен меняться вместе с темой (consistency между темами).
+  const fallbackBg = userId ? colorFromId(userId) : '#71717a'
   const label = initials(name || '?')
 
   return (

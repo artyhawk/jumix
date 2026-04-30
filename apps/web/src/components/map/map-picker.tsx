@@ -4,6 +4,7 @@ import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl'
 import { useEffect, useRef, useState } from 'react'
 import { BaseMap } from './base-map'
 import { circlePolygon } from './geofence-polygon'
+import { useMapStyleEpoch } from './map-style'
 import { RadiusSlider } from './radius-slider'
 
 export interface MapPickerValue {
@@ -35,6 +36,7 @@ export function MapPicker({
   defaultRadius = 200,
 }: MapPickerProps) {
   const [map, setMap] = useState<MapLibreMap | null>(null)
+  const styleEpoch = useMapStyleEpoch(map)
   const markerRef = useRef<maplibregl.Marker | null>(null)
   const sourceId = 'picker-geofence'
   const fillId = 'picker-geofence-fill'
@@ -53,6 +55,7 @@ export function MapPicker({
     onChange({ ...value, radiusM })
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: styleEpoch — синтетический trigger для re-add layers после map.setStyle (B3-THEME-2)
   useEffect(() => {
     if (!map) return
 
@@ -102,7 +105,7 @@ export function MapPicker({
         .setLngLat([value.longitude, value.latitude])
         .addTo(map)
     }
-  }, [map, value])
+  }, [map, value, styleEpoch])
 
   return (
     <div className="flex flex-col gap-3">

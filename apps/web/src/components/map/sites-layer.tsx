@@ -10,6 +10,9 @@ export interface SitesLayerProps {
   sites: Site[]
   activeSiteId?: string | null
   onSiteClick?: (site: Site) => void
+  /** B3-THEME — counter из useMapStyleEpoch(map). Прибавь его в deps,
+   *  чтобы layer/source пере-регистрировались после `map.setStyle(...)`. */
+  styleEpoch?: number
 }
 
 const SOURCE_ID = 'sites-geofences'
@@ -20,11 +23,12 @@ const LINE_LAYER_ID = 'sites-geofences-line'
  * Рендерит sites как маркеры + круги геозон. Цветовая палитра из
  * design-system §8.5: `#F97B10` (brand-500), fill 10%, stroke 1px.
  */
-export function SitesLayer({ map, sites, activeSiteId, onSiteClick }: SitesLayerProps) {
+export function SitesLayer({ map, sites, activeSiteId, onSiteClick, styleEpoch }: SitesLayerProps) {
   const markersRef = useRef<maplibregl.Marker[]>([])
   const onSiteClickRef = useRef(onSiteClick)
   onSiteClickRef.current = onSiteClick
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: styleEpoch — синтетический trigger для re-add layers после map.setStyle (B3-THEME-2)
   useEffect(() => {
     if (!map) return
 
@@ -86,9 +90,11 @@ export function SitesLayer({ map, sites, activeSiteId, onSiteClick }: SitesLayer
     return () => {
       for (const m of markers) m.remove()
       markersRef.current = []
-      // layers/source оставляем — следующий render переиспользует через setData
+      // layers/source оставляем — следующий render переиспользует через setData.
+      // Style-swap (theme change) wipe'ит их полностью; styleEpoch++ → этот
+      // effect перезапустится и пройдёт через add-layer branch.
     }
-  }, [map, sites, activeSiteId])
+  }, [map, sites, activeSiteId, styleEpoch])
 
   return null
 }

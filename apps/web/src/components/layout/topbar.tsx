@@ -1,5 +1,6 @@
 'use client'
 
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -85,6 +86,9 @@ export function Topbar({ user }: { user: AuthUser }) {
 
           {/* Density toggle — desktop only; на mobile cards всегда comfortable */}
           <DensityToggle className="hidden md:inline-flex" />
+
+          {/* Theme toggle (B3-THEME) */}
+          <ThemeToggle />
 
           {/* Notifications */}
           <DropdownRoot>
