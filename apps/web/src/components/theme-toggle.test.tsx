@@ -24,49 +24,61 @@ afterEach(() => {
 })
 
 describe('ThemeToggle (B3-THEME)', () => {
-  it('renders trigger с aria-label', () => {
+  it('renders с aria-label "Включить тёмную тему" когда сейчас light', async () => {
     render(
       <ThemeProvider>
         <ThemeToggle />
       </ThemeProvider>,
     )
-    expect(screen.getByRole('button', { name: 'Сменить тему' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Включить тёмную тему' })).toBeInTheDocument()
   })
 
-  it('opens dropdown с 3 опциями (Светлая / Тёмная / Системная)', async () => {
-    render(
-      <ThemeProvider>
-        <ThemeToggle />
-      </ThemeProvider>,
-    )
-    await userEvent.click(screen.getByRole('button', { name: 'Сменить тему' }))
-    expect(await screen.findByText('Светлая')).toBeInTheDocument()
-    expect(screen.getByText('Тёмная')).toBeInTheDocument()
-    expect(screen.getByText('Системная')).toBeInTheDocument()
-  })
-
-  it('клик по "Тёмная" применяет .theme-dark на <html>', async () => {
-    render(
-      <ThemeProvider>
-        <ThemeToggle />
-      </ThemeProvider>,
-    )
-    await userEvent.click(screen.getByRole('button', { name: 'Сменить тему' }))
-    await userEvent.click(await screen.findByText('Тёмная'))
-    expect(document.documentElement.classList.contains('theme-dark')).toBe(true)
-    expect(window.localStorage.getItem('jumix-theme-mode')).toBe('dark')
-  })
-
-  it('клик по "Светлая" применяет .theme-light', async () => {
+  it('renders с aria-label "Включить светлую тему" когда сейчас dark', async () => {
     window.localStorage.setItem('jumix-theme-mode', 'dark')
     render(
       <ThemeProvider>
         <ThemeToggle />
       </ThemeProvider>,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Сменить тему' }))
-    await userEvent.click(await screen.findByText('Светлая'))
+    expect(await screen.findByRole('button', { name: 'Включить светлую тему' })).toBeInTheDocument()
+  })
+
+  it('клик из light состояния → applies .theme-dark', async () => {
+    render(
+      <ThemeProvider>
+        <ThemeToggle />
+      </ThemeProvider>,
+    )
+    const button = await screen.findByRole('button', { name: 'Включить тёмную тему' })
+    await userEvent.click(button)
+    expect(document.documentElement.classList.contains('theme-dark')).toBe(true)
+    expect(window.localStorage.getItem('jumix-theme-mode')).toBe('dark')
+  })
+
+  it('клик из dark состояния → applies .theme-light', async () => {
+    window.localStorage.setItem('jumix-theme-mode', 'dark')
+    render(
+      <ThemeProvider>
+        <ThemeToggle />
+      </ThemeProvider>,
+    )
+    const button = await screen.findByRole('button', { name: 'Включить светлую тему' })
+    await userEvent.click(button)
     expect(document.documentElement.classList.contains('theme-light')).toBe(true)
     expect(window.localStorage.getItem('jumix-theme-mode')).toBe('light')
+  })
+
+  it('два клика подряд возвращают исходную тему (round-trip)', async () => {
+    render(
+      <ThemeProvider>
+        <ThemeToggle />
+      </ThemeProvider>,
+    )
+    const button = await screen.findByRole('button')
+    await userEvent.click(button)
+    expect(window.localStorage.getItem('jumix-theme-mode')).toBe('dark')
+    await userEvent.click(button)
+    expect(window.localStorage.getItem('jumix-theme-mode')).toBe('light')
+    expect(document.documentElement.classList.contains('theme-light')).toBe(true)
   })
 })
