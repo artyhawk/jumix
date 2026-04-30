@@ -68,6 +68,30 @@ export function refreshTokens(args: {
 }
 
 /**
+ * Password reset via SMS. Two-phase:
+ *   1. request — отправить OTP на phone (uniform `{ok:true}` даже если phone
+ *      не зарегистрирован — anti-enumeration);
+ *   2. confirm — phone + code + newPassword → пароль меняется, все active
+ *      tokens revoked. Юзер обязан залогиниться заново — endpoint новые
+ *      токены НЕ возвращает.
+ */
+export function requestPasswordReset(phone: string) {
+  return apiFetch<{ ok: true }>('/auth/password-reset/request', {
+    method: 'POST',
+    skipAuth: true,
+    body: { phone },
+  })
+}
+
+export function confirmPasswordReset(args: { phone: string; code: string; newPassword: string }) {
+  return apiFetch<{ ok: true }>('/auth/password-reset/confirm', {
+    method: 'POST',
+    skipAuth: true,
+    body: { phone: args.phone, code: args.code, newPassword: args.newPassword },
+  })
+}
+
+/**
  * Public registration (ADR 0004). Two-phase:
  *   1. start — отправить OTP на телефон;
  *   2. verify — проверить OTP + создать operator account; вернуть JWT-пару.

@@ -111,9 +111,17 @@ export function LoginForm() {
       <FadeSwap swapKey={mode}>
         {mode === 'password' ? (
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="password" className="text-xs font-medium text-text-secondary">
-              {t('auth.login.passwordLabel')}
-            </label>
+            <div className="flex items-baseline justify-between">
+              <label htmlFor="password" className="text-xs font-medium text-text-secondary">
+                {t('auth.login.passwordLabel')}
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-brand-500 hover:text-brand-400 transition-colors"
+              >
+                {t('auth.forgotPassword.linkOnLogin')}
+              </Link>
+            </div>
             <div className="relative">
               <Lock
                 className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-text-tertiary pointer-events-none"
