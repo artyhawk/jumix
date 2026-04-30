@@ -113,8 +113,9 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE}
       JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-/run/secrets/jwt_private.pem}
       JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/run/secrets/jwt_public.pem}
-      SMS_GATEWAY_URL: ${SMS_GATEWAY_URL}
-      SMS_GATEWAY_KEY: ${SMS_GATEWAY_KEY}
+      MOBIZON_API_URL: ${MOBIZON_API_URL:-https://api.mobizon.kz}
+      MOBIZON_API_KEY: ${MOBIZON_API_KEY:-}
+      MOBIZON_FROM: ${MOBIZON_FROM:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
       CORS_ORIGINS: ${CORS_ORIGINS}
       TZ: Asia/Almaty
