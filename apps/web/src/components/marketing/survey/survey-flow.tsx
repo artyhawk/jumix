@@ -408,14 +408,14 @@ function QuestionStage({
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--m-brand)]',
           'transition-colors duration-200',
           error
-            ? 'border-[#ef4444]'
+            ? 'border-[var(--color-danger)]'
             : 'border-[var(--m-border-strong)] focus:border-[var(--m-brand)]',
         )}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `q-${question.position}-error` : undefined}
       />
       {error ? (
-        <p id={`q-${question.position}-error`} className="text-[13px] text-[#ef4444]">
+        <p id={`q-${question.position}-error`} className="text-[13px] text-[var(--color-danger)]">
           {error}
         </p>
       ) : null}
@@ -546,12 +546,12 @@ function ContactField({
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--m-brand)]',
           'transition-colors duration-200',
           error
-            ? 'border-[#ef4444]'
+            ? 'border-[var(--color-danger)]'
             : 'border-[var(--m-border-strong)] focus:border-[var(--m-brand)]',
         )}
         aria-invalid={Boolean(error)}
       />
-      {error ? <p className="text-[12px] text-[#ef4444]">{error}</p> : null}
+      {error ? <p className="text-[12px] text-[var(--color-danger)]">{error}</p> : null}
     </label>
   )
 }

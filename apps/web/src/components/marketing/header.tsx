@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { LocaleSwitcher } from './locale-switcher'
 import { LoginLink } from './login-link'
+import { MarketingThemeToggle } from './theme-toggle'
 import { WhatsAppButton } from './whatsapp-button'
 
 const NAV_LINKS = [
@@ -74,6 +75,7 @@ export function Header() {
           ) : null}
 
           <div className="flex items-center gap-1.5 md:gap-2">
+            <MarketingThemeToggle />
             <LocaleSwitcher />
             <LoginLink variant="ghost" size="md" className="hidden sm:inline-flex" />
             <WhatsAppButton variant="primary" size="md">

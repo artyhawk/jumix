@@ -1,10 +1,19 @@
 /**
- * Marketing-only стили (B3-LANDING). Тёплые dark surfaces, premium easings,
- * radial-glow утилиты для hero. Эти CSS-переменные scoped на body[data-marketing="true"]
- * — admin cabinet их не использует и его design-tokens (globals.css) не затрагиваются.
+ * Marketing-only стили (B3-LANDING + B3-THEME). Тёплые dark surfaces, premium
+ * easings, radial-glow утилиты для hero. Эти CSS-переменные scoped на
+ * `[data-marketing="true"]` body — admin cabinet их не использует, и его
+ * design-tokens (globals.css) не затрагиваются.
+ *
+ * B3-THEME-3: переменные стали theme-aware. Variant выбирается по родительской
+ * `.theme-light` / `.theme-dark` class на <html>, которую ставит ThemeScript.
+ * Marketing landing + surveys + privacy/terms — все используют эти токены.
+ *
+ * Light-вариант — generous whites с soft cream surface для warmth (заказчик
+ * preference). Dark — preserved от B3-LANDING.
  */
 
-[data-marketing="true"] {
+/* === Dark variant (originally B3-LANDING palette) === */
+.theme-dark [data-marketing="true"] {
   --m-bg: #07070a;
   --m-surface: #0e0e12;
   --m-surface-elevated: #14141a;
@@ -23,6 +32,52 @@
   --m-success: #22c55e;
   --m-info: #3b82f6;
 
+  --m-grid-line: rgba(255, 255, 255, 0.025);
+
+  /* SVG mockup tokens (B3-THEME-3) — отдельный sub-palette для inline SVG. */
+  --m-mockup-bg: #0a0a0b;
+  --m-mockup-surface: #14141a;
+  --m-mockup-elevated: #1d1d24;
+  --m-mockup-border: #2a2a33;
+  --m-mockup-text: #fafafa;
+  --m-mockup-text-muted: #a1a1aa;
+  --m-mockup-text-tertiary: #71717a;
+}
+
+/* === Light variant (default — заказчик preference) === */
+:root [data-marketing="true"],
+.theme-light [data-marketing="true"] {
+  --m-bg: #fcfcfb;
+  --m-surface: #ffffff;
+  --m-surface-elevated: #ffffff;
+  --m-border: #e8e6e0;
+  --m-border-strong: #d4d2cc;
+
+  --m-fg: #18181b;
+  --m-fg-secondary: #52525b;
+  --m-fg-tertiary: #71717a;
+
+  --m-brand: #f97b10;
+  --m-brand-hover: #e06a06;
+  --m-brand-glow: rgba(249, 123, 16, 0.14);
+  --m-brand-glow-strong: rgba(249, 123, 16, 0.24);
+
+  --m-success: #16a34a;
+  --m-info: #0891b2;
+
+  --m-grid-line: rgba(0, 0, 0, 0.04);
+
+  --m-mockup-bg: #ffffff;
+  --m-mockup-surface: #f7f7f5;
+  --m-mockup-elevated: #ffffff;
+  --m-mockup-border: #e8e6e0;
+  --m-mockup-text: #18181b;
+  --m-mockup-text-muted: #52525b;
+  --m-mockup-text-tertiary: #71717a;
+}
+
+/* === Common (shared) === */
+[data-marketing="true"] {
   --m-ease-premium: cubic-bezier(0.22, 1, 0.36, 1);
   --m-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
@@ -36,8 +91,8 @@
 }
 
 [data-marketing="true"] .m-grid-bg {
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-image: linear-gradient(to right, var(--m-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--m-grid-line) 1px, transparent 1px);
   background-size: 56px 56px;
   -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
   mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);

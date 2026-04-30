@@ -26,7 +26,9 @@ export function FeatureCard({
             'inline-flex size-11 items-center justify-center rounded-[12px] shrink-0',
             tone === 'default'
               ? 'bg-[color:var(--m-brand-glow)] text-[var(--m-brand)]'
-              : 'bg-red-500/10 text-red-400',
+              : // danger tone — pain-points section. red-400/red-500 хорошо читается на dark,
+                // на light fade'ит. Используем semantic --color-danger token (theme-aware).
+                'bg-[color-mix(in_srgb,var(--color-danger)_12%,transparent)] text-[var(--color-danger)]',
           )}
           aria-hidden
         >

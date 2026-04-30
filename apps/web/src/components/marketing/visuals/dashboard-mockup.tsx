@@ -71,9 +71,9 @@ export function DashboardMockup({ className }: { className?: string }) {
       >
         {/* Browser chrome */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--m-border)] bg-[var(--m-surface-elevated)]">
-          <span className="size-3 rounded-full bg-[#3a3a40]" />
-          <span className="size-3 rounded-full bg-[#3a3a40]" />
-          <span className="size-3 rounded-full bg-[#3a3a40]" />
+          <span className="size-3 rounded-full bg-[var(--m-border-strong)]" />
+          <span className="size-3 rounded-full bg-[var(--m-border-strong)]" />
+          <span className="size-3 rounded-full bg-[var(--m-border-strong)]" />
           <div className="flex-1 mx-4 h-6 rounded-md bg-[var(--m-bg)] flex items-center justify-center">
             <span className="text-[10px] text-[var(--m-fg-tertiary)] tracking-wide">
               app.jumix.kz/dashboard
@@ -262,7 +262,7 @@ function ChartBars() {
               'flex-1 rounded-t-[3px]',
               isLast
                 ? 'bg-[var(--m-brand)]'
-                : 'bg-gradient-to-t from-[var(--m-border-strong)] to-[#3f3f46]',
+                : 'bg-gradient-to-t from-[var(--m-border)] to-[var(--m-border-strong)]',
             )}
           />
         )
