@@ -10,6 +10,7 @@ import { t } from '@/lib/i18n'
 import { applyPhoneMask, toE164 } from '@/lib/phone-format'
 import { motion } from 'framer-motion'
 import { ArrowRight, Lock, Phone } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -177,6 +178,13 @@ export function LoginForm() {
       >
         {mode === 'sms' ? t('auth.login.usePassword') : t('auth.login.useSms')}
       </button>
+
+      <div className="text-sm text-center text-text-secondary">
+        {t('auth.register.noAccount')}{' '}
+        <Link href="/register" className="text-brand-500 hover:text-brand-400 font-medium">
+          {t('auth.register.registerLink')}
+        </Link>
+      </div>
     </motion.form>
   )
 }
