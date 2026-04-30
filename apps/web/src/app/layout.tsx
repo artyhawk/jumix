@@ -1,5 +1,7 @@
+import { ThemeScript } from '@/components/theme-script'
 import { AuthProvider } from '@/providers/auth-provider'
 import { QueryProvider } from '@/providers/query-provider'
+import { ThemeProviders } from '@/providers/theme-providers'
 import { ToastProvider } from '@/providers/toast-provider'
 import type { Metadata } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
@@ -31,16 +33,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html
-      lang="ru"
-      className={`dark ${inter.variable} ${jetbrains.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="ru" className={`${inter.variable} ${jetbrains.variable}`} suppressHydrationWarning>
+      <head>
+        {/* B3-THEME — inline script читает localStorage и ставит class на <html>
+            ДО React hydrate (FOUC prevention). См. theme-script.tsx. */}
+        <ThemeScript />
+      </head>
       <body className="antialiased">
-        <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </QueryProvider>
-        <ToastProvider />
+        <ThemeProviders>
+          <QueryProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </QueryProvider>
+          <ToastProvider />
+        </ThemeProviders>
       </body>
     </html>
   )

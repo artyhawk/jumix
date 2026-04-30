@@ -31,6 +31,10 @@ export const users = pgTable(
     // Инкрементируется при logout-all, обесценивает все активные access-токены (§5.5)
     tokenVersion: integer().notNull().default(0),
     lastLoginAt: timestamp({ withTimezone: true, mode: 'date' }),
+    // 'light' | 'dark' | 'system' (B3-THEME). Default 'system' — следовать
+    // OS prefers-color-scheme. Anonymous users persist в localStorage; logged-in —
+    // здесь, чтобы preference переживала смену устройства.
+    themeMode: text().notNull().default('system'),
     createdAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
@@ -43,6 +47,7 @@ export const users = pgTable(
       .on(t.organizationId)
       .where(sql`status = 'active' AND deleted_at IS NULL`),
     check('users_phone_format_chk', sql`${t.phone} ~ '^\\+7[0-9]{10}$'`),
+    check('users_theme_mode_chk', sql`${t.themeMode} IN ('light', 'dark', 'system')`),
     // Инвариант (ADR 0003): superadmin — org IS NULL; owner — org IS NOT NULL;
     // operator — org IS NULL (идентичность живёт на crane_profiles;
     // per-org context резолвится через organization_operators + X-Organization-Id

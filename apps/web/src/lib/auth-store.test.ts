@@ -16,6 +16,7 @@ const sampleUser = {
   role: 'owner' as const,
   organizationId: 'o-1',
   name: 'Иван',
+  themeMode: 'system' as const,
 }
 
 beforeEach(() => {

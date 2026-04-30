@@ -40,6 +40,7 @@ export const registerPasswordRoutes: FastifyPluginAsync = async (app: FastifyIns
         role: user.role,
         organizationId: user.organizationId,
         name: user.name,
+        themeMode: user.themeMode as 'light' | 'dark' | 'system',
       },
     })
   })

@@ -80,3 +80,5 @@ export type {
   SurveyResponseAnswer,
   SurveyResponseDetail,
 } from './api/survey'
+export { THEME_MODES, THEME_MODE_DEFAULT, isThemeMode } from './api/preferences'
+export type { ThemeMode, UpdatePreferencesPayload } from './api/preferences'

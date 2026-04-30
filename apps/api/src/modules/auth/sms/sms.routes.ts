@@ -70,6 +70,7 @@ export const registerSmsRoutes: FastifyPluginAsync = async (app: FastifyInstance
         role: user.role,
         organizationId: user.organizationId,
         name: user.name,
+        themeMode: user.themeMode as 'light' | 'dark' | 'system',
       },
     })
   })

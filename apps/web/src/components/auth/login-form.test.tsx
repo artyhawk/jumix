@@ -134,7 +134,7 @@ describe('LoginForm', () => {
       refreshToken: 'rt',
       accessTokenExpiresAt: '2026-04-22T00:00:00Z',
       refreshTokenExpiresAt: '2026-05-22T00:00:00Z',
-      user: { id: 'u-1', role: 'owner', organizationId: 'o-1', name: 'Иван' },
+      user: { id: 'u-1', role: 'owner', organizationId: 'o-1', name: 'Иван', themeMode: 'system' },
     })
     render(<LoginForm />)
     await userEvent.click(screen.getByRole('button', { name: /Войти по паролю/ }))

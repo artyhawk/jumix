@@ -36,6 +36,10 @@ interface AuthActions {
     accessTokenExpiresAt: string
     refreshTokenExpiresAt: string
   }) => void
+  /** Обновляет subset полей user без затрагивания tokens. Используется для
+   *  preferences-sync (B3-THEME): после PATCH /me/preferences кладём свежий
+   *  user в store, persist подхватывает в localStorage. */
+  patchUser: (patch: Partial<AuthUser>) => void
   clear: () => void
   refresh: () => Promise<boolean>
   logout: () => Promise<void>
@@ -76,6 +80,12 @@ export const useAuthStore = create<AuthStore>()(
           accessTokenExpiresAt: s.accessTokenExpiresAt,
           refreshTokenExpiresAt: s.refreshTokenExpiresAt,
         }),
+
+      patchUser: (patch) => {
+        const cur = get().user
+        if (!cur) return
+        set({ user: { ...cur, ...patch } })
+      },
 
       clear: () =>
         set({

@@ -44,6 +44,7 @@ export const registerRegistrationRoutes: FastifyPluginAsync = async (app: Fastif
             role: result.user.role,
             organizationId: result.user.organizationId,
             name: result.user.name,
+            themeMode: result.user.themeMode as 'light' | 'dark' | 'system',
           },
           craneProfile: toRegistrationCraneProfileDTO(result.craneProfile, result.user.phone),
         })

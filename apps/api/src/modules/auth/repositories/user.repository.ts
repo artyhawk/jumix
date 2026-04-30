@@ -94,4 +94,20 @@ export class UserRepository {
       .set({ passwordHash, updatedAt: new Date() })
       .where(eq(users.id, userId))
   }
+
+  /**
+   * Обновляет theme preference (B3-THEME) и возвращает обновлённую row.
+   * Возвращает `null` если пользователь не найден.
+   */
+  async updateThemeMode(
+    userId: string,
+    themeMode: 'light' | 'dark' | 'system',
+  ): Promise<User | null> {
+    const rows = await this.database.db
+      .update(users)
+      .set({ themeMode, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning()
+    return rows[0] ?? null
+  }
 }

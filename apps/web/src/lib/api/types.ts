@@ -40,6 +40,8 @@ import type {
   ShiftStatus,
   ShiftWithRelations,
   StartShiftPayload,
+  ThemeMode,
+  UpdatePreferencesPayload,
 } from '@jumix/shared'
 
 export type {
@@ -75,6 +77,8 @@ export type {
   ShiftStatus,
   ShiftWithRelations,
   StartShiftPayload,
+  ThemeMode,
+  UpdatePreferencesPayload,
 }
 
 export type UserRole = 'superadmin' | 'owner' | 'operator'
@@ -86,6 +90,8 @@ export interface AuthUser {
   role: UserRole
   organizationId: string | null
   name: string
+  /** B3-THEME — user theme preference. Default 'system' для new users. */
+  themeMode: ThemeMode
 }
 
 /** Ответ SMS verify / password login. */
