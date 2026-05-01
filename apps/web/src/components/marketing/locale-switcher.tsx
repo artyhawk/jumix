@@ -72,14 +72,21 @@ export function LocaleSwitcher({ className }: { className?: string }) {
       <AnimatePresence>
         {open ? (
           <DropdownMenu.Portal forceMount>
-            <DropdownMenu.Content asChild sideOffset={8} align="end" forceMount loop>
+            <DropdownMenu.Content
+              asChild
+              sideOffset={8}
+              align="end"
+              collisionPadding={8}
+              forceMount
+              loop
+            >
               <motion.div
                 initial={reduceMotion ? false : { opacity: 0, y: -6, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.97 }}
                 transition={{ duration: 0.22, ease: PREMIUM_EASE }}
                 className={cn(
-                  'z-50 min-w-[200px] rounded-[14px] p-1.5 origin-top-right',
+                  'z-50 min-w-[180px] max-w-[calc(100vw-16px)] rounded-[14px] p-1.5 origin-top-right',
                   'border border-[var(--m-border-strong)] bg-[var(--m-surface-elevated)]',
                   'shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)] backdrop-blur',
                 )}

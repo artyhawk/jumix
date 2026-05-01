@@ -228,7 +228,7 @@ export function SurveyFlow({ survey }: { survey: SurveyWithQuestions }) {
   return (
     <section
       ref={containerRef}
-      className="relative min-h-[calc(100dvh-4rem)] flex items-start justify-center px-5 md:px-8 py-12 md:py-20"
+      className="relative min-h-[calc(100dvh-4rem)] flex items-start justify-center px-3 sm:px-5 md:px-8 py-10 sm:py-12 md:py-20"
     >
       <div className="absolute inset-0 m-radial-hero pointer-events-none" aria-hidden />
       <div className="absolute inset-0 m-grid-bg opacity-50 pointer-events-none" aria-hidden />
@@ -316,7 +316,7 @@ function IntroStage({
   onStart: () => void
 }) {
   return (
-    <div className="m-card p-8 md:p-12 space-y-6">
+    <div className="m-card p-5 sm:p-8 md:p-12 space-y-5 sm:space-y-6">
       <div className="space-y-3">
         <span className="inline-flex items-center gap-2 text-[11px] font-semibold tracking-[0.14em] uppercase text-[var(--m-brand)]">
           <span className="size-1 rounded-full bg-[var(--m-brand)]" aria-hidden />
@@ -374,7 +374,7 @@ function QuestionStage({
   if (!question) return null
   return (
     <form
-      className="m-card p-7 md:p-10 space-y-6"
+      className="m-card p-5 sm:p-7 md:p-10 space-y-5 sm:space-y-6"
       onSubmit={(e) => {
         e.preventDefault()
         onNext()
@@ -451,7 +451,7 @@ function ContactStage({
   onSubmit: (e: FormEvent) => void
 }) {
   return (
-    <form className="m-card p-7 md:p-10 space-y-6" onSubmit={onSubmit}>
+    <form className="m-card p-5 sm:p-7 md:p-10 space-y-5 sm:space-y-6" onSubmit={onSubmit}>
       <div className="space-y-2">
         <h2
           className="font-semibold tracking-tight text-[var(--m-fg)]"
@@ -558,7 +558,7 @@ function ContactField({
 
 function SubmittingStage() {
   return (
-    <div className="m-card p-10 md:p-14 flex flex-col items-center text-center gap-5">
+    <div className="m-card p-8 sm:p-10 md:p-14 flex flex-col items-center text-center gap-5">
       <Loader2 className="size-10 animate-spin text-[var(--m-brand)]" aria-hidden />
       <p className="text-[15px] text-[var(--m-fg-secondary)]">Отправляем ваш ответ…</p>
     </div>
@@ -567,7 +567,7 @@ function SubmittingStage() {
 
 function SuccessStage({ outro, onReturn }: { outro: string; onReturn: () => void }) {
   return (
-    <div className="m-card p-10 md:p-14 flex flex-col items-center text-center gap-6">
+    <div className="m-card p-8 sm:p-10 md:p-14 flex flex-col items-center text-center gap-6">
       <div
         className="inline-flex size-16 items-center justify-center rounded-full"
         style={{ background: 'var(--m-brand-glow)' }}
@@ -595,7 +595,7 @@ function SuccessStage({ outro, onReturn }: { outro: string; onReturn: () => void
 
 function ErrorStage({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="m-card p-8 md:p-12 space-y-5">
+    <div className="m-card p-5 sm:p-8 md:p-12 space-y-5">
       <h2 className="text-[18px] font-semibold text-[var(--m-fg)]">Что-то пошло не так</h2>
       <p className="text-[14px] text-[var(--m-fg-secondary)] leading-relaxed">{message}</p>
       <PrimaryButton onClick={onRetry}>Попробовать ещё раз</PrimaryButton>
@@ -626,7 +626,7 @@ function PrimaryButton({
       className={cn(
         'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[12px] font-medium',
         'transition-colors duration-200 select-none',
-        'min-h-[52px] md:h-14 px-7 text-[15px]',
+        'min-h-[48px] sm:min-h-[52px] md:h-14 px-5 sm:px-7 text-[14px] sm:text-[15px]',
         'bg-[var(--m-brand)] text-[#0a0a0b] hover:bg-[var(--m-brand-hover)] m-cta-glow',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--m-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--m-bg)]',
         'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -653,7 +653,7 @@ function SecondaryButton({
       className={cn(
         'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[12px] font-medium',
         'transition-colors duration-200 select-none',
-        'min-h-[52px] md:h-14 px-6 text-[14px]',
+        'min-h-[48px] sm:min-h-[52px] md:h-14 px-5 sm:px-6 text-[13px] sm:text-[14px]',
         'border border-[var(--m-border-strong)] text-[var(--m-fg-secondary)]',
         'hover:border-[var(--m-brand)] hover:text-[var(--m-fg)]',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--m-brand)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--m-bg)]',

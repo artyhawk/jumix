@@ -20,8 +20,8 @@ const variants: Record<Variant, string> = {
 }
 
 const sizes: Record<Size, string> = {
-  md: 'min-h-[44px] md:h-11 px-5 text-sm',
-  lg: 'min-h-[52px] md:h-14 px-7 text-[15px]',
+  md: 'min-h-[44px] md:h-11 px-3 sm:px-5 text-[13px] sm:text-sm',
+  lg: 'min-h-[48px] sm:min-h-[52px] md:h-14 px-5 sm:px-7 text-[14px] sm:text-[15px]',
 }
 
 export function LoginLink({

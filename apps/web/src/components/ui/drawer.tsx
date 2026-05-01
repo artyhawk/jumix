@@ -71,7 +71,9 @@ export const DrawerContent = forwardRef<
 })
 
 export function DrawerHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('px-5 py-4 border-b border-border-subtle', className)} {...props} />
+  return (
+    <div className={cn('px-4 sm:px-5 py-4 border-b border-border-subtle', className)} {...props} />
+  )
 }
 
 export const DrawerTitle = forwardRef<
@@ -88,14 +90,14 @@ export const DrawerTitle = forwardRef<
 })
 
 export function DrawerBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('flex-1 overflow-auto px-5 py-4', className)} {...props} />
+  return <div className={cn('flex-1 overflow-auto px-4 sm:px-5 py-4', className)} {...props} />
 }
 
 export function DrawerFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        'px-5 py-4 border-t border-border-subtle flex items-center justify-end gap-2',
+        'px-4 sm:px-5 py-4 border-t border-border-subtle flex flex-wrap items-center justify-end gap-2',
         className,
       )}
       {...props}

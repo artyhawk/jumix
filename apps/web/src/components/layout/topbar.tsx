@@ -32,7 +32,7 @@ export function Topbar({ user }: { user: AuthUser }) {
   return (
     <>
       <header className="h-14 shrink-0 border-b border-border-subtle bg-layer-0/80 backdrop-blur supports-[backdrop-filter]:bg-layer-0/60 sticky top-0 z-30">
-        <div className="h-full flex items-center gap-2 px-3 md:px-6">
+        <div className="h-full flex items-center gap-1.5 px-2 sm:gap-2 sm:px-3 md:px-6">
           {/* Hamburger — только mobile */}
           <Button
             variant="ghost"
@@ -102,7 +102,11 @@ export function Topbar({ user }: { user: AuthUser }) {
                 <Bell className="size-5 md:size-[18px]" strokeWidth={1.5} />
               </Button>
             </DropdownTrigger>
-            <DropdownContent align="end" className="w-[280px]">
+            <DropdownContent
+              align="end"
+              collisionPadding={8}
+              className="w-[280px] max-w-[calc(100vw-16px)]"
+            >
               <DropdownLabel>Уведомления</DropdownLabel>
               <DropdownSeparator />
               <div className="py-6 text-center text-sm text-text-tertiary">
@@ -122,7 +126,11 @@ export function Topbar({ user }: { user: AuthUser }) {
                 <Avatar name={user.name} userId={user.id} size="md" />
               </button>
             </DropdownTrigger>
-            <DropdownContent align="end" className="w-[220px]">
+            <DropdownContent
+              align="end"
+              collisionPadding={8}
+              className="w-[220px] max-w-[calc(100vw-16px)]"
+            >
               <div className="px-2 py-2 flex flex-col gap-1">
                 <div className="text-sm font-medium text-text-primary truncate">{user.name}</div>
                 <Badge variant="neutral" withDot={false} className="self-start">

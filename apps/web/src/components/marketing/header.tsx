@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { LocaleSwitcher } from './locale-switcher'
 import { LoginLink } from './login-link'
+import { MarketingMobileMenu } from './mobile-menu'
 import { MarketingThemeToggle } from './theme-toggle'
 import { WhatsAppButton } from './whatsapp-button'
 
@@ -39,8 +40,8 @@ export function Header() {
           : 'bg-transparent border-b border-transparent',
       )}
     >
-      <div className="mx-auto max-w-7xl px-5 md:px-8">
-        <div className="h-16 md:h-20 flex items-center justify-between gap-6">
+      <div className="mx-auto max-w-7xl px-3 sm:px-5 md:px-8">
+        <div className="h-16 md:h-20 flex items-center justify-between gap-3 sm:gap-6">
           <Link
             href="/"
             className="inline-flex items-center gap-2 select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--m-brand)] rounded-md"
@@ -61,7 +62,7 @@ export function Header() {
           </Link>
 
           {isHome ? (
-            <nav className="hidden md:flex items-center gap-8" aria-label="Главная навигация">
+            <nav className="hidden lg:flex items-center gap-6" aria-label="Главная навигация">
               {NAV_LINKS.map((link) => (
                 <a
                   key={link.key}
@@ -75,12 +76,13 @@ export function Header() {
           ) : null}
 
           <div className="flex items-center gap-1.5 md:gap-2">
-            <MarketingThemeToggle />
-            <LocaleSwitcher />
-            <LoginLink variant="ghost" size="md" className="hidden sm:inline-flex" />
-            <WhatsAppButton variant="primary" size="md">
+            <MarketingThemeToggle className="hidden md:inline-flex" />
+            <LocaleSwitcher className="hidden md:inline-flex" />
+            <LoginLink variant="ghost" size="md" className="hidden md:inline-flex" />
+            <WhatsAppButton variant="primary" size="md" className="hidden md:inline-flex">
               {t('marketing.nav.contact')}
             </WhatsAppButton>
+            <MarketingMobileMenu />
           </div>
         </div>
       </div>

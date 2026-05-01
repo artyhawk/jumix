@@ -11,7 +11,7 @@ export function FinalCtaSection() {
   return (
     <SectionContainer id="final-cta" className="relative">
       <AnimatedSection>
-        <div className="relative mx-auto max-w-4xl rounded-[28px] border border-[var(--m-border-strong)] bg-gradient-to-b from-[var(--m-surface-elevated)] to-[var(--m-surface)] px-6 py-16 md:px-12 md:py-24 overflow-hidden">
+        <div className="relative mx-auto max-w-4xl rounded-[28px] border border-[var(--m-border-strong)] bg-gradient-to-b from-[var(--m-surface-elevated)] to-[var(--m-surface)] px-5 sm:px-6 py-12 sm:py-16 md:px-12 md:py-24 overflow-hidden">
           {/* Glow */}
           <div
             className="absolute inset-0 opacity-70"

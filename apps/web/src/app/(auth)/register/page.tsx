@@ -22,8 +22,8 @@ export default function RegisterPage() {
         <ArrowLeft className="size-4" aria-hidden />
         {t('auth.login.backToHome')}
       </Link>
-      <div className="rounded-xl border border-border-subtle bg-layer-1/70 backdrop-blur p-5 md:p-8 shadow-2xl shadow-black/30">
-        <div className="flex flex-col items-center gap-3 pb-6">
+      <div className="rounded-xl border border-border-subtle bg-layer-1/70 backdrop-blur p-4 sm:p-5 md:p-8 shadow-2xl shadow-black/30">
+        <div className="flex flex-col items-center gap-3 pb-5 sm:pb-6">
           <Logo variant="mark" className="size-12" priority />
           <div className="text-center space-y-1.5">
             <h1 className="text-xl md:text-[24px] font-semibold text-text-primary">

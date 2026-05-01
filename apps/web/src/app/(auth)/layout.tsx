@@ -32,7 +32,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         }}
         aria-hidden
       />
-      <div className="relative flex-1 flex items-center justify-center p-4 md:p-6">{children}</div>
+      <div className="relative flex-1 flex items-center justify-center p-3 sm:p-4 md:p-6">
+        {children}
+      </div>
       <footer className="relative py-4 text-center text-[11px] text-text-tertiary">
         © Jumix 2026 · <span className="text-text-tertiary">Соглашение</span> ·{' '}
         <span className="text-text-tertiary">Конфиденциальность</span>

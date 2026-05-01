@@ -81,9 +81,9 @@ export function DashboardMockup({ className }: { className?: string }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-[180px_1fr] min-h-[420px]">
+        <div className="grid grid-cols-[120px_1fr] sm:grid-cols-[180px_1fr] min-h-[420px]">
           {/* Sidebar */}
-          <aside className="border-r border-[var(--m-border)] bg-[var(--m-surface-elevated)] p-4 space-y-1">
+          <aside className="border-r border-[var(--m-border)] bg-[var(--m-surface-elevated)] p-3 sm:p-4 space-y-1">
             <div className="flex items-center gap-2 mb-5">
               <div className="size-6 rounded-md bg-[var(--m-brand)]" />
               <span className="text-[12px] font-semibold text-[var(--m-fg)]">Jumix</span>
@@ -115,7 +115,10 @@ export function DashboardMockup({ className }: { className?: string }) {
           </aside>
 
           {/* Main content */}
-          <motion.div style={{ x: txInverse, y: tyInverse }} className="p-5 space-y-4">
+          <motion.div
+            style={{ x: txInverse, y: tyInverse }}
+            className="p-3 sm:p-5 space-y-4 min-w-0"
+          >
             <div className="flex items-center justify-between">
               <h4 className="text-[13px] font-semibold text-[var(--m-fg)]">Обзор платформы</h4>
               <div className="flex items-center gap-1.5">
@@ -127,7 +130,7 @@ export function DashboardMockup({ className }: { className?: string }) {
             </div>
 
             {/* Stats grid */}
-            <div className="grid grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5">
               {[
                 { value: '12', label: 'Объектов' },
                 { value: '8', label: 'Кранов' },

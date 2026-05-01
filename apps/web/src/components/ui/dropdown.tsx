@@ -17,7 +17,7 @@ export const DropdownContent = forwardRef<
         ref={ref}
         sideOffset={sideOffset}
         className={cn(
-          'z-50 min-w-[180px] rounded-md border border-border-default bg-layer-3',
+          'z-50 min-w-[180px] max-w-[calc(100vw-16px)] rounded-md border border-border-default bg-layer-3',
           'p-1 shadow-xl shadow-black/40 origin-top',
           'anim-fade-zoom',
           className,

@@ -22,9 +22,9 @@ export function SectionContainer({
     <Tag
       id={id}
       className={cn(
-        variant !== 'bare' && 'px-5 md:px-8',
-        variant === 'default' && 'py-20 md:py-32',
-        variant === 'narrow' && 'py-16 md:py-24',
+        variant !== 'bare' && 'px-4 sm:px-5 md:px-8',
+        variant === 'default' && 'py-16 sm:py-20 md:py-32',
+        variant === 'narrow' && 'py-12 sm:py-16 md:py-24',
         className,
       )}
     >

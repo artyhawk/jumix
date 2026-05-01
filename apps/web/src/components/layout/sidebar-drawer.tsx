@@ -34,7 +34,7 @@ export function SidebarDrawer({
       <RadixDialog.Portal>
         <DrawerOverlay />
         <RadixDialog.Content
-          className="fixed inset-y-0 left-0 z-50 h-dvh w-[280px] bg-layer-1 border-r border-border-default shadow-2xl anim-slide-left flex flex-col focus:outline-none md:hidden"
+          className="fixed inset-y-0 left-0 z-50 h-dvh w-[260px] sm:w-[280px] max-w-[calc(100vw-48px)] bg-layer-1 border-r border-border-default shadow-2xl anim-slide-left flex flex-col focus:outline-none md:hidden"
           aria-label="Навигация"
         >
           <RadixDialog.Title className="sr-only">Навигация</RadixDialog.Title>

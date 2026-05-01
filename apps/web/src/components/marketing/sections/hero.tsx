@@ -26,8 +26,8 @@ export function HeroSection() {
       <div className="absolute inset-0 m-radial-hero" aria-hidden />
       <div className="absolute inset-0 m-grid-bg" aria-hidden />
 
-      <div className="relative mx-auto max-w-7xl px-5 md:px-8 pt-12 pb-20 md:pt-20 md:pb-32">
-        <div className="grid gap-12 lg:gap-16 lg:grid-cols-[1.05fr_1fr] items-center">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-5 md:px-8 pt-10 pb-16 sm:pt-12 sm:pb-20 md:pt-20 md:pb-32">
+        <div className="grid gap-10 sm:gap-12 lg:gap-16 lg:grid-cols-[1.05fr_1fr] items-center">
           <div>
             <motion.span
               {...fadeUp(0)}
@@ -75,7 +75,7 @@ export function HeroSection() {
             initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }}
             animate={reduceMotion ? undefined : { opacity: 1, scale: 1 }}
             transition={{ duration: 0.9, ease: PREMIUM_EASE, delay: 0.4 }}
-            className="lg:pl-4"
+            className="lg:pl-4 min-w-0"
           >
             <DashboardMockup />
           </motion.div>

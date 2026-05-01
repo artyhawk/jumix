@@ -28,7 +28,7 @@ export function HowItWorksSection() {
         />
       </AnimatedSection>
 
-      <StaggeredChildren className="mt-12 md:mt-16 grid gap-6 md:grid-cols-3 relative">
+      <StaggeredChildren className="mt-10 sm:mt-12 md:mt-16 grid gap-4 sm:gap-6 md:grid-cols-3 relative">
         {/* Connecting line — desktop only */}
         <div
           className="hidden md:block absolute top-[88px] left-[16%] right-[16%] h-px bg-gradient-to-r from-transparent via-[var(--m-border-strong)] to-transparent"
@@ -37,7 +37,7 @@ export function HowItWorksSection() {
 
         {steps.map((step, idx) => (
           <StaggerItem key={step.label} index={idx}>
-            <article className="relative m-card p-6 md:p-7 h-full flex flex-col gap-5">
+            <article className="relative m-card p-4 sm:p-6 md:p-7 h-full flex flex-col gap-4 sm:gap-5">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--m-brand)] font-semibold tabular-nums">
                   {step.label}

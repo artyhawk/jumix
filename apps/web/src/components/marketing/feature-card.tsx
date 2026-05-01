@@ -19,7 +19,12 @@ export function FeatureCard({
   tone?: 'default' | 'danger'
 }) {
   return (
-    <div className={cn('m-card m-card-glow p-6 md:p-7 h-full flex flex-col gap-4', className)}>
+    <div
+      className={cn(
+        'm-card m-card-glow p-4 sm:p-6 md:p-7 h-full flex flex-col gap-3 sm:gap-4',
+        className,
+      )}
+    >
       {icon ? (
         <div
           className={cn(

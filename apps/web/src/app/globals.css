@@ -173,6 +173,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Safety net против горизонтального overflow от широких визуалов
+       (mockups с grid-cols-[180px_1fr] на узких phone'ах). `clip` а не
+       `hidden` — preserves sticky positioning у header'а. */
+    overflow-x: clip;
   }
 
   *,

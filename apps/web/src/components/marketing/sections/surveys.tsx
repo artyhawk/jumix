@@ -34,7 +34,7 @@ export function SurveysSection() {
         />
       </AnimatedSection>
 
-      <StaggeredChildren className="mt-12 md:mt-16 grid gap-5 md:gap-6 md:grid-cols-2">
+      <StaggeredChildren className="mt-10 sm:mt-12 md:mt-16 grid gap-4 sm:gap-5 md:gap-6 md:grid-cols-2">
         <StaggerItem index={0}>
           <SurveyCard
             icon={<Building2 className="size-6" aria-hidden />}
@@ -79,7 +79,7 @@ function SurveyCard({
     <Link
       href={href}
       className={cn(
-        'group relative m-card m-card-glow p-7 md:p-9 h-full flex flex-col gap-5',
+        'group relative m-card m-card-glow p-5 sm:p-7 md:p-9 h-full flex flex-col gap-4 sm:gap-5',
         'transition-transform duration-300 hover:-translate-y-1',
       )}
     >

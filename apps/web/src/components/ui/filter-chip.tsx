@@ -90,8 +90,9 @@ export function FilterChip<T extends string>({
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
+          collisionPadding={8}
           className={cn(
-            'z-50 min-w-[200px] rounded-md border border-border-default bg-layer-3',
+            'z-50 min-w-[180px] max-w-[calc(100vw-16px)] rounded-md border border-border-default bg-layer-3',
             'p-1 shadow-xl shadow-black/40 origin-top',
             'anim-fade-zoom',
           )}

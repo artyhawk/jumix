@@ -9,8 +9,8 @@ export function Footer() {
   const t = useT()
   return (
     <footer className="border-t border-[var(--m-border)] bg-[var(--m-bg)]">
-      <div className="mx-auto max-w-7xl px-5 md:px-8 py-14 md:py-20">
-        <div className="grid gap-12 md:grid-cols-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-5 md:px-8 py-12 sm:py-14 md:py-20">
+        <div className="grid gap-8 sm:gap-12 md:grid-cols-4">
           <div className="md:col-span-2 max-w-md space-y-4">
             <Link href="/" className="inline-flex items-center gap-2 select-none">
               <Image

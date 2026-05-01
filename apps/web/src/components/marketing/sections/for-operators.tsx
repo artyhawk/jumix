@@ -19,8 +19,8 @@ export function ForOperatorsSection() {
 
   return (
     <SectionContainer id="for-operators" className="relative bg-[var(--m-surface)]/40">
-      <div className="grid gap-16 lg:gap-20 lg:grid-cols-[1fr_1.1fr] items-start">
-        <div className="lg:sticky lg:top-28 space-y-10">
+      <div className="grid gap-12 sm:gap-16 lg:gap-20 lg:grid-cols-[1fr_1.1fr] items-start">
+        <div className="lg:sticky lg:top-28 space-y-8 sm:space-y-10">
           <AnimatedSection>
             <SectionHeading
               overline={t('marketing.forOperators.overline')}
@@ -37,7 +37,7 @@ export function ForOperatorsSection() {
           </AnimatedSection>
 
           <AnimatedSection delay={0.2}>
-            <div className="rounded-[14px] border border-[var(--m-border)] bg-[var(--m-surface)] p-5">
+            <div className="rounded-[14px] border border-[var(--m-border)] bg-[var(--m-surface)] p-4 sm:p-5">
               <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--m-brand)] font-semibold">
                 Итог
               </div>
@@ -51,7 +51,7 @@ export function ForOperatorsSection() {
         <StaggeredChildren className="space-y-4">
           {items.map((item, idx) => (
             <StaggerItem key={item.title} index={idx}>
-              <article className="m-card m-card-glow p-5 md:p-6 flex gap-4 items-start">
+              <article className="m-card m-card-glow p-4 sm:p-5 md:p-6 flex gap-3 sm:gap-4 items-start">
                 <span
                   aria-hidden
                   className="inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[color:var(--m-brand-glow)] text-[var(--m-brand)] text-[13px] font-semibold tabular-nums"
@@ -72,7 +72,7 @@ export function ForOperatorsSection() {
         </StaggeredChildren>
       </div>
 
-      <div className="lg:hidden mt-12 flex justify-center">
+      <div className="lg:hidden mt-10 sm:mt-12 flex justify-center">
         <AnimatedSection>
           <PhoneMockup />
         </AnimatedSection>
