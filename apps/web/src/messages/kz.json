@@ -1,8 +1,105 @@
 {
   "common": {},
   "auth": {
-    "login": {},
-    "verify": {},
+    "login": {
+      "backToHome": "Басты бетке",
+      "title": "Jumix-ке кіру",
+      "subtitle": "Кіру үшін телефон нөміріңізді енгізіңіз",
+      "phoneLabel": "Телефон нөмірі",
+      "phonePlaceholder": "+7 700 000 00 00",
+      "continue": "Кодты алу",
+      "or": "немесе",
+      "usePassword": "Құпиясөзбен кіру",
+      "useSms": "SMS-кодпен кіру",
+      "passwordLabel": "Құпиясөз",
+      "passwordPlaceholder": "Құпиясөзді енгізіңіз",
+      "loginButton": "Кіру",
+      "invalidPhone": "Қазақстанның дұрыс телефон нөмірін енгізіңіз",
+      "invalidCredentials": "Нөмір немесе құпиясөз қате",
+      "rateLimited": "Тым көп әрекет. Кейінірек қайталаңыз.",
+      "accountLocked": "Аккаунт уақытша құлыпталды. 15 минуттан кейін көріңіз.",
+      "genericError": "Кіре алмадық. Кейінірек көріңіз.",
+      "footerTerms": "Келісім",
+      "footerPrivacy": "Құпиялылық"
+    },
+    "register": {
+      "title": "Кран жүргізушісін тіркеу",
+      "subtitle": "Деректерді толтырыңыз — растау кодын SMS арқылы жібереміз",
+      "lastNameLabel": "Тегі",
+      "lastNamePlaceholder": "Иванов",
+      "firstNameLabel": "Аты",
+      "firstNamePlaceholder": "Иван",
+      "patronymicLabel": "Әкесінің аты",
+      "patronymicHint": "міндетті емес",
+      "patronymicPlaceholder": "Иванович",
+      "iinLabel": "ЖСН",
+      "iinPlaceholder": "12 цифр",
+      "phoneLabel": "Телефон нөмірі",
+      "phonePlaceholder": "+7 700 000 00 00",
+      "submit": "Кодты алу",
+      "haveAccount": "Аккаунтыңыз бар ма?",
+      "loginLink": "Кіру",
+      "back": "Артқа",
+      "noAccount": "Аккаунтыңыз жоқ па?",
+      "registerLink": "Тіркелу",
+      "verifyTitle": "Нөмірді растаңыз",
+      "verifySubtitle": "6 цифрлы кодты жібердік:",
+      "edit": "Деректерді өзгерту",
+      "invalidLastName": "Тегін енгізіңіз",
+      "invalidFirstName": "Атын енгізіңіз",
+      "invalidIin": "Дұрыс 12 цифрлы ЖСН енгізіңіз",
+      "invalidPhone": "Қазақстанның дұрыс телефон нөмірін енгізіңіз",
+      "phoneAlreadyRegistered": "Бұл нөмір тіркелген. Қолданыстағы аккаунтқа кіріңіз.",
+      "iinAlreadyExists": "Мұндай ЖСН бар аккаунт қазір тіркелген. Жұмыс берушіге хабарласыңыз.",
+      "rateLimited": "Тым көп әрекет. Біраз күтіңіз.",
+      "smsDeliveryFailed": "SMS жіберілмеді. Кейінірек көріңіз.",
+      "invalidOrExpiredCode": "Код қате немесе мерзімі өтті. Жаңасын сұраңыз.",
+      "genericError": "Тіркелуді аяқтай алмадық. Кейінірек көріңіз.",
+      "afterSuccessHint": "Аккаунт жасалды. Профиль әкімшіде тексерілуде."
+    },
+    "forgotPassword": {
+      "linkOnLogin": "Құпиясөзді ұмыттыңыз ба?",
+      "title": "Құпиясөзді қалпына келтіру",
+      "subtitle": "Телефон нөмірін енгізіңіз — құпиясөзді ауыстыру коды жіберіледі",
+      "phoneLabel": "Телефон нөмірі",
+      "phonePlaceholder": "+7 700 000 00 00",
+      "submitPhone": "Кодты алу",
+      "resetTitle": "Жаңа құпиясөз",
+      "resetSubtitle": "6 цифрлы кодты жібердік:",
+      "codeLabel": "SMS-код",
+      "newPasswordLabel": "Жаңа құпиясөз",
+      "newPasswordPlaceholder": "Кемінде 10 таңба",
+      "confirmPasswordLabel": "Құпиясөзді қайталаңыз",
+      "confirmPasswordPlaceholder": "Жаңа құпиясөзді қайталаңыз",
+      "submitReset": "Құпиясөзді өзгерту",
+      "edit": "Нөмірді өзгерту",
+      "successTitle": "Құпиясөз өзгертілді",
+      "successSubtitle": "Жаңа құпиясөзбен кіріңіз.",
+      "goToLogin": "Кіру бетіне өту",
+      "rememberPassword": "Құпиясөз есіңізге түсті ме?",
+      "loginLink": "Кіру",
+      "invalidPhone": "Қазақстанның дұрыс телефон нөмірін енгізіңіз",
+      "passwordTooShort": "Құпиясөз кемінде 10 таңбадан тұруы тиіс",
+      "passwordsDoNotMatch": "Құпиясөздер сәйкес келмейді",
+      "invalidCode": "Код қате немесе мерзімі өтті",
+      "rateLimited": "Тым көп әрекет. Кейінірек қайталаңыз.",
+      "smsDeliveryFailed": "SMS жіберілмеді. Кейінірек көріңіз.",
+      "genericError": "Құпиясөзді өзгерте алмадық. Кейінірек көріңіз."
+    },
+    "verify": {
+      "title": "Кодты енгізіңіз",
+      "subtitle": "6 цифрлы кодты жібердік:",
+      "codeLabel": "SMS-код",
+      "resendIn": "Қайта жіберуге дейін",
+      "resend": "Қайта жіберу",
+      "changePhone": "Нөмірді өзгерту",
+      "invalidCode": "Код қате",
+      "expiredCode": "Код мерзімі өтті. Жаңасын сұраңыз.",
+      "maxAttempts": "Әрекеттер саны асып кетті. Жаңа кодты сұраңыз.",
+      "requestNew": "Жаңа кодты сұрау",
+      "userNotRegistered": "Бұл нөмір тіркелмеген",
+      "genericError": "Кодты растай алмадық"
+    },
     "welcome": {}
   },
   "nav": {
@@ -34,6 +131,62 @@
       "ctaPrimary": "WhatsApp арқылы хабарласу",
       "ctaSecondary": "Жүйеге кіру",
       "trustLine": "Ауысымдар геолокациясы · Автоматты есептеу · Кран жүргізушілерінің биржасы"
+    },
+    "mockup": {
+      "ariaLabel": "Jumix басқару панелінің демонстрациясы: нысандар, крандар, операторлар метрикалары және нақты уақыттағы карта",
+      "nav": {
+        "dashboard": "Дашборд",
+        "sites": "Нысандар",
+        "cranes": "Крандар",
+        "operators": "Операторлар",
+        "approvals": "Өтінімдер",
+        "incidents": "Инциденттер"
+      },
+      "overview": "Платформаға шолу",
+      "live": "Live",
+      "stats": {
+        "sites": "Нысандар",
+        "cranes": "Крандар",
+        "operators": "Операторлар",
+        "approvals": "Өтінімдер"
+      },
+      "chart": {
+        "title": "Крандардың жұмыс уақыты · 7 күн"
+      },
+      "table": {
+        "site": "Нысан",
+        "crane": "Кран",
+        "status": "Күй",
+        "active": "Ауысым",
+        "paused": "Үзіліс",
+        "rows": {
+          "almatyPark": "Алматы Парк",
+          "esentaiTower": "Esentai Tower",
+          "nurlyZhol": "Nurly Жол"
+        }
+      },
+      "shiftCard": {
+        "label": "Белсенді ауысым",
+        "operator": "Алимов А. · MCT-88 краны",
+        "geofence": "Геозонада"
+      }
+    },
+    "phoneMockup": {
+      "ariaLabel": "Кран жүргізушісіне арналған Jumix мобильді қосымшасының демонстрациясы — таймері бар белсенді ауысым экраны",
+      "activeShift": "Белсенді ауысым",
+      "craneTitle": "MCT-88 краны",
+      "site": "Алматы Парк",
+      "timerLabel": "Ауысым уақыты",
+      "geofenceConfirmed": "Расталды",
+      "geofenceStatus": "Нысан геозонасында",
+      "stats": {
+        "today": "Бүгін",
+        "month": "Ай"
+      },
+      "actions": {
+        "endShift": "Ауысымды аяқтау",
+        "break": "Үзіліс"
+      }
     },
     "painPoints": {
       "overline": "Таныс па?",

@@ -15,6 +15,10 @@ describe('t() — i18n', () => {
   })
 
   it('falls back from kz to ru when key missing in kz', () => {
-    expect(t('auth.login.title', undefined, 'kz')).toBe('Войти в Jumix')
+    expect(t('auth.welcome.title', { name: 'Иван' }, 'kz')).toBe('Добро пожаловать, Иван!')
+  })
+
+  it('uses kz translation when present', () => {
+    expect(t('auth.login.title', undefined, 'kz')).toBe('Jumix-ке кіру')
   })
 })

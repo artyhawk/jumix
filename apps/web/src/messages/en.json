@@ -1,4 +1,105 @@
 {
+  "auth": {
+    "login": {
+      "backToHome": "Back to home",
+      "title": "Sign in to Jumix",
+      "subtitle": "Enter your phone number to sign in",
+      "phoneLabel": "Phone number",
+      "phonePlaceholder": "+7 700 000 00 00",
+      "continue": "Get code",
+      "or": "or",
+      "usePassword": "Sign in with password",
+      "useSms": "Sign in with SMS code",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Enter your password",
+      "loginButton": "Sign in",
+      "invalidPhone": "Enter a valid Kazakhstan phone number",
+      "invalidCredentials": "Invalid phone number or password",
+      "rateLimited": "Too many attempts. Please try again later.",
+      "accountLocked": "Account temporarily locked. Try again in 15 minutes.",
+      "genericError": "Could not sign in. Please try again later.",
+      "footerTerms": "Terms",
+      "footerPrivacy": "Privacy"
+    },
+    "register": {
+      "title": "Crane operator registration",
+      "subtitle": "Fill in your details — we'll send a confirmation code via SMS",
+      "lastNameLabel": "Last name",
+      "lastNamePlaceholder": "Smith",
+      "firstNameLabel": "First name",
+      "firstNamePlaceholder": "John",
+      "patronymicLabel": "Middle name",
+      "patronymicHint": "optional",
+      "patronymicPlaceholder": "—",
+      "iinLabel": "IIN",
+      "iinPlaceholder": "12 digits",
+      "phoneLabel": "Phone number",
+      "phonePlaceholder": "+7 700 000 00 00",
+      "submit": "Get code",
+      "haveAccount": "Already have an account?",
+      "loginLink": "Sign in",
+      "back": "Back",
+      "noAccount": "No account?",
+      "registerLink": "Register",
+      "verifyTitle": "Verify your number",
+      "verifySubtitle": "We sent a 6-digit code to",
+      "edit": "Edit details",
+      "invalidLastName": "Enter your last name",
+      "invalidFirstName": "Enter your first name",
+      "invalidIin": "Enter a valid 12-digit IIN",
+      "invalidPhone": "Enter a valid Kazakhstan phone number",
+      "phoneAlreadyRegistered": "This number is already registered. Sign in to your existing account.",
+      "iinAlreadyExists": "An account with this IIN already exists. Contact your employer.",
+      "rateLimited": "Too many attempts. Please wait a moment.",
+      "smsDeliveryFailed": "Could not send SMS. Please try again later.",
+      "invalidOrExpiredCode": "Code is invalid or expired. Request a new one.",
+      "genericError": "Could not complete registration. Please try again later.",
+      "afterSuccessHint": "Account created. Your profile is being reviewed by an administrator."
+    },
+    "forgotPassword": {
+      "linkOnLogin": "Forgot password?",
+      "title": "Password recovery",
+      "subtitle": "Enter your phone number — we'll send a code to reset your password",
+      "phoneLabel": "Phone number",
+      "phonePlaceholder": "+7 700 000 00 00",
+      "submitPhone": "Get code",
+      "resetTitle": "New password",
+      "resetSubtitle": "We sent a 6-digit code to",
+      "codeLabel": "SMS code",
+      "newPasswordLabel": "New password",
+      "newPasswordPlaceholder": "Minimum 10 characters",
+      "confirmPasswordLabel": "Confirm password",
+      "confirmPasswordPlaceholder": "Repeat the new password",
+      "submitReset": "Change password",
+      "edit": "Edit number",
+      "successTitle": "Password changed",
+      "successSubtitle": "Sign in with your new password.",
+      "goToLogin": "Go to sign in",
+      "rememberPassword": "Remembered your password?",
+      "loginLink": "Sign in",
+      "invalidPhone": "Enter a valid Kazakhstan phone number",
+      "passwordTooShort": "Password must be at least 10 characters",
+      "passwordsDoNotMatch": "Passwords do not match",
+      "invalidCode": "Code is invalid or expired",
+      "rateLimited": "Too many attempts. Please try again later.",
+      "smsDeliveryFailed": "Could not send SMS. Please try again later.",
+      "genericError": "Could not change password. Please try again later."
+    },
+    "verify": {
+      "title": "Enter the code",
+      "subtitle": "We sent a 6-digit code to",
+      "codeLabel": "SMS code",
+      "resendIn": "Resend code in",
+      "resend": "Resend code",
+      "changePhone": "Change number",
+      "invalidCode": "Invalid code",
+      "expiredCode": "Code expired. Request a new one.",
+      "maxAttempts": "Too many attempts. Request a new code.",
+      "requestNew": "Request a new code",
+      "userNotRegistered": "This number is not registered",
+      "genericError": "Could not verify the code"
+    }
+  },
   "marketing": {
     "metadata": {
       "title": "Jumix — Digital platform for crane services",
@@ -23,6 +124,62 @@
       "ctaPrimary": "Message us on WhatsApp",
       "ctaSecondary": "Sign in",
       "trustLine": "Shift geolocation · Automated payroll · Operator marketplace"
+    },
+    "mockup": {
+      "ariaLabel": "Jumix dashboard preview: metrics for sites, cranes, operators and a real-time map",
+      "nav": {
+        "dashboard": "Dashboard",
+        "sites": "Sites",
+        "cranes": "Cranes",
+        "operators": "Operators",
+        "approvals": "Approvals",
+        "incidents": "Incidents"
+      },
+      "overview": "Platform overview",
+      "live": "Live",
+      "stats": {
+        "sites": "Sites",
+        "cranes": "Cranes",
+        "operators": "Operators",
+        "approvals": "Approvals"
+      },
+      "chart": {
+        "title": "Crane working hours · 7 days"
+      },
+      "table": {
+        "site": "Site",
+        "crane": "Crane",
+        "status": "Status",
+        "active": "On shift",
+        "paused": "Paused",
+        "rows": {
+          "almatyPark": "Almaty Park",
+          "esentaiTower": "Esentai Tower",
+          "nurlyZhol": "Nurly Zhol"
+        }
+      },
+      "shiftCard": {
+        "label": "Active shift",
+        "operator": "A. Alimov · Crane MCT-88",
+        "geofence": "Inside geofence"
+      }
+    },
+    "phoneMockup": {
+      "ariaLabel": "Jumix mobile app preview for crane operators — active shift screen with timer",
+      "activeShift": "Active shift",
+      "craneTitle": "Crane MCT-88",
+      "site": "Almaty Park",
+      "timerLabel": "Shift time",
+      "geofenceConfirmed": "Confirmed",
+      "geofenceStatus": "Inside site geofence",
+      "stats": {
+        "today": "Today",
+        "month": "Month"
+      },
+      "actions": {
+        "endShift": "End shift",
+        "break": "Break"
+      }
     },
     "painPoints": {
       "overline": "Sound familiar?",

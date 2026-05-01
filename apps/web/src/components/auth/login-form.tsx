@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { passwordLogin, requestSmsCode } from '@/lib/api/auth'
 import { AppError } from '@/lib/api/errors'
 import { useAuthStore } from '@/lib/auth-store'
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { applyPhoneMask, toE164 } from '@/lib/phone-format'
 import { motion } from 'framer-motion'
 import { ArrowRight, Lock, Phone } from 'lucide-react'
@@ -17,6 +17,7 @@ import { useState } from 'react'
 type Mode = 'sms' | 'password'
 
 export function LoginForm() {
+  const t = useT()
   const router = useRouter()
   const setSession = useAuthStore((s) => s.setSession)
   const [mode, setMode] = useState<Mode>('sms')
@@ -66,7 +67,20 @@ export function LoginForm() {
       }
     } catch (err) {
       if (err instanceof AppError) {
-        triggerShake(mapError(err))
+        switch (err.code) {
+          case 'INVALID_CREDENTIALS':
+            triggerShake(t('auth.login.invalidCredentials'))
+            break
+          case 'SMS_RATE_LIMITED':
+          case 'RATE_LIMITED':
+            triggerShake(t('auth.login.rateLimited'))
+            break
+          case 'ACCOUNT_LOCKED':
+            triggerShake(t('auth.login.accountLocked'))
+            break
+          default:
+            triggerShake(err.message || t('auth.login.genericError'))
+        }
       } else {
         triggerShake(t('auth.login.genericError'))
       }
@@ -195,18 +209,4 @@ export function LoginForm() {
       </div>
     </motion.form>
   )
-}
-
-function mapError(err: AppError): string {
-  switch (err.code) {
-    case 'INVALID_CREDENTIALS':
-      return t('auth.login.invalidCredentials')
-    case 'SMS_RATE_LIMITED':
-    case 'RATE_LIMITED':
-      return t('auth.login.rateLimited')
-    case 'ACCOUNT_LOCKED':
-      return t('auth.login.accountLocked')
-    default:
-      return err.message || t('auth.login.genericError')
-  }
 }

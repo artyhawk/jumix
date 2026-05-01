@@ -1,5 +1,6 @@
 'use client'
 
+import { useT } from '@/lib/marketing-locale'
 import { cn } from '@/lib/utils'
 import { motion, useReducedMotion } from 'framer-motion'
 import { useEffect, useState } from 'react'
@@ -25,6 +26,7 @@ function format(total: number): string {
  * статичный demo, не реальная смена). respects prefers-reduced-motion.
  */
 export function PhoneMockup({ className }: { className?: string }) {
+  const t = useT()
   const reduceMotion = useReducedMotion()
   const [seconds, setSeconds] = useState(START_SECONDS)
 
@@ -38,7 +40,7 @@ export function PhoneMockup({ className }: { className?: string }) {
     <div
       className={cn('relative isolate', className)}
       role="img"
-      aria-label="Демонстрация мобильного приложения Jumix для кранового — экран активной смены с таймером"
+      aria-label={t('marketing.phoneMockup.ariaLabel')}
     >
       {/* Glow */}
       <div
@@ -77,16 +79,20 @@ export function PhoneMockup({ className }: { className?: string }) {
         <div className="px-5 pt-6">
           <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[var(--m-success)]">
             <span className="size-1.5 rounded-full bg-[var(--m-success)] m-pulse-dot" />
-            Активная смена
+            {t('marketing.phoneMockup.activeShift')}
           </span>
-          <div className="mt-1 text-[14px] font-semibold text-[var(--m-fg)]">Кран MCT-88</div>
-          <div className="text-[11px] text-[var(--m-fg-secondary)]">Алматы Парк</div>
+          <div className="mt-1 text-[14px] font-semibold text-[var(--m-fg)]">
+            {t('marketing.phoneMockup.craneTitle')}
+          </div>
+          <div className="text-[11px] text-[var(--m-fg-secondary)]">
+            {t('marketing.phoneMockup.site')}
+          </div>
         </div>
 
         {/* Timer */}
         <div className="mt-7 mx-5 rounded-[20px] bg-gradient-to-b from-[var(--m-surface-elevated)] to-[var(--m-bg)] border border-[var(--m-border)] p-5 text-center">
           <div className="text-[10px] uppercase tracking-wider text-[var(--m-fg-tertiary)]">
-            Время в смене
+            {t('marketing.phoneMockup.timerLabel')}
           </div>
           <motion.div
             key={Math.floor(seconds / 60)}
@@ -103,12 +109,12 @@ export function PhoneMockup({ className }: { className?: string }) {
               className="size-3"
               fill="currentColor"
               role="img"
-              aria-label="Подтверждено"
+              aria-label={t('marketing.phoneMockup.geofenceConfirmed')}
             >
-              <title>Подтверждено</title>
+              <title>{t('marketing.phoneMockup.geofenceConfirmed')}</title>
               <path d="M5 8.6L2.4 6l-.8.8L5 10.2 11.4 3.8l-.8-.8z" />
             </svg>
-            В геозоне объекта
+            {t('marketing.phoneMockup.geofenceStatus')}
           </div>
         </div>
 
@@ -116,7 +122,7 @@ export function PhoneMockup({ className }: { className?: string }) {
         <div className="mt-4 mx-5 grid grid-cols-2 gap-2">
           <div className="rounded-[12px] bg-[var(--m-surface-elevated)] border border-[var(--m-border)] p-3">
             <div className="text-[10px] text-[var(--m-fg-tertiary)] uppercase tracking-wider">
-              Сегодня
+              {t('marketing.phoneMockup.stats.today')}
             </div>
             <div className="mt-1 text-[16px] font-semibold text-[var(--m-fg)] tabular-nums">
               ₸ 18 400
@@ -124,7 +130,7 @@ export function PhoneMockup({ className }: { className?: string }) {
           </div>
           <div className="rounded-[12px] bg-[var(--m-surface-elevated)] border border-[var(--m-border)] p-3">
             <div className="text-[10px] text-[var(--m-fg-tertiary)] uppercase tracking-wider">
-              Месяц
+              {t('marketing.phoneMockup.stats.month')}
             </div>
             <div className="mt-1 text-[16px] font-semibold text-[var(--m-fg)] tabular-nums">
               ₸ 412 000
@@ -140,7 +146,7 @@ export function PhoneMockup({ className }: { className?: string }) {
             aria-hidden
             className="h-10 rounded-[12px] bg-[var(--m-brand)] text-[#0a0a0b] text-[13px] font-semibold pointer-events-none"
           >
-            Завершить смену
+            {t('marketing.phoneMockup.actions.endShift')}
           </button>
           <button
             type="button"
@@ -148,7 +154,7 @@ export function PhoneMockup({ className }: { className?: string }) {
             aria-hidden
             className="h-10 rounded-[12px] border border-[var(--m-border-strong)] text-[var(--m-fg)] text-[13px] font-medium pointer-events-none"
           >
-            Перерыв
+            {t('marketing.phoneMockup.actions.break')}
           </button>
         </div>
       </div>

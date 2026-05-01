@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { confirmPasswordReset, requestPasswordReset } from '@/lib/api/auth'
 import { AppError } from '@/lib/api/errors'
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { applyPhoneMask, toE164 } from '@/lib/phone-format'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
@@ -20,7 +20,32 @@ const OTP_SLOTS = ['s0', 's1', 's2', 's3', 's4', 's5'] as const
 const MIN_PASSWORD_LENGTH = 10
 
 export function ForgotPasswordForm() {
+  const t = useT()
   const [step, setStep] = useState<Step>('phone')
+
+  const mapRequestError = (err: AppError): string => {
+    switch (err.code) {
+      case 'RATE_LIMITED':
+      case 'SMS_RATE_LIMITED':
+        return t('auth.forgotPassword.rateLimited')
+      case 'SMS_DELIVERY_FAILED':
+        return t('auth.forgotPassword.smsDeliveryFailed')
+      default:
+        return err.message || t('auth.forgotPassword.genericError')
+    }
+  }
+
+  const mapConfirmError = (err: AppError): string => {
+    switch (err.code) {
+      case 'PASSWORD_RESET_INVALID':
+      case 'SMS_CODE_INVALID_OR_EXPIRED':
+        return t('auth.forgotPassword.invalidCode')
+      case 'RATE_LIMITED':
+        return t('auth.forgotPassword.rateLimited')
+      default:
+        return err.message || t('auth.forgotPassword.genericError')
+    }
+  }
 
   // Phone step
   const [phoneDisplay, setPhoneDisplay] = useState('')
@@ -432,28 +457,4 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function mapRequestError(err: AppError): string {
-  switch (err.code) {
-    case 'RATE_LIMITED':
-    case 'SMS_RATE_LIMITED':
-      return t('auth.forgotPassword.rateLimited')
-    case 'SMS_DELIVERY_FAILED':
-      return t('auth.forgotPassword.smsDeliveryFailed')
-    default:
-      return err.message || t('auth.forgotPassword.genericError')
-  }
-}
-
-function mapConfirmError(err: AppError): string {
-  switch (err.code) {
-    case 'PASSWORD_RESET_INVALID':
-    case 'SMS_CODE_INVALID_OR_EXPIRED':
-      return t('auth.forgotPassword.invalidCode')
-    case 'RATE_LIMITED':
-      return t('auth.forgotPassword.rateLimited')
-    default:
-      return err.message || t('auth.forgotPassword.genericError')
-  }
 }

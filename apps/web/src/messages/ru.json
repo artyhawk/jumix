@@ -197,6 +197,62 @@
       "ctaSecondary": "Войти в систему",
       "trustLine": "Геолокация смен · Автоматический расчёт · Биржа крановых"
     },
+    "mockup": {
+      "ariaLabel": "Демонстрация панели управления Jumix: дашборд с метриками объектов, кранов, операторов и карта в реальном времени",
+      "nav": {
+        "dashboard": "Дашборд",
+        "sites": "Объекты",
+        "cranes": "Краны",
+        "operators": "Операторы",
+        "approvals": "Заявки",
+        "incidents": "Инциденты"
+      },
+      "overview": "Обзор платформы",
+      "live": "Live",
+      "stats": {
+        "sites": "Объектов",
+        "cranes": "Кранов",
+        "operators": "Операторов",
+        "approvals": "Заявок"
+      },
+      "chart": {
+        "title": "Часы работы кранов · 7 дней"
+      },
+      "table": {
+        "site": "Объект",
+        "crane": "Кран",
+        "status": "Статус",
+        "active": "Смена",
+        "paused": "Пауза",
+        "rows": {
+          "almatyPark": "Алматы Парк",
+          "esentaiTower": "Esentai Tower",
+          "nurlyZhol": "Nurly Жол"
+        }
+      },
+      "shiftCard": {
+        "label": "Активная смена",
+        "operator": "Алимов А. · Кран MCT-88",
+        "geofence": "В геозоне"
+      }
+    },
+    "phoneMockup": {
+      "ariaLabel": "Демонстрация мобильного приложения Jumix для кранового — экран активной смены с таймером",
+      "activeShift": "Активная смена",
+      "craneTitle": "Кран MCT-88",
+      "site": "Алматы Парк",
+      "timerLabel": "Время в смене",
+      "geofenceConfirmed": "Подтверждено",
+      "geofenceStatus": "В геозоне объекта",
+      "stats": {
+        "today": "Сегодня",
+        "month": "Месяц"
+      },
+      "actions": {
+        "endShift": "Завершить смену",
+        "break": "Перерыв"
+      }
+    },
     "painPoints": {
       "overline": "Знакомо?",
       "title": "Что мешает вашему бизнесу",

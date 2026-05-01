@@ -1,5 +1,6 @@
 'use client'
 
+import { useT } from '@/lib/marketing-locale'
 import { cn } from '@/lib/utils'
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'framer-motion'
 import { useEffect, useRef } from 'react'
@@ -11,6 +12,7 @@ import { useEffect, useRef } from 'react'
  * pulsing live dot.
  */
 export function DashboardMockup({ className }: { className?: string }) {
+  const t = useT()
   const reduceMotion = useReducedMotion()
   const containerRef = useRef<HTMLDivElement | null>(null)
 
@@ -53,7 +55,7 @@ export function DashboardMockup({ className }: { className?: string }) {
       className={cn('relative isolate', className)}
       style={{ perspective: 1400 }}
       role="img"
-      aria-label="Демонстрация панели управления Jumix: дашборд с метриками объектов, кранов, операторов и карта в реальном времени"
+      aria-label={t('marketing.mockup.ariaLabel')}
     >
       {/* Glow halo behind */}
       <div
@@ -89,15 +91,15 @@ export function DashboardMockup({ className }: { className?: string }) {
               <span className="text-[12px] font-semibold text-[var(--m-fg)]">Jumix</span>
             </div>
             {[
-              { label: 'Дашборд', active: true },
-              { label: 'Объекты' },
-              { label: 'Краны' },
-              { label: 'Операторы' },
-              { label: 'Заявки' },
-              { label: 'Инциденты' },
+              { key: 'dashboard', label: t('marketing.mockup.nav.dashboard'), active: true },
+              { key: 'sites', label: t('marketing.mockup.nav.sites') },
+              { key: 'cranes', label: t('marketing.mockup.nav.cranes') },
+              { key: 'operators', label: t('marketing.mockup.nav.operators') },
+              { key: 'approvals', label: t('marketing.mockup.nav.approvals') },
+              { key: 'incidents', label: t('marketing.mockup.nav.incidents') },
             ].map((item) => (
               <div
-                key={item.label}
+                key={item.key}
                 className={cn(
                   'relative flex items-center gap-2 px-2 py-1.5 rounded-md text-[11px]',
                   item.active
@@ -120,11 +122,13 @@ export function DashboardMockup({ className }: { className?: string }) {
             className="p-3 sm:p-5 space-y-4 min-w-0"
           >
             <div className="flex items-center justify-between">
-              <h4 className="text-[13px] font-semibold text-[var(--m-fg)]">Обзор платформы</h4>
+              <h4 className="text-[13px] font-semibold text-[var(--m-fg)]">
+                {t('marketing.mockup.overview')}
+              </h4>
               <div className="flex items-center gap-1.5">
                 <span className="size-1.5 rounded-full bg-[var(--m-success)] m-pulse-dot" />
                 <span className="text-[10px] text-[var(--m-fg-tertiary)] uppercase tracking-wider">
-                  Live
+                  {t('marketing.mockup.live')}
                 </span>
               </div>
             </div>
@@ -132,13 +136,18 @@ export function DashboardMockup({ className }: { className?: string }) {
             {/* Stats grid */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5">
               {[
-                { value: '12', label: 'Объектов' },
-                { value: '8', label: 'Кранов' },
-                { value: '24', label: 'Операторов' },
-                { value: '3', label: 'Заявок', accent: true },
+                { key: 'sites', value: '12', label: t('marketing.mockup.stats.sites') },
+                { key: 'cranes', value: '8', label: t('marketing.mockup.stats.cranes') },
+                { key: 'operators', value: '24', label: t('marketing.mockup.stats.operators') },
+                {
+                  key: 'approvals',
+                  value: '3',
+                  label: t('marketing.mockup.stats.approvals'),
+                  accent: true,
+                },
               ].map((stat) => (
                 <div
-                  key={stat.label}
+                  key={stat.key}
                   className="rounded-lg border border-[var(--m-border)] bg-[var(--m-bg)] p-2.5"
                 >
                   <div
@@ -160,7 +169,7 @@ export function DashboardMockup({ className }: { className?: string }) {
             <div className="rounded-lg border border-[var(--m-border)] bg-[var(--m-bg)] p-3">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[10px] text-[var(--m-fg-secondary)]">
-                  Часы работы кранов · 7 дней
+                  {t('marketing.mockup.chart.title')}
                 </span>
                 <span className="text-[10px] text-[var(--m-fg-tertiary)]">+18%</span>
               </div>
@@ -170,14 +179,26 @@ export function DashboardMockup({ className }: { className?: string }) {
             {/* Mini table */}
             <div className="rounded-lg border border-[var(--m-border)] bg-[var(--m-bg)]">
               <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 border-b border-[var(--m-border)] text-[9px] uppercase tracking-wider text-[var(--m-fg-tertiary)]">
-                <span>Объект</span>
-                <span>Кран</span>
-                <span>Статус</span>
+                <span>{t('marketing.mockup.table.site')}</span>
+                <span>{t('marketing.mockup.table.crane')}</span>
+                <span>{t('marketing.mockup.table.status')}</span>
               </div>
               {[
-                { site: 'Алматы Парк', crane: 'MCT-88', status: 'active' as const },
-                { site: 'Esentai Tower', crane: 'POT-160', status: 'active' as const },
-                { site: 'Nurly Жол', crane: 'LM-520', status: 'paused' as const },
+                {
+                  site: t('marketing.mockup.table.rows.almatyPark'),
+                  crane: 'MCT-88',
+                  status: 'active' as const,
+                },
+                {
+                  site: t('marketing.mockup.table.rows.esentaiTower'),
+                  crane: 'POT-160',
+                  status: 'active' as const,
+                },
+                {
+                  site: t('marketing.mockup.table.rows.nurlyZhol'),
+                  crane: 'LM-520',
+                  status: 'paused' as const,
+                },
               ].map((row) => (
                 <div
                   key={row.crane}
@@ -201,7 +222,9 @@ export function DashboardMockup({ className }: { className?: string }) {
                           : 'bg-[var(--m-fg-tertiary)]',
                       )}
                     />
-                    {row.status === 'active' ? 'Смена' : 'Пауза'}
+                    {row.status === 'active'
+                      ? t('marketing.mockup.table.active')
+                      : t('marketing.mockup.table.paused')}
                   </span>
                 </div>
               ))}
@@ -221,14 +244,18 @@ export function DashboardMockup({ className }: { className?: string }) {
         <div className="flex items-center gap-2">
           <span className="size-2 rounded-full bg-[var(--m-success)] m-pulse-dot" />
           <span className="text-[10px] uppercase tracking-wider text-[var(--m-fg-tertiary)]">
-            Активная смена
+            {t('marketing.mockup.shiftCard.label')}
           </span>
         </div>
         <div className="mt-2 text-[20px] font-semibold tabular-nums text-[var(--m-fg)] leading-none">
           06:42:11
         </div>
-        <div className="mt-1 text-[10px] text-[var(--m-fg-secondary)]">Алимов А. · Кран MCT-88</div>
-        <div className="mt-2 text-[10px] text-[var(--m-success)]">В геозоне</div>
+        <div className="mt-1 text-[10px] text-[var(--m-fg-secondary)]">
+          {t('marketing.mockup.shiftCard.operator')}
+        </div>
+        <div className="mt-2 text-[10px] text-[var(--m-success)]">
+          {t('marketing.mockup.shiftCard.geofence')}
+        </div>
       </motion.div>
     </div>
   )

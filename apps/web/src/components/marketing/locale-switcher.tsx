@@ -33,7 +33,7 @@ export function LocaleSwitcher({ className }: { className?: string }) {
     }
 
   return (
-    <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+    <DropdownMenu.Root open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenu.Trigger asChild>
         <button
           type="button"

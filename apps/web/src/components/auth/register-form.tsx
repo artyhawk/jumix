@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { startRegistration, verifyRegistration } from '@/lib/api/auth'
 import { AppError } from '@/lib/api/errors'
 import { useAuthStore } from '@/lib/auth-store'
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { applyPhoneMask, toE164 } from '@/lib/phone-format'
 import { cn } from '@/lib/utils'
 import { isValidKzIin } from '@jumix/shared'
@@ -31,8 +31,42 @@ interface ProfileData {
 }
 
 export function RegisterForm() {
+  const t = useT()
   const router = useRouter()
   const setSession = useAuthStore((s) => s.setSession)
+
+  const mapStartError = (err: AppError): string => {
+    switch (err.code) {
+      case 'PHONE_ALREADY_REGISTERED':
+        return t('auth.register.phoneAlreadyRegistered')
+      case 'RATE_LIMITED':
+      case 'SMS_RATE_LIMITED':
+        return t('auth.register.rateLimited')
+      case 'SMS_DELIVERY_FAILED':
+        return t('auth.register.smsDeliveryFailed')
+      default:
+        return err.message || t('auth.register.genericError')
+    }
+  }
+
+  const mapVerifyError = (err: AppError): string => {
+    switch (err.code) {
+      case 'SMS_CODE_INVALID_OR_EXPIRED':
+      case 'INVALID_CODE':
+      case 'CODE_EXPIRED':
+      case 'MAX_ATTEMPTS_EXCEEDED':
+        return t('auth.register.invalidOrExpiredCode')
+      case 'PHONE_ALREADY_REGISTERED':
+        return t('auth.register.phoneAlreadyRegistered')
+      case 'IIN_ALREADY_EXISTS':
+        return t('auth.register.iinAlreadyExists')
+      case 'RATE_LIMITED':
+      case 'SMS_RATE_LIMITED':
+        return t('auth.register.rateLimited')
+      default:
+        return err.message || t('auth.register.genericError')
+    }
+  }
 
   const [step, setStep] = useState<Step>('profile')
 
@@ -532,37 +566,4 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function mapStartError(err: AppError): string {
-  switch (err.code) {
-    case 'PHONE_ALREADY_REGISTERED':
-      return t('auth.register.phoneAlreadyRegistered')
-    case 'RATE_LIMITED':
-    case 'SMS_RATE_LIMITED':
-      return t('auth.register.rateLimited')
-    case 'SMS_DELIVERY_FAILED':
-      return t('auth.register.smsDeliveryFailed')
-    default:
-      return err.message || t('auth.register.genericError')
-  }
-}
-
-function mapVerifyError(err: AppError): string {
-  switch (err.code) {
-    case 'SMS_CODE_INVALID_OR_EXPIRED':
-    case 'INVALID_CODE':
-    case 'CODE_EXPIRED':
-    case 'MAX_ATTEMPTS_EXCEEDED':
-      return t('auth.register.invalidOrExpiredCode')
-    case 'PHONE_ALREADY_REGISTERED':
-      return t('auth.register.phoneAlreadyRegistered')
-    case 'IIN_ALREADY_EXISTS':
-      return t('auth.register.iinAlreadyExists')
-    case 'RATE_LIMITED':
-    case 'SMS_RATE_LIMITED':
-      return t('auth.register.rateLimited')
-    default:
-      return err.message || t('auth.register.genericError')
-  }
 }

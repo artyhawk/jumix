@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { requestSmsCode, verifySmsCode } from '@/lib/api/auth'
 import { AppError } from '@/lib/api/errors'
 import { useAuthStore } from '@/lib/auth-store'
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
@@ -14,8 +14,27 @@ const RESEND_SECONDS = 60
 const OTP_SLOTS = ['s0', 's1', 's2', 's3', 's4', 's5'] as const
 
 export function OtpForm({ phone }: { phone: string }) {
+  const t = useT()
   const router = useRouter()
   const setSession = useAuthStore((s) => s.setSession)
+
+  const mapError = (err: AppError): string => {
+    switch (err.code) {
+      case 'INVALID_CODE':
+        return t('auth.verify.invalidCode')
+      case 'CODE_EXPIRED':
+        return t('auth.verify.expiredCode')
+      case 'MAX_ATTEMPTS_EXCEEDED':
+        return t('auth.verify.maxAttempts')
+      case 'USER_NOT_REGISTERED':
+        return t('auth.verify.userNotRegistered')
+      case 'SMS_RATE_LIMITED':
+      case 'RATE_LIMITED':
+        return t('auth.login.rateLimited')
+      default:
+        return err.message || t('auth.verify.genericError')
+    }
+  }
   const [digits, setDigits] = useState<string[]>(['', '', '', '', '', ''])
   const [error, setError] = useState<string | null>(null)
   const [shakeId, setShakeId] = useState(0)
@@ -223,22 +242,4 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function mapError(err: AppError): string {
-  switch (err.code) {
-    case 'INVALID_CODE':
-      return t('auth.verify.invalidCode')
-    case 'CODE_EXPIRED':
-      return t('auth.verify.expiredCode')
-    case 'MAX_ATTEMPTS_EXCEEDED':
-      return t('auth.verify.maxAttempts')
-    case 'USER_NOT_REGISTERED':
-      return t('auth.verify.userNotRegistered')
-    case 'SMS_RATE_LIMITED':
-    case 'RATE_LIMITED':
-      return t('auth.login.rateLimited')
-    default:
-      return err.message || t('auth.verify.genericError')
-  }
 }

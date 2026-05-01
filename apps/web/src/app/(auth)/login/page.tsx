@@ -2,12 +2,13 @@
 
 import { LoginForm } from '@/components/auth/login-form'
 import { Logo } from '@/components/layout/logo'
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 export default function LoginPage() {
+  const t = useT()
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}

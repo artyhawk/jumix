@@ -2,7 +2,7 @@
 
 import { OtpForm } from '@/components/auth/otp-form'
 import { Logo } from '@/components/layout/logo'
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { motion } from 'framer-motion'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect } from 'react'
@@ -14,6 +14,7 @@ import { Suspense, useEffect } from 'react'
  * за чем "ждать", в runtime ничего не меняется.
  */
 function VerifyContent() {
+  const t = useT()
   const params = useSearchParams()
   const router = useRouter()
   const phone = params.get('phone') ?? ''

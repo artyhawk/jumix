@@ -2,12 +2,13 @@
 
 import { RegisterForm } from '@/components/auth/register-form'
 import { Logo } from '@/components/layout/logo'
-import { t } from '@/lib/i18n'
+import { useT } from '@/lib/marketing-locale'
 import { motion } from 'framer-motion'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
 export default function RegisterPage() {
+  const t = useT()
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
